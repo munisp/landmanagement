@@ -101,7 +101,32 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function isDatabaseAvailable(): Promise<boolean> {
+  return (await getDb()) !== null;
+}
+
+export async function requireDb() {
+  const db = await getDb();
+  if (!db) {
+    throw new Error('Database connection failed');
+  }
+  return db;
+}
+
+export async function getDatabaseFeatureStatus() {
+  const databaseAvailable = await isDatabaseAvailable();
+  return {
+    databaseAvailable,
+    services: {
+      parcel: process.env.PARCEL_SERVICE_URL || 'http://localhost:8081',
+      title: process.env.TITLE_SERVICE_URL || 'http://localhost:8082',
+      transaction: process.env.TRANSACTION_SERVICE_URL || 'http://localhost:8083',
+      payment: process.env.PAYMENT_SERVICE_URL || 'http://localhost:8084',
+      document: process.env.DOCUMENT_SERVICE_URL || 'http://localhost:8085',
+      blockchain: process.env.BLOCKCHAIN_SERVICE_URL || 'http://localhost:8086',
+    },
+  };
+}
 
 // API client for microservices
 export class MicroserviceClient {

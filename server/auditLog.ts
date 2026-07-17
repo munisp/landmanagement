@@ -22,6 +22,7 @@ export interface AuditLogEntry {
 
 const AUDIT_STORE_DIR = path.join(process.cwd(), 'server', 'data');
 const AUDIT_STORE_PATH = path.join(AUDIT_STORE_DIR, 'audit-log-store.json');
+const AUDIT_RETENTION_DAYS = Number(process.env.AUDIT_LOG_RETENTION_DAYS || 90);
 
 interface PersistedAuditLogEntry extends Omit<AuditLogEntry, 'timestamp'> {
   timestamp: string;
@@ -57,6 +58,22 @@ async function writeAuditStore(entries: AuditLogEntry[]): Promise<void> {
   await fs.writeFile(AUDIT_STORE_PATH, JSON.stringify(serialized, null, 2) + '\n', 'utf8');
 }
 
+export async function cleanupAuditLogs(retentionDays = AUDIT_RETENTION_DAYS): Promise<{ deletedCount: number; retainedCount: number }> {
+  const entries = await readAuditStore();
+  const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+  const retained = entries.filter((entry) => entry.timestamp.getTime() >= cutoff);
+  const deletedCount = entries.length - retained.length;
+
+  if (deletedCount > 0) {
+    await writeAuditStore(retained);
+  }
+
+  return {
+    deletedCount,
+    retainedCount: retained.length,
+  };
+}
+
 /**
  * Log an audit event
  */
@@ -77,6 +94,7 @@ export async function logAudit(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): 
 
     existing.unshift(auditEntry);
     await writeAuditStore(existing.slice(0, 5000));
+    await cleanupAuditLogs();
 
     console.log('[Audit]', {
       ...auditEntry,

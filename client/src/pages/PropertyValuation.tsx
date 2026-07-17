@@ -34,6 +34,15 @@ export default function PropertyValuation() {
       toast.error(error.message || "Unable to calculate valuation");
     },
   });
+  const createValuationDispute = trpc.valuations.createDispute.useMutation({
+    onSuccess: () => {
+      toast.success("Valuation dispute filed successfully.");
+      setNotes("");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Unable to file valuation dispute.");
+    },
+  });
 
   const valuationHistory = useMemo(() => (valuationHistoryQuery.data as any)?.history ?? [], [valuationHistoryQuery.data]);
   const comparableSales = latestResult?.comparableSales ?? [];
@@ -60,6 +69,23 @@ export default function PropertyValuation() {
 
   const requestProfessionalValuation = () => {
     toast.success(`Professional valuation request logged for ${parcelId || "selected parcel"}. ${notes ? "Supporting notes captured for the valuer." : ""}`.trim());
+  };
+
+  const fileValuationDispute = async () => {
+    if (!latestResult?.parcel?.parcelNumber) {
+      toast.error("Calculate a valuation before filing a dispute.");
+      return;
+    }
+
+    const disputeNarrative = notes.trim()
+      ? notes.trim()
+      : `Requested review of valuation amount ₦${latestResult.estimatedValue.toLocaleString()} for ${latestResult.parcel.parcelNumber}.`;
+
+    await createValuationDispute.mutateAsync({
+      parcelNumber: latestResult.parcel.parcelNumber,
+      description: disputeNarrative,
+      requestedRelief: 'Independent review of the valuation result and supporting comparable sales.',
+    });
   };
 
   const downloadReport = () => {
@@ -256,10 +282,20 @@ export default function PropertyValuation() {
                         ))}
                       </ul>
                     </div>
-                    <Button className="w-full mt-6 gap-2" onClick={downloadReport}>
-                      <Download className="h-4 w-4" />
-                      Download Valuation Report
-                    </Button>
+                    <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                      <Button className="flex-1 gap-2" onClick={downloadReport}>
+                        <Download className="h-4 w-4" />
+                        Download Valuation Report
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={fileValuationDispute}
+                        disabled={createValuationDispute.isPending}
+                      >
+                        {createValuationDispute.isPending ? 'Filing Dispute...' : 'Dispute This Valuation'}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               )}

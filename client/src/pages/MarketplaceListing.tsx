@@ -13,6 +13,7 @@ export default function MarketplaceListing() {
   const [minPrice, setMinPrice] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [page, setPage] = useState(1);
+  const [comparisonIds, setComparisonIds] = useState<number[]>([]);
 
   const { data, isLoading } = trpc.marketplace.getListings.useQuery({
     listingType,
@@ -32,6 +33,20 @@ export default function MarketplaceListing() {
     } catch (error) {
       alert('Failed to add to favorites');
     }
+  };
+
+  const comparisonListings = (data?.listings || []).filter((listing: any) => comparisonIds.includes(listing.id));
+
+  const toggleComparison = (listingId: number) => {
+    setComparisonIds((current) => {
+      if (current.includes(listingId)) {
+        return current.filter((id) => id !== listingId);
+      }
+      if (current.length >= 3) {
+        return [...current.slice(1), listingId];
+      }
+      return [...current, listingId];
+    });
   };
 
   return (
@@ -102,6 +117,47 @@ export default function MarketplaceListing() {
           </div>
         </CardContent>
       </Card>
+
+      {comparisonListings.length >= 2 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Property Comparison</CardTitle>
+            <CardDescription>Compare up to three active marketplace listings side by side.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 pr-4 font-medium">Field</th>
+                    {comparisonListings.map((listing: any) => (
+                      <th key={listing.id} className="text-left py-2 pr-4 font-medium min-w-[220px]">{listing.title}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { label: 'Type', getter: (listing: any) => listing.listingType },
+                    { label: 'Price', getter: (listing: any) => `${listing.currency} ${parseFloat(listing.price).toLocaleString()}` },
+                    { label: 'Status', getter: (listing: any) => listing.status },
+                    { label: 'Views', getter: (listing: any) => String(listing.viewCount || 0) },
+                    { label: 'Current Bid', getter: (listing: any) => listing.currentBid ? `${listing.currency} ${parseFloat(listing.currentBid).toLocaleString()}` : 'N/A' },
+                    { label: 'Auction End', getter: (listing: any) => listing.auctionEndDate ? new Date(listing.auctionEndDate).toLocaleDateString() : 'N/A' },
+                    { label: 'Description', getter: (listing: any) => listing.description || 'N/A' },
+                  ].map((field) => (
+                    <tr key={field.label} className="border-b align-top">
+                      <td className="py-2 pr-4 font-medium">{field.label}</td>
+                      {comparisonListings.map((listing: any) => (
+                        <td key={`${listing.id}-${field.label}`} className="py-2 pr-4 text-muted-foreground">{field.getter(listing)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Listings Grid */}
       {isLoading ? (
@@ -179,6 +235,12 @@ export default function MarketplaceListing() {
                   <Link href={`/marketplace/${listing.id}`} className="flex-1">
                     <Button className="w-full">View Details</Button>
                   </Link>
+                  <Button
+                    variant={comparisonIds.includes(listing.id) ? 'secondary' : 'outline'}
+                    onClick={() => toggleComparison(listing.id)}
+                  >
+                    Compare
+                  </Button>
                   <Button
                     variant="outline"
                     size="icon"

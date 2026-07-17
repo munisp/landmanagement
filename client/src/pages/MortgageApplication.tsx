@@ -35,6 +35,7 @@ export default function MortgageApplication() {
   const [bankName, setBankName] = useState("National Housing Finance Desk");
   const [bankBranch, setBankBranch] = useState("Primary Processing Hub");
   const [creditScore, setCreditScore] = useState(720);
+  const [prefillDocumentId, setPrefillDocumentId] = useState<string>('none');
 
   const calculatorQuery = trpc.mortgageApplications.calculate.useQuery({
     propertyValue,
@@ -43,6 +44,11 @@ export default function MortgageApplication() {
     loanTermYears,
   });
   const applicationsQuery = trpc.mortgageApplications.mine.useQuery(undefined, { enabled: isAuthenticated });
+  const documentsQuery = trpc.documents.list.useQuery(undefined, { enabled: isAuthenticated });
+  const prefillResultsQuery = trpc.documentAI.getResults.useQuery(
+    { documentId: Number(prefillDocumentId) },
+    { enabled: prefillDocumentId !== 'none' }
+  );
   const createApplication = trpc.mortgageApplications.create.useMutation({
     onSuccess: async (application: any) => {
       toast.success(`Mortgage application ${application.applicationId} submitted successfully.`);
@@ -65,6 +71,48 @@ export default function MortgageApplication() {
   const applications = useMemo(() => (applicationsQuery.data as any)?.applications ?? [], [applicationsQuery.data]);
 
   const formatCurrency = (amount: number) => `₦${(amount / 1000000).toFixed(1)}M`;
+
+  const applyDocumentPrefill = () => {
+    const latestResult = prefillResultsQuery.data?.[0];
+    const extracted = (latestResult?.extractedFields || {}) as Record<string, unknown>;
+
+    const parsedPropertyId = Number(extracted.propertyId ?? extracted.parcelNumber ?? propertyId);
+    if (Number.isFinite(parsedPropertyId) && parsedPropertyId > 0) {
+      setPropertyId(parsedPropertyId);
+    }
+
+    const parsedPropertyValue = Number(extracted.estimatedPropertyValue ?? extracted.propertyValue ?? propertyValue);
+    if (Number.isFinite(parsedPropertyValue) && parsedPropertyValue > 0) {
+      setPropertyValue(parsedPropertyValue);
+      if (loanAmount > parsedPropertyValue) {
+        setLoanAmount(Math.round(parsedPropertyValue * 0.7));
+      }
+    }
+
+    const parsedMonthlyIncome = Number(extracted.monthlyIncome ?? extracted.income ?? monthlyIncome);
+    if (Number.isFinite(parsedMonthlyIncome) && parsedMonthlyIncome > 0) {
+      setMonthlyIncome(parsedMonthlyIncome);
+    }
+
+    const parsedCreditScore = Number(extracted.creditScore ?? creditScore);
+    if (Number.isFinite(parsedCreditScore) && parsedCreditScore > 0) {
+      setCreditScore(parsedCreditScore);
+    }
+
+    if (typeof extracted.employmentStatus === 'string' && ['employed', 'self-employed', 'unemployed', 'retired'].includes(extracted.employmentStatus)) {
+      setEmploymentStatus(extracted.employmentStatus as 'employed' | 'self-employed' | 'unemployed' | 'retired');
+    }
+
+    if (typeof extracted.bankName === 'string' && extracted.bankName.trim()) {
+      setBankName(extracted.bankName.trim());
+    }
+
+    if (typeof extracted.bankBranch === 'string' && extracted.bankBranch.trim()) {
+      setBankBranch(extracted.bankBranch.trim());
+    }
+
+    toast.success('Applied available extracted document fields to the mortgage form.');
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -257,6 +305,39 @@ export default function MortgageApplication() {
                 {step === 1 && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">Applicant Information</h3>
+                    <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/40 p-4 space-y-3">
+                      <div>
+                        <h4 className="font-medium">Intelligent Form Fill</h4>
+                        <p className="text-sm text-slate-500">Use processed identity, property, or financial documents to prefill mortgage application fields.</p>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+                        <div>
+                          <Label>Processed Document Source</Label>
+                          <Select value={prefillDocumentId} onValueChange={setPrefillDocumentId}>
+                            <SelectTrigger className="mt-2"><SelectValue placeholder="Select processed document" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No prefill document</SelectItem>
+                              {(documentsQuery.data ?? []).map((doc: any) => (
+                                <SelectItem key={doc.id} value={String(doc.id)}>{doc.title} ({doc.fileName})</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={applyDocumentPrefill}
+                          disabled={prefillDocumentId === 'none' || prefillResultsQuery.isLoading || !(prefillResultsQuery.data && prefillResultsQuery.data.length > 0)}
+                        >
+                          Apply Prefill
+                        </Button>
+                      </div>
+                      {prefillDocumentId !== 'none' && prefillResultsQuery.data?.[0]?.extractedFields && (
+                        <div className="text-xs text-slate-500">
+                          Available fields: {Object.keys(prefillResultsQuery.data[0].extractedFields).join(', ') || 'none'}
+                        </div>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Full Name</Label>

@@ -106,8 +106,9 @@ function seededStore(): OfflineAdminStore {
 }
 
 function reviveDate<T extends Record<string, any>>(record: T, keys: string[]) {
+  const mutableRecord = record as Record<string, any>;
   for (const key of keys) {
-    if (record[key]) record[key] = new Date(record[key]);
+    if (mutableRecord[key]) mutableRecord[key] = new Date(mutableRecord[key]);
   }
   return record;
 }

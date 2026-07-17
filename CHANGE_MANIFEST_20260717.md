@@ -35,17 +35,26 @@ The Drizzle schema was extended with missing governance and infrastructure persi
 
 A broad platform hardening pass removed remaining PostgreSQL-only and service-only failure paths across stakeholder workflows. This included deterministic repository-backed continuity for verification workflows, Mojaloop payments, blockchain workflows, saved searches, activity logs, comments, administration operations, API key management, reporting flows, Phase 4 workflows, unified dashboards, and additional user-facing and administrative surfaces previously dependent on unavailable infrastructure.
 
+## Final Product-Surface Closures in This Pass
+
+| Area | Implemented Work |
+|---|---|
+| Intelligent form filling | Added document-driven mortgage application prefilling backed by existing processed-document extraction results in the live stakeholder workflow. |
+| Land suitability analysis | Added a concrete parcel suitability scoring model using land use, terrain, flood exposure, solar yield, viewshed quality, and density signals, then surfaced the score and drivers in the live 3D building visualization experience. |
+| Unified dashboard validation hardening | Corrected the offline payment-system status contract in the unified dashboard router and widened the typed status model to include the valid `initiated` state uncovered during final validation. |
+| TODO normalization | Removed duplicated historical roadmap blocks from `todo.md` and refreshed the audit note to reflect that the remaining unchecked count is still inflated by future-program scope, not unresolved core-product defects. |
+
 ## Validation Outcomes
 
 | Validation Step | Outcome |
 |---|---|
-| TypeScript validation | Passed |
-| Production build | Passed |
+| TypeScript validation | Passed with final rerun (`TSC_EXIT_CODE=0`) |
+| Production build | Passed with final rerun (`BUILD_EXIT_CODE=0`) |
 | Python lakehouse syntax validation | Passed |
 | Go operations bridge build | Passed |
 | Rust middleware control-plane build | Passed |
-| Full automated regression validation | Passed with **17 test files passed**, **141 tests passed**, **1 skipped** |
+| Full automated regression validation | Passed with final rerun (`TEST_EXIT_CODE=0`), **17 test files passed**, **141 tests passed**, **1 skipped** |
 
 ## Delivery State
 
-The repository is now in a materially improved production-readiness state with the requested infrastructure integration surface substantially implemented, broader schema coverage in place, stakeholder workflows hardened for degraded environments, and the automated regression surface passing in the current sandbox.
+The repository is now in a materially improved production-readiness state with the requested infrastructure integration surface substantially implemented, broader schema coverage in place, stakeholder workflows hardened for degraded environments, the last core product-surface closures implemented, and the automated regression surface passing in the current sandbox.

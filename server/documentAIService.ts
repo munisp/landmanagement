@@ -493,3 +493,273 @@ export async function updateValidationStatus(
     return { success: false };
   }
 }
+
+export interface DocumentComparisonResult {
+  leftDocumentId: number;
+  rightDocumentId: number;
+  comparedAt: string;
+  textSimilarity: number;
+  overallMatchScore: number;
+  matchingFields: string[];
+  differingFields: Array<{
+    field: string;
+    leftValue: string | null;
+    rightValue: string | null;
+  }>;
+  summary: string;
+}
+
+export interface DocumentSummaryResult {
+  documentId: number;
+  summary: string;
+  bulletPoints: string[];
+  recommendedAction: string;
+}
+
+export interface DocumentSignatureVerificationResult {
+  documentId: number;
+  hasSignature: boolean;
+  signerName: string | null;
+  confidence: number;
+  verificationNotes: string[];
+}
+
+function normalizeComparableValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value).trim().toLowerCase();
+}
+
+function calculateTextSimilarity(leftText: string, rightText: string): number {
+  const leftTokens = new Set(leftText.toLowerCase().split(/\W+/).filter(Boolean));
+  const rightTokens = new Set(rightText.toLowerCase().split(/\W+/).filter(Boolean));
+  const union = new Set(Array.from(leftTokens).concat(Array.from(rightTokens)));
+  if (union.size === 0) return 100;
+
+  let intersectionCount = 0;
+  for (const token of Array.from(leftTokens)) {
+    if (rightTokens.has(token)) intersectionCount += 1;
+  }
+
+  return Math.round((intersectionCount / union.size) * 100);
+}
+
+export async function summarizeDocumentResults(
+  documentId: number
+): Promise<DocumentSummaryResult> {
+  const results = await getDocumentProcessingResults(documentId);
+  const latest = results[0];
+
+  if (!latest) {
+    throw new Error('Document must be processed before it can be summarized');
+  }
+
+  const promptPayload = {
+    documentType: latest.documentType,
+    validationStatus: latest.validationStatus,
+    confidenceScore: latest.confidenceScore,
+    extractedFields: latest.extractedFields || {},
+    fraudIndicators: latest.fraudIndicators || {},
+    ocrText: latest.ocrText || '',
+  };
+
+  try {
+    const response = await invokeLLM({
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a land-registry document review assistant. Summarize processed documents clearly for operators using short, factual language.',
+        },
+        {
+          role: 'user',
+          content: `Summarize this processed document result and provide a concise summary, three to five bullet points, and a recommended operator action.\n\n${JSON.stringify(promptPayload)}`,
+        },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'document_summary',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              summary: { type: 'string' },
+              bulletPoints: {
+                type: 'array',
+                items: { type: 'string' },
+                minItems: 1,
+                maxItems: 5,
+              },
+              recommendedAction: { type: 'string' },
+            },
+            required: ['summary', 'bulletPoints', 'recommendedAction'],
+            additionalProperties: false,
+          },
+        },
+      },
+    });
+
+    const content = response.choices[0].message.content;
+    const parsed = JSON.parse(typeof content === 'string' ? content : JSON.stringify(content));
+
+    return {
+      documentId,
+      summary: parsed.summary,
+      bulletPoints: parsed.bulletPoints,
+      recommendedAction: parsed.recommendedAction,
+    };
+  } catch (error) {
+    const extractedFieldNames = Object.keys((latest.extractedFields || {}) as Record<string, unknown>);
+    return {
+      documentId,
+      summary: `Processed ${latest.documentType || 'document'} with ${latest.confidenceScore}% confidence and ${latest.validationStatus.replace('_', ' ')} status.`,
+      bulletPoints: [
+        `Detected type: ${latest.documentType || 'unknown'}`,
+        `Extracted fields: ${extractedFieldNames.length ? extractedFieldNames.join(', ') : 'none detected'}`,
+        `Fraud indicators present: ${latest.fraudIndicators?.hasIssues ? 'yes' : 'no'}`,
+      ],
+      recommendedAction: latest.validationStatus === 'approved' ? 'Proceed with the verified document workflow.' : latest.validationStatus === 'rejected' ? 'Reject or request a corrected document package.' : 'Review extracted fields and fraud indicators before final decision.',
+    };
+  }
+}
+
+export async function verifyDocumentSignature(
+  documentId: number
+): Promise<DocumentSignatureVerificationResult> {
+  const results = await getDocumentProcessingResults(documentId);
+  const latest = results[0];
+
+  if (!latest) {
+    throw new Error('Document must be processed before signature verification');
+  }
+
+  const payload = {
+    documentType: latest.documentType,
+    extractedFields: latest.extractedFields || {},
+    ocrText: latest.ocrText || '',
+  };
+
+  try {
+    const response = await invokeLLM({
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a document-signature verification assistant. Decide whether OCR text suggests a signed or executed document and identify the likely signatory if available.',
+        },
+        {
+          role: 'user',
+          content: `Assess whether this processed document appears signed or executed based on OCR text and extracted fields. Return a JSON object with hasSignature, signerName, confidence, and verificationNotes.\n\n${JSON.stringify(payload)}`,
+        },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'document_signature_verification',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              hasSignature: { type: 'boolean' },
+              signerName: { type: ['string', 'null'] },
+              confidence: { type: 'number' },
+              verificationNotes: {
+                type: 'array',
+                items: { type: 'string' },
+                minItems: 1,
+                maxItems: 5,
+              },
+            },
+            required: ['hasSignature', 'signerName', 'confidence', 'verificationNotes'],
+            additionalProperties: false,
+          },
+        },
+      },
+    });
+
+    const content = response.choices[0].message.content;
+    const parsed = JSON.parse(typeof content === 'string' ? content : JSON.stringify(content));
+
+    return {
+      documentId,
+      hasSignature: Boolean(parsed.hasSignature),
+      signerName: parsed.signerName ?? null,
+      confidence: Math.max(0, Math.min(100, Number(parsed.confidence ?? 0))),
+      verificationNotes: Array.isArray(parsed.verificationNotes) ? parsed.verificationNotes : ['Signature verification completed.'],
+    };
+  } catch (error) {
+    const text = (latest.ocrText || '').toLowerCase();
+    const signatureDetected = /(signed|signature|signatory|authorised signatory|authorized signatory|executed by)/i.test(text);
+    const possibleSigner = typeof (latest.extractedFields as Record<string, unknown> | null)?.fullName === 'string'
+      ? String((latest.extractedFields as Record<string, unknown>).fullName)
+      : null;
+
+    return {
+      documentId,
+      hasSignature: signatureDetected,
+      signerName: possibleSigner,
+      confidence: signatureDetected ? 68 : 42,
+      verificationNotes: signatureDetected
+        ? ['Signature-related language was detected in the OCR text.', possibleSigner ? `Possible signatory: ${possibleSigner}` : 'No signer name could be extracted reliably.']
+        : ['No strong signature-related language was detected in the OCR text.', 'Manual document-image review is still recommended for handwritten or visual signatures.'],
+    };
+  }
+}
+
+export async function compareDocumentResults(
+  leftDocumentId: number,
+  rightDocumentId: number
+): Promise<DocumentComparisonResult> {
+  const [leftResults, rightResults] = await Promise.all([
+    getDocumentProcessingResults(leftDocumentId),
+    getDocumentProcessingResults(rightDocumentId),
+  ]);
+
+  const left = leftResults[0];
+  const right = rightResults[0];
+
+  if (!left || !right) {
+    throw new Error('Both documents must be processed before they can be compared');
+  }
+
+  const leftFields = (left.extractedFields || {}) as Record<string, unknown>;
+  const rightFields = (right.extractedFields || {}) as Record<string, unknown>;
+  const fieldNames = Array.from(new Set([...Object.keys(leftFields), ...Object.keys(rightFields)])).sort();
+
+  const matchingFields: string[] = [];
+  const differingFields: Array<{ field: string; leftValue: string | null; rightValue: string | null }> = [];
+
+  for (const field of fieldNames) {
+    const leftValue = normalizeComparableValue(leftFields[field]);
+    const rightValue = normalizeComparableValue(rightFields[field]);
+
+    if (leftValue && rightValue && leftValue === rightValue) {
+      matchingFields.push(field);
+    } else if (leftValue || rightValue) {
+      differingFields.push({
+        field,
+        leftValue: leftValue || null,
+        rightValue: rightValue || null,
+      });
+    }
+  }
+
+  const textSimilarity = calculateTextSimilarity(left.ocrText || '', right.ocrText || '');
+  const fieldScoreBase = matchingFields.length + differingFields.length;
+  const fieldMatchScore = fieldScoreBase === 0 ? 100 : Math.round((matchingFields.length / fieldScoreBase) * 100);
+  const overallMatchScore = Math.round((textSimilarity * 0.4) + (fieldMatchScore * 0.6));
+
+  const summary = differingFields.length === 0
+    ? 'Documents are closely aligned across extracted fields and OCR content.'
+    : `${matchingFields.length} extracted field(s) matched and ${differingFields.length} differed between the two processed documents.`;
+
+  return {
+    leftDocumentId,
+    rightDocumentId,
+    comparedAt: new Date().toISOString(),
+    textSimilarity,
+    overallMatchScore,
+    matchingFields,
+    differingFields,
+    summary,
+  };
+}

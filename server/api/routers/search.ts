@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { publicProcedure, protectedProcedure, router } from '../../_core/trpc';
 import { getElasticsearchService } from '../../elasticsearchService';
+import { getPopularSearches } from '../../elasticsearch';
 
 export const searchRouter = router({
   /**
@@ -349,4 +350,17 @@ export const searchRouter = router({
 
     return { success: true, count: allTransactions.length };
   }),
+
+  popularSearches: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(25).default(10),
+      }).optional(),
+    )
+    .query(async ({ input }) => {
+      const popular = await getPopularSearches(input?.limit ?? 10);
+      return {
+        searches: popular,
+      };
+    }),
 });

@@ -1,4 +1,3 @@
-import { getDb } from './db';
 import {
   mortgageBrokers as brokers,
   brokerClients,
@@ -7,6 +6,7 @@ import {
   mortgageApplications,
 } from '../drizzle/schema';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
+import { getDb } from './db';
 import { sendEmail } from './notificationDelivery';
 import fs from 'fs';
 import path from 'path';
@@ -85,14 +85,19 @@ export async function calculateBrokerCommission(
 
   const brokerData = broker[0];
 
-  // Get commission structure
-  const structure = await db
+  // Get commission structures for the broker. Multiple rows are used as loan-amount tiers.
+  const structures = await db
     .select()
     .from(brokerCommissionStructures)
-    .where(eq(brokerCommissionStructures.brokerId, brokerId))
-    .limit(1);
+    .where(eq(brokerCommissionStructures.brokerId, brokerId));
 
-  if (structure.length === 0) {
+  const activeStructures = structures
+    .filter((item) => item.isActive)
+    .filter((item) => item.effectiveFrom <= endDate)
+    .filter((item) => !item.effectiveTo || item.effectiveTo >= startDate)
+    .sort((a, b) => Number(a.minLoanAmount) - Number(b.minLoanAmount));
+
+  if (activeStructures.length === 0) {
     // Use default commission rate from broker
     const defaultRate = Number(brokerData.defaultCommissionRate) / 100; // Convert basis points to percentage
 
@@ -144,7 +149,7 @@ export async function calculateBrokerCommission(
     };
   }
 
-  const commissionStructure = structure[0];
+  const defaultStructure = activeStructures[0];
 
   // Get closed loans for the period (through broker submissions)
   const closedLoans = await db
@@ -162,13 +167,16 @@ export async function calculateBrokerCommission(
       )
     );
 
-  // Calculate commission for each loan
+  // Calculate commission for each loan using the matching amount tier when available.
   const loanCommissions = closedLoans.map((loan) => {
     const loanAmount = Number(loan.loanAmount);
-    let commissionRate = Number(commissionStructure.commissionRate) / 100; // Convert basis points to percentage
+    const matchedStructure = activeStructures.find((item) => {
+      const min = Number(item.minLoanAmount ?? 0);
+      const max = item.maxLoanAmount == null ? Number.POSITIVE_INFINITY : Number(item.maxLoanAmount);
+      return loanAmount >= min && loanAmount <= max;
+    }) ?? defaultStructure;
 
-    // Tiered rates not implemented in current schema
-
+    const commissionRate = Number(matchedStructure.commissionRate) / 100; // Convert basis points to percentage
     const commissionAmount = loanAmount * (commissionRate / 100);
 
     return {

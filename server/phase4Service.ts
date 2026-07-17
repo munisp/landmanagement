@@ -194,7 +194,7 @@ export async function createTaxClearance(data: InsertTaxClearance) {
     const created = createAdminTaxClearance({
       clearanceId: data.clearanceId,
       transactionId: data.transactionId,
-      taxAuthority: data.taxAuthority,
+      taxAuthority: 'Federal Inland Revenue Service',
       amountDue: data.taxAmount,
       amountPaid: data.paidAmount,
       certificateNumber: null,
@@ -313,12 +313,12 @@ export async function createInsurancePolicy(data: InsertInsurancePolicy) {
   if (!db) {
     const created = createAdminInsurancePolicy({
       policyId: data.policyId,
-      transactionId: data.transactionId,
+      transactionId: data.transactionId ?? data.policyId,
       providerName: data.providerName,
-      policyNumber: data.policyNumber ?? `${data.providerName.replace(/\s+/g, '-').toUpperCase()}-${Date.now()}`,
+      policyNumber: `${data.providerName.replace(/\s+/g, '-').toUpperCase()}-${data.policyId}`,
       premiumAmount: data.premiumAmount,
-      startDate: (data.effectiveDate ?? data.coverageStartDate ?? new Date()).toISOString(),
-      endDate: (data.expiryDate ?? data.coverageEndDate ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)).toISOString(),
+      startDate: (data.effectiveDate ?? new Date()).toISOString(),
+      endDate: (data.expiryDate ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)).toISOString(),
       policyHolderId: data.policyHolderId,
       status: data.status ?? 'pending',
     });

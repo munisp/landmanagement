@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { trpc } from '../lib/trpc';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -17,6 +17,8 @@ import {
   FileText,
   TrendingUp,
   AlertCircle,
+  Share2,
+  GitBranch,
 } from 'lucide-react';
 
 export default function ReportHistoryDashboard() {
@@ -32,6 +34,47 @@ export default function ReportHistoryDashboard() {
 
   // Fetch statistics
   const { data: stats } = trpc.reportScheduler.getStatistics.useQuery();
+
+  const shareToCollaborationMutation = trpc.collaboration.sendMessage.useMutation({
+    onSuccess: () => {
+      toast.success('Report link shared to collaboration workspace');
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const versionMap = useMemo(() => {
+    const grouped = new Map<string, Array<{ id: number; generatedAt: string | Date }>>();
+    for (const item of history || []) {
+      const key = `${item.reportName}::${item.reportType}`;
+      const existing = grouped.get(key) || [];
+      existing.push({ id: item.id, generatedAt: item.generatedAt });
+      grouped.set(key, existing);
+    }
+
+    const resolved = new Map<number, number>();
+    Array.from(grouped.values()).forEach((items) => {
+      items
+        .sort((a: { id: number; generatedAt: string | Date }, b: { id: number; generatedAt: string | Date }) => new Date(a.generatedAt).getTime() - new Date(b.generatedAt).getTime())
+        .forEach((entry: { id: number; generatedAt: string | Date }, index: number) => resolved.set(entry.id, index + 1));
+    });
+    return resolved;
+  }, [history]);
+
+  const handleShareReport = async (item: any) => {
+    if (!item.fileUrl) return;
+
+    const shareMessage = `Shared report: ${item.reportName} (${item.reportType}) — ${item.fileUrl}`;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(item.fileUrl);
+      }
+      await shareToCollaborationMutation.mutateAsync({ message: shareMessage });
+    } catch (error) {
+      toast.error('Failed to share report');
+    }
+  };
 
   // Filter history
   const filteredHistory = history?.filter((item) => {
@@ -230,14 +273,21 @@ export default function ReportHistoryDashboard() {
                 filteredHistory.map((item) => (
                   <tr key={item.id} className="hover:bg-muted/50">
                     <td className="px-4 py-3">
-                      <div>
-                        <p className="font-medium">{item.reportName}</p>
-                        {item.scheduledReportId && (
-                          <p className="text-xs text-muted-foreground">
-                            Scheduled Report #{item.scheduledReportId}
-                          </p>
-                        )}
-                      </div>
+                                              <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{item.reportName}</p>
+                            <Badge variant="secondary" className="gap-1">
+                              <GitBranch className="h-3 w-3" />
+                              v{versionMap.get(item.id) || 1}
+                            </Badge>
+                          </div>
+                          {item.scheduledReportId && (
+                            <p className="text-xs text-muted-foreground">
+                              Scheduled Report #{item.scheduledReportId}
+                            </p>
+                          )}
+                        </div>
+
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant="outline">{item.reportType}</Badge>
@@ -258,14 +308,25 @@ export default function ReportHistoryDashboard() {
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
                         {item.fileUrl && item.status === 'completed' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.open(item.fileUrl!, '_blank')}
-                          >
-                            <Download className="h-3 w-3 mr-1" />
-                            Download
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(item.fileUrl!, '_blank')}
+                            >
+                              <Download className="h-3 w-3 mr-1" />
+                              Download
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleShareReport(item)}
+                              disabled={shareToCollaborationMutation.isPending}
+                            >
+                              <Share2 className="h-3 w-3 mr-1" />
+                              Share
+                            </Button>
+                          </>
                         )}
                         {item.status === 'failed' && item.errorMessage && (
                           <Button

@@ -72,12 +72,9 @@ async function fetchParcelData(filters: Record<string, any>): Promise<any[]> {
       limit: 500,
     });
     return offline.parcels.map((parcel) => ({
-      id: parcel.id,
-      location: parcel.streetAddress ?? `${parcel.lga}, ${parcel.state}`,
-      areaSquareMeters: parcel.areaSquareMeters,
-      ownerName: parcel.verifierId ?? parcel.surveyorId ?? 'Registry User',
-      status: parcel.status,
       ...parcel,
+      location: parcel.streetAddress ?? `${parcel.lga}, ${parcel.state}`,
+      ownerName: parcel.verifierId ?? parcel.surveyorId ?? 'Registry User',
     }));
   }
 }
@@ -98,15 +95,10 @@ async function fetchTransactionData(filters: Record<string, any>): Promise<any[]
       limit: 500,
     });
     return offline.transactions.map((transaction) => ({
-      id: transaction.id,
-      type: transaction.type,
-      parcelId: transaction.parcelId,
+      ...transaction,
       buyerName: transaction.counterpartyName ?? transaction.initiatorName,
       amount: transaction.considerationAmount,
       totalAmount: transaction.considerationAmount,
-      status: transaction.status,
-      createdAt: transaction.createdAt,
-      ...transaction,
     }));
   }
 }

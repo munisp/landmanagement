@@ -2517,6 +2517,34 @@ export const appRouter = router({
         const { updateValidationStatus } = await import('./documentAIService');
         return await updateValidationStatus(input.resultId, input.status, ctx.user.id);
       }),
+
+    compareDocuments: protectedProcedure
+      .input(z.object({
+        leftDocumentId: z.number(),
+        rightDocumentId: z.number(),
+      }))
+      .query(async ({ input }) => {
+        const { compareDocumentResults } = await import('./documentAIService');
+        return await compareDocumentResults(input.leftDocumentId, input.rightDocumentId);
+      }),
+
+    summarizeDocument: protectedProcedure
+      .input(z.object({
+        documentId: z.number(),
+      }))
+      .query(async ({ input }) => {
+        const { summarizeDocumentResults } = await import('./documentAIService');
+        return await summarizeDocumentResults(input.documentId);
+      }),
+
+    verifySignature: protectedProcedure
+      .input(z.object({
+        documentId: z.number(),
+      }))
+      .query(async ({ input }) => {
+        const { verifyDocumentSignature } = await import('./documentAIService');
+        return await verifyDocumentSignature(input.documentId);
+      }),
   }),
 
   // Field Data Sync

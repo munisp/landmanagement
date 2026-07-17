@@ -419,12 +419,16 @@ export default function VerificationWorkflow() {
                           <div>
                             <h4 className="font-semibold mb-2">History</h4>
                             <div className="space-y-2">
-                              {history?.map((entry) => (
+                              {history?.map((entry) => {
+                                const actorName = 'userName' in entry && entry.userName
+                                  ? entry.userName
+                                  : `User #${entry.userId}`;
+                                return (
                                 <div key={entry.id} className="flex items-start gap-2 text-sm">
                                   <div className="w-2 h-2 rounded-full bg-primary mt-1.5" />
                                   <div>
                                     <p>
-                                      <span className="font-medium">{entry.userName}</span> {entry.action}
+                                      <span className="font-medium">{actorName}</span> {entry.action}
                                     </p>
                                     {entry.comment && (
                                       <p className="text-muted-foreground">{entry.comment}</p>
@@ -434,7 +438,7 @@ export default function VerificationWorkflow() {
                                     </p>
                                   </div>
                                 </div>
-                              ))}
+                              )})}
                             </div>
                           </div>
 

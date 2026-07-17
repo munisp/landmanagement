@@ -215,6 +215,17 @@ export default function Building3DVisualization() {
                 <div className="flex items-center gap-2"><Droplets className="h-5 w-5 text-blue-500" /><div><p className="text-sm font-medium">Flood Risk</p><Badge variant="outline" className="text-xs">{data.floodRisk}</Badge></div></div>
                 <div className="flex items-center gap-2"><Mountain className="h-5 w-5 text-green-500" /><div><p className="text-sm font-medium">Elevation</p><p className="text-xs text-slate-500">{data.elevationMeters}m above sea level</p></div></div>
                 <div className="flex items-center gap-2"><Eye className="h-5 w-5 text-purple-500" /><div><p className="text-sm font-medium">Viewshed Score</p><p className="text-xs text-slate-500">{data.viewshedScore}/10</p></div></div>
+                <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/40 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">Land Suitability</p>
+                      <p className="text-xs text-slate-500">Land use aware siting score from terrain, flood, solar, visibility, and density conditions.</p>
+                    </div>
+                    <Badge className="bg-emerald-600 hover:bg-emerald-600">{data.suitabilityBand}</Badge>
+                  </div>
+                  <div className="text-2xl font-bold text-emerald-600">{data.suitabilityScore}/100</div>
+                  <p className="text-xs text-slate-500">Preferred program: {data.recommendedDevelopment}</p>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -237,6 +248,20 @@ export default function Building3DVisualization() {
                   <div className="text-center"><p className="text-sm text-slate-500">Plot Coverage</p><p className="text-lg font-bold">{data.plotCoverage}%</p></div>
                   <div className="text-center"><p className="text-sm text-slate-500">Floor Area Ratio</p><p className="text-lg font-bold">{data.floorAreaRatio}</p></div>
                   <div className="text-center"><p className="text-sm text-slate-500">Setback</p><p className="text-lg font-bold">{data.setbackMeters}m</p></div>
+                </div>
+                <div className="mt-6 rounded-lg border p-4 bg-white/80 dark:bg-slate-900/50">
+                  <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-900 dark:text-white">Land Suitability Drivers</h3>
+                      <p className="text-sm text-slate-500">Parcel {data.parcelId} is classified as {data.landUseType} and assessed against current siting constraints.</p>
+                    </div>
+                    <Badge variant="outline">{data.suitabilityBand}</Badge>
+                  </div>
+                  <div className="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    {data.suitabilityDrivers.map((driver: string) => (
+                      <div key={driver} className="rounded border bg-slate-50 dark:bg-slate-800/60 px-3 py-2">{driver}</div>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>

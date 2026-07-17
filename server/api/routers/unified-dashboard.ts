@@ -8,7 +8,7 @@ import { generateTransactionReport, type TransactionReportData } from '../../ser
 
 interface SystemStatus {
   system: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
+  status: 'initiated' | 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
   progress: number;
   lastUpdated: Date;
   details?: string;
@@ -40,7 +40,7 @@ export const unifiedDashboardRouter = router({
       if (!db) {
         const createdAt = new Date();
         const systems: SystemStatus[] = [
-          { system: 'payment', status: 'initiated', progress: 25, lastUpdated: createdAt, details: 'Amount: ₦100,000.00' },
+          { system: 'payment', status: 'initiated', progress: 10, lastUpdated: createdAt, details: 'Amount: ₦100,000.00' },
           { system: 'mortgage', status: 'pending', progress: 25, lastUpdated: createdAt, details: 'Mortgage application pending' },
           { system: 'tax', status: 'in_progress', progress: 50, lastUpdated: createdAt, details: 'Tax clearance pending' },
         ];
@@ -243,7 +243,7 @@ export const unifiedDashboardRouter = router({
           }
           const createdAt = new Date();
           const systems: SystemStatus[] = [
-            { system: 'payment', status: 'initiated', progress: 25, lastUpdated: createdAt, details: 'Amount: ₦100,000.00, Payment Method: Mojaloop' },
+            { system: 'payment', status: 'initiated', progress: 10, lastUpdated: createdAt, details: 'Amount: ₦100,000.00, Payment Method: Mojaloop' },
             { system: 'mortgage', status: 'pending', progress: 25, lastUpdated: createdAt, details: 'Mortgage application pending' },
             { system: 'tax', status: 'in_progress', progress: 50, lastUpdated: createdAt, details: 'Tax clearance pending' },
           ];
