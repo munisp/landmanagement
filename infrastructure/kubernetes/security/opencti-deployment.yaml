@@ -1,0 +1,437 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opencti-secrets
+  namespace: security
+type: Opaque
+stringData:
+  OPENCTI_ADMIN_EMAIL: admin@idlr.gov.ng
+  OPENCTI_ADMIN_PASSWORD: ChangeMe123!
+  OPENCTI_ADMIN_TOKEN: $(openssl rand -hex 32)
+  OPENCTI_BASE_URL: http://opencti:8080
+  MINIO_ROOT_USER: opencti
+  MINIO_ROOT_PASSWORD: ChangeMe123!
+  RABBITMQ_DEFAULT_USER: opencti
+  RABBITMQ_DEFAULT_PASS: ChangeMe123!
+  ELASTICSEARCH_PASSWORD: ChangeMe123!
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opencti-config
+  namespace: security
+data:
+  OPENCTI_PLATFORM_TITLE: "IDLR Threat Intelligence"
+  OPENCTI_PLATFORM_LANGUAGE: "en"
+  OPENCTI_PLATFORM_THEME: "dark"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencti-elasticsearch
+  namespace: security
+  labels:
+    app: opencti-elasticsearch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opencti-elasticsearch
+  template:
+    metadata:
+      labels:
+        app: opencti-elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9300
+          name: transport
+        env:
+        - name: discovery.type
+          value: single-node
+        - name: xpack.security.enabled
+          value: "true"
+        - name: ELASTIC_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: ELASTICSEARCH_PASSWORD
+        - name: ES_JAVA_OPTS
+          value: "-Xms2g -Xmx2g"
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+      volumes:
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencti-elasticsearch
+  namespace: security
+spec:
+  selector:
+    app: opencti-elasticsearch
+  ports:
+  - port: 9200
+    targetPort: 9200
+    name: http
+  - port: 9300
+    targetPort: 9300
+    name: transport
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencti-redis
+  namespace: security
+  labels:
+    app: opencti-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opencti-redis
+  template:
+    metadata:
+      labels:
+        app: opencti-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7.2-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencti-redis
+  namespace: security
+spec:
+  selector:
+    app: opencti-redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencti-rabbitmq
+  namespace: security
+  labels:
+    app: opencti-rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opencti-rabbitmq
+  template:
+    metadata:
+      labels:
+        app: opencti-rabbitmq
+    spec:
+      containers:
+      - name: rabbitmq
+        image: rabbitmq:3.12-management
+        ports:
+        - containerPort: 5672
+          name: amqp
+        - containerPort: 15672
+          name: management
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: RABBITMQ_DEFAULT_USER
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: RABBITMQ_DEFAULT_PASS
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencti-rabbitmq
+  namespace: security
+spec:
+  selector:
+    app: opencti-rabbitmq
+  ports:
+  - port: 5672
+    targetPort: 5672
+    name: amqp
+  - port: 15672
+    targetPort: 15672
+    name: management
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencti-minio
+  namespace: security
+  labels:
+    app: opencti-minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opencti-minio
+  template:
+    metadata:
+      labels:
+        app: opencti-minio
+    spec:
+      containers:
+      - name: minio
+        image: minio/minio:latest
+        args:
+        - server
+        - /data
+        - --console-address
+        - ":9001"
+        ports:
+        - containerPort: 9000
+          name: api
+        - containerPort: 9001
+          name: console
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: MINIO_ROOT_USER
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: MINIO_ROOT_PASSWORD
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencti-minio
+  namespace: security
+spec:
+  selector:
+    app: opencti-minio
+  ports:
+  - port: 9000
+    targetPort: 9000
+    name: api
+  - port: 9001
+    targetPort: 9001
+    name: console
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencti
+  namespace: security
+  labels:
+    app: opencti
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opencti
+  template:
+    metadata:
+      labels:
+        app: opencti
+    spec:
+      initContainers:
+      - name: wait-for-elasticsearch
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z opencti-elasticsearch 9200; do echo waiting for elasticsearch; sleep 2; done;']
+      - name: wait-for-redis
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z opencti-redis 6379; do echo waiting for redis; sleep 2; done;']
+      - name: wait-for-rabbitmq
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z opencti-rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done;']
+      containers:
+      - name: opencti
+        image: opencti/platform:5.12.17
+        ports:
+        - containerPort: 8080
+        env:
+        - name: NODE_OPTIONS
+          value: "--max-old-space-size=8192"
+        - name: APP__PORT
+          value: "8080"
+        - name: APP__BASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: OPENCTI_BASE_URL
+        - name: APP__ADMIN__EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: OPENCTI_ADMIN_EMAIL
+        - name: APP__ADMIN__PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: OPENCTI_ADMIN_PASSWORD
+        - name: APP__ADMIN__TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: OPENCTI_ADMIN_TOKEN
+        - name: APP__APP_LOGS__LOGS_LEVEL
+          value: "info"
+        - name: REDIS__HOSTNAME
+          value: "opencti-redis"
+        - name: REDIS__PORT
+          value: "6379"
+        - name: ELASTICSEARCH__URL
+          value: "http://opencti-elasticsearch:9200"
+        - name: ELASTICSEARCH__USERNAME
+          value: "elastic"
+        - name: ELASTICSEARCH__PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: ELASTICSEARCH_PASSWORD
+        - name: MINIO__ENDPOINT
+          value: "opencti-minio"
+        - name: MINIO__PORT
+          value: "9000"
+        - name: MINIO__USE_SSL
+          value: "false"
+        - name: MINIO__ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: MINIO_ROOT_USER
+        - name: MINIO__SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: MINIO_ROOT_PASSWORD
+        - name: RABBITMQ__HOSTNAME
+          value: "opencti-rabbitmq"
+        - name: RABBITMQ__PORT
+          value: "5672"
+        - name: RABBITMQ__USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: RABBITMQ_DEFAULT_USER
+        - name: RABBITMQ__PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: opencti-secrets
+              key: RABBITMQ_DEFAULT_PASS
+        envFrom:
+        - configMapRef:
+            name: opencti-config
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "2000m"
+          limits:
+            memory: "12Gi"
+            cpu: "4000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 180
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opencti
+  namespace: security
+  labels:
+    app: opencti
+spec:
+  selector:
+    app: opencti
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: opencti-ingress
+  namespace: security
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: opencti.idlr.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: opencti
+            port:
+              number: 8080

@@ -1,0 +1,17 @@
+{
+  "query": "\nCREATE TABLE IF NOT EXISTS email_logs (\n  id SERIAL PRIMARY KEY,\n  recipient VARCHAR(255) NOT NULL,\n  subject VARCHAR(500) NOT NULL,\n  status VARCHAR(50) NOT NULL,\n  message_id VARCHAR(255),\n  error TEXT,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\nCREATE INDEX IF NOT EXISTS idx_email_logs_recipient ON email_logs(recipient);\nCREATE INDEX IF NOT EXISTS idx_email_logs_status ON email_logs(status);\nCREATE INDEX IF NOT EXISTS idx_email_logs_created_at ON email_logs(created_at);\n\nCREATE TABLE IF NOT EXISTS email_queue (\n  id SERIAL PRIMARY KEY,\n  recipient VARCHAR(255) NOT NULL,\n  subject VARCHAR(500) NOT NULL,\n  html_content TEXT NOT NULL,\n  text_content TEXT,\n  attachments JSONB,\n  status VARCHAR(50) DEFAULT 'pending',\n  retry_count INTEGER DEFAULT 0,\n  max_retries INTEGER DEFAULT 3,\n  last_error TEXT,\n  scheduled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  sent_at TIMESTAMP,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\nCREATE INDEX IF NOT EXISTS idx_email_queue_status ON email_queue(status);\nCREATE INDEX IF NOT EXISTS idx_email_queue_scheduled_at ON email_queue(scheduled_at);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user NzNswwN3cq6gauf.53d7f32ec8a4 --database Md9ypRHK4yuz574ZuX5amw --execute \nCREATE TABLE IF NOT EXISTS email_logs (\n  id SERIAL PRIMARY KEY,\n  recipient VARCHAR(255) NOT NULL,\n  subject VARCHAR(500) NOT NULL,\n  status VARCHAR(50) NOT NULL,\n  message_id VARCHAR(255),\n  error TEXT,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\nCREATE INDEX IF NOT EXISTS idx_email_logs_recipient ON email_logs(recipient);\nCREATE INDEX IF NOT EXISTS idx_email_logs_status ON email_logs(status);\nCREATE INDEX IF NOT EXISTS idx_email_logs_created_at ON email_logs(created_at);\n\nCREATE TABLE IF NOT EXISTS email_queue (\n  id SERIAL PRIMARY KEY,\n  recipient VARCHAR(255) NOT NULL,\n  subject VARCHAR(500) NOT NULL,\n  html_content TEXT NOT NULL,\n  text_content TEXT,\n  attachments JSONB,\n  status VARCHAR(50) DEFAULT 'pending',\n  retry_count INTEGER DEFAULT 0,\n  max_retries INTEGER DEFAULT 3,\n  last_error TEXT,\n  scheduled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  sent_at TIMESTAMP,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\nCREATE INDEX IF NOT EXISTS idx_email_queue_status ON email_queue(status);\nCREATE INDEX IF NOT EXISTS idx_email_queue_scheduled_at ON email_queue(scheduled_at);\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 16: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 7 column 20 near \"JSONB,",
+    "  status VARCHAR(50) DEFAULT 'pending',",
+    "  retry_count INTEGER DEFAULT 0,",
+    "  max_retries INTEGER DEFAULT 3,",
+    "  last_error TEXT,",
+    "  scheduled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,",
+    "  sent_at TIMESTAMP,",
+    "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,",
+    "  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    ")\""
+  ]
+}

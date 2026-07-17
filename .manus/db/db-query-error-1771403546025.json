@@ -1,0 +1,11 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS blockchain_transactions (\n  id SERIAL PRIMARY KEY,\n  transaction_hash VARCHAR(66) UNIQUE NOT NULL,\n  parcel_id INTEGER,\n  transaction_type VARCHAR(50) NOT NULL,\n  from_address VARCHAR(42),\n  to_address VARCHAR(42),\n  contract_address VARCHAR(42),\n  block_number BIGINT,\n  gas_used BIGINT,\n  gas_price BIGINT,\n  value DECIMAL(20, 8),\n  status VARCHAR(20) NOT NULL DEFAULT 'pending',\n  metadata JSONB,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  confirmed_at TIMESTAMP\n);\n\nCREATE INDEX IF NOT EXISTS idx_blockchain_tx_hash ON blockchain_transactions(transaction_hash);\nCREATE INDEX IF NOT EXISTS idx_blockchain_parcel ON blockchain_transactions(parcel_id);\nCREATE INDEX IF NOT EXISTS idx_blockchain_status ON blockchain_transactions(status);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user NzNswwN3cq6gauf.53d7f32ec8a4 --database Md9ypRHK4yuz574ZuX5amw --execute CREATE TABLE IF NOT EXISTS blockchain_transactions (\n  id SERIAL PRIMARY KEY,\n  transaction_hash VARCHAR(66) UNIQUE NOT NULL,\n  parcel_id INTEGER,\n  transaction_type VARCHAR(50) NOT NULL,\n  from_address VARCHAR(42),\n  to_address VARCHAR(42),\n  contract_address VARCHAR(42),\n  block_number BIGINT,\n  gas_used BIGINT,\n  gas_price BIGINT,\n  value DECIMAL(20, 8),\n  status VARCHAR(20) NOT NULL DEFAULT 'pending',\n  metadata JSONB,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  confirmed_at TIMESTAMP\n);\n\nCREATE INDEX IF NOT EXISTS idx_blockchain_tx_hash ON blockchain_transactions(transaction_hash);\nCREATE INDEX IF NOT EXISTS idx_blockchain_parcel ON blockchain_transactions(parcel_id);\nCREATE INDEX IF NOT EXISTS idx_blockchain_status ON blockchain_transactions(status);",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 14 column 17 near \"JSONB,",
+    "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,",
+    "  confirmed_at TIMESTAMP",
+    ")\""
+  ]
+}

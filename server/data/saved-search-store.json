@@ -1,0 +1,31 @@
+{
+  "nextId": 21,
+  "searches": [
+    {
+      "id": 1,
+      "userId": 1,
+      "name": "Verified Lagos Parcels",
+      "query": {
+        "query": "",
+        "state": "Lagos",
+        "status": "verified",
+        "landUseType": "residential"
+      },
+      "isFavorite": true,
+      "createdAt": "2026-05-10T09:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "userId": 1,
+      "name": "High Value Commercial Search",
+      "query": {
+        "query": "",
+        "state": "Abuja",
+        "landUseType": "commercial",
+        "priceMin": 50000000
+      },
+      "isFavorite": false,
+      "createdAt": "2026-05-11T11:30:00.000Z"
+    }
+  ]
+}

@@ -1,0 +1,257 @@
+global:
+  # Default SMTP configuration
+  smtp_smarthost: '${SMTP_HOST}:${SMTP_PORT}'
+  smtp_from: '${SMTP_FROM}'
+  smtp_auth_username: '${SMTP_USER}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+  
+  # Slack API URL (optional, can use webhook instead)
+  slack_api_url: '${SLACK_API_URL}'
+  
+  # Resolve timeout
+  resolve_timeout: 5m
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert distribution
+route:
+  # Default receiver for all alerts
+  receiver: 'default'
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'cluster', 'service']
+  
+  # Wait time before sending initial notification
+  group_wait: 10s
+  
+  # Wait time before sending notification about new alerts in the same group
+  group_interval: 10s
+  
+  # Wait time before re-sending notification if alert is still firing
+  repeat_interval: 12h
+  
+  # Child routes with specific matching rules
+  routes:
+    # Critical alerts - immediate notification via Slack and email
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      group_interval: 5m
+      repeat_interval: 4h
+      continue: false
+    
+    # Warning alerts - notification via Slack
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      group_interval: 10m
+      repeat_interval: 12h
+      continue: false
+    
+    # Database alerts - specialized receiver
+    - match:
+        component: database
+      receiver: 'database-alerts'
+      group_wait: 10s
+      repeat_interval: 6h
+      continue: true
+    
+    # Security alerts - immediate notification
+    - match:
+        component: security
+      receiver: 'security-alerts'
+      group_wait: 5s
+      repeat_interval: 2h
+      continue: true
+    
+    # Business alerts - notification during business hours
+    - match:
+        component: business
+      receiver: 'business-alerts'
+      group_wait: 1m
+      repeat_interval: 24h
+      # Only send during business hours (9 AM - 6 PM UTC)
+      active_time_intervals:
+        - business_hours
+
+# Inhibition rules - suppress certain alerts when others are firing
+inhibit_rules:
+  # Inhibit warning if critical is firing for the same alert
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'cluster', 'service']
+  
+  # Inhibit application alerts if application is down
+  - source_match:
+      alertname: 'ApplicationDown'
+    target_match_re:
+      alertname: '^(HighResponseTime|HighErrorRate|.*)'
+    equal: ['cluster']
+  
+  # Inhibit database connection alerts if database is down
+  - source_match:
+      alertname: 'DatabaseDown'
+    target_match_re:
+      alertname: '^(HighDatabaseConnections|SlowDatabaseQueries)$'
+    equal: ['cluster']
+
+# Time intervals for routing
+time_intervals:
+  - name: business_hours
+    time_intervals:
+      - times:
+        - start_time: '09:00'
+          end_time: '18:00'
+        weekdays: ['monday:friday']
+
+# Receivers - notification endpoints
+receivers:
+  # Default receiver - Slack general channel
+  - name: 'default'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#idlr-alerts'
+        title: 'IDLR-PTS Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+  
+  # Critical alerts - Slack + Email + PagerDuty
+  - name: 'critical-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#idlr-critical'
+        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |-
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Environment:* {{ .CommonLabels.environment }}
+          *Component:* {{ .CommonLabels.component }}
+          
+          *Details:*
+          {{ range .Alerts }}
+          • {{ .Annotations.summary }}
+          • {{ .Annotations.description }}
+          {{ end }}
+          
+          *Actions Required:* Immediate investigation and resolution
+        send_resolved: true
+        color: 'danger'
+        actions:
+          - type: button
+            text: 'View in Grafana'
+            url: 'https://grafana.example.com/d/idlr-pts'
+          - type: button
+            text: 'View Logs'
+            url: 'https://logs.example.com'
+    
+    email_configs:
+      - to: '${ALERT_EMAIL_RECIPIENTS}'
+        headers:
+          Subject: '[CRITICAL] IDLR-PTS: {{ .GroupLabels.alertname }}'
+        html: |-
+          <h2 style="color: #d32f2f;">🚨 CRITICAL ALERT</h2>
+          <p><strong>Alert:</strong> {{ .GroupLabels.alertname }}</p>
+          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
+          <p><strong>Environment:</strong> {{ .CommonLabels.environment }}</p>
+          <p><strong>Component:</strong> {{ .CommonLabels.component }}</p>
+          
+          <h3>Details:</h3>
+          <ul>
+          {{ range .Alerts }}
+            <li>{{ .Annotations.summary }}</li>
+            <li>{{ .Annotations.description }}</li>
+          {{ end }}
+          </ul>
+          
+          <p><strong>Actions Required:</strong> Immediate investigation and resolution</p>
+          <p><a href="https://grafana.example.com/d/idlr-pts">View in Grafana</a></p>
+        send_resolved: true
+  
+  # Warning alerts - Slack only
+  - name: 'warning-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#idlr-alerts'
+        title: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+        text: |-
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Component:* {{ .CommonLabels.component }}
+          
+          {{ range .Alerts }}
+          • {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+        color: 'warning'
+  
+  # Database alerts - Slack + Email to DB team
+  - name: 'database-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#idlr-database'
+        title: '💾 Database Alert: {{ .GroupLabels.alertname }}'
+        text: |-
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Severity:* {{ .CommonLabels.severity }}
+          
+          {{ range .Alerts }}
+          • {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+    
+    email_configs:
+      - to: 'database-team@example.com'
+        headers:
+          Subject: '[{{ .CommonLabels.severity | toUpper }}] Database: {{ .GroupLabels.alertname }}'
+        send_resolved: true
+  
+  # Security alerts - Slack + Email to security team
+  - name: 'security-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#idlr-security'
+        title: '🔒 Security Alert: {{ .GroupLabels.alertname }}'
+        text: |-
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Severity:* {{ .CommonLabels.severity }}
+          
+          {{ range .Alerts }}
+          • {{ .Annotations.summary }}
+          • {{ .Annotations.description }}
+          {{ end }}
+          
+          *Action Required:* Investigate potential security incident
+        send_resolved: true
+        color: 'danger'
+    
+    email_configs:
+      - to: 'security-team@example.com'
+        headers:
+          Subject: '[SECURITY] IDLR-PTS: {{ .GroupLabels.alertname }}'
+        send_resolved: true
+  
+  # Business alerts - Email only during business hours
+  - name: 'business-alerts'
+    email_configs:
+      - to: 'business-team@example.com'
+        headers:
+          Subject: '[BUSINESS] IDLR-PTS: {{ .GroupLabels.alertname }}'
+        html: |-
+          <h2>Business Metrics Alert</h2>
+          <p><strong>Alert:</strong> {{ .GroupLabels.alertname }}</p>
+          
+          <h3>Details:</h3>
+          <ul>
+          {{ range .Alerts }}
+            <li>{{ .Annotations.description }}</li>
+          {{ end }}
+          </ul>
+        send_resolved: true

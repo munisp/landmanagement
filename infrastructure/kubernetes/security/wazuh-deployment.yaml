@@ -1,0 +1,339 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wazuh-secrets
+  namespace: security
+type: Opaque
+stringData:
+  WAZUH_API_USER: "wazuh"
+  WAZUH_API_PASSWORD: "ChangeMe123!"
+  INDEXER_PASSWORD: "ChangeMe123!"
+  FILEBEAT_PASSWORD: "ChangeMe123!"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wazuh-config
+  namespace: security
+data:
+  WAZUH_CLUSTER_NAME: "idlr-wazuh-cluster"
+  WAZUH_CLUSTER_NODE_NAME: "master-node"
+  WAZUH_CLUSTER_NODE_TYPE: "master"
+  WAZUH_CLUSTER_KEY: "c98b62a9b6169ac5f67dae55ae4a9088"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wazuh-indexer
+  namespace: security
+  labels:
+    app: wazuh-indexer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wazuh-indexer
+  template:
+    metadata:
+      labels:
+        app: wazuh-indexer
+    spec:
+      containers:
+      - name: wazuh-indexer
+        image: wazuh/wazuh-indexer:4.7.2
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9300
+          name: transport
+        env:
+        - name: discovery.type
+          value: single-node
+        - name: bootstrap.memory_lock
+          value: "true"
+        - name: OPENSEARCH_JAVA_OPTS
+          value: "-Xms2g -Xmx2g"
+        - name: INDEXER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: wazuh-secrets
+              key: INDEXER_PASSWORD
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/wazuh-indexer
+        securityContext:
+          capabilities:
+            add:
+            - IPC_LOCK
+      volumes:
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wazuh-indexer
+  namespace: security
+spec:
+  selector:
+    app: wazuh-indexer
+  ports:
+  - port: 9200
+    targetPort: 9200
+    name: http
+  - port: 9300
+    targetPort: 9300
+    name: transport
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wazuh-manager
+  namespace: security
+  labels:
+    app: wazuh-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wazuh-manager
+  template:
+    metadata:
+      labels:
+        app: wazuh-manager
+    spec:
+      initContainers:
+      - name: wait-for-indexer
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z wazuh-indexer 9200; do echo waiting for indexer; sleep 2; done;']
+      containers:
+      - name: wazuh-manager
+        image: wazuh/wazuh-manager:4.7.2
+        ports:
+        - containerPort: 1514
+          name: agents-tcp
+          protocol: TCP
+        - containerPort: 1514
+          name: agents-udp
+          protocol: UDP
+        - containerPort: 1515
+          name: registration
+        - containerPort: 1516
+          name: cluster
+        - containerPort: 55000
+          name: api
+        env:
+        - name: INDEXER_URL
+          value: "https://wazuh-indexer:9200"
+        - name: INDEXER_USERNAME
+          value: "admin"
+        - name: INDEXER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: wazuh-secrets
+              key: INDEXER_PASSWORD
+        - name: FILEBEAT_SSL_VERIFICATION_MODE
+          value: "none"
+        - name: SSL_CERTIFICATE_AUTHORITIES
+          value: ""
+        - name: SSL_CERTIFICATE
+          value: ""
+        - name: SSL_KEY
+          value: ""
+        - name: API_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: wazuh-secrets
+              key: WAZUH_API_USER
+        - name: API_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: wazuh-secrets
+              key: WAZUH_API_PASSWORD
+        envFrom:
+        - configMapRef:
+            name: wazuh-config
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: wazuh-data
+          mountPath: /var/ossec/data
+        - name: wazuh-logs
+          mountPath: /var/ossec/logs
+        livenessProbe:
+          exec:
+            command:
+            - /var/ossec/bin/wazuh-control
+            - status
+          initialDelaySeconds: 90
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command:
+            - /var/ossec/bin/wazuh-control
+            - status
+          initialDelaySeconds: 60
+          periodSeconds: 10
+      volumes:
+      - name: wazuh-data
+        emptyDir: {}
+      - name: wazuh-logs
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wazuh-manager
+  namespace: security
+spec:
+  selector:
+    app: wazuh-manager
+  ports:
+  - port: 1514
+    targetPort: 1514
+    name: agents-tcp
+    protocol: TCP
+  - port: 1514
+    targetPort: 1514
+    name: agents-udp
+    protocol: UDP
+  - port: 1515
+    targetPort: 1515
+    name: registration
+  - port: 1516
+    targetPort: 1516
+    name: cluster
+  - port: 55000
+    targetPort: 55000
+    name: api
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wazuh-dashboard
+  namespace: security
+  labels:
+    app: wazuh-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wazuh-dashboard
+  template:
+    metadata:
+      labels:
+        app: wazuh-dashboard
+    spec:
+      initContainers:
+      - name: wait-for-manager
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z wazuh-manager 55000; do echo waiting for manager; sleep 2; done;']
+      containers:
+      - name: wazuh-dashboard
+        image: wazuh/wazuh-dashboard:4.7.2
+        ports:
+        - containerPort: 5601
+          name: http
+        env:
+        - name: INDEXER_URL
+          value: "https://wazuh-indexer:9200"
+        - name: WAZUH_API_URL
+          value: "https://wazuh-manager:55000"
+        - name: API_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: wazuh-secrets
+              key: WAZUH_API_USER
+        - name: API_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: wazuh-secrets
+              key: WAZUH_API_PASSWORD
+        - name: DASHBOARD_USERNAME
+          value: "admin"
+        - name: DASHBOARD_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: wazuh-secrets
+              key: WAZUH_API_PASSWORD
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 120
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 90
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wazuh-dashboard
+  namespace: security
+spec:
+  selector:
+    app: wazuh-dashboard
+  ports:
+  - port: 5601
+    targetPort: 5601
+    name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wazuh
+  namespace: security
+  labels:
+    app: wazuh
+spec:
+  selector:
+    app: wazuh-manager
+  ports:
+  - port: 55000
+    targetPort: 55000
+    name: api
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: wazuh-ingress
+  namespace: security
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: wazuh.idlr.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: wazuh-dashboard
+            port:
+              number: 5601

@@ -1,0 +1,230 @@
+groups:
+  - name: idlr_pts_alerts
+    interval: 30s
+    rules:
+      # Application Alerts
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High response time detected"
+          description: "p95 response time is {{ $value }}s (threshold: 2s)"
+          
+      - alert: CriticalResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "Critical response time detected"
+          description: "p95 response time is {{ $value }}s (threshold: 5s)"
+          
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+          
+      - alert: CriticalErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.10
+        for: 2m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "Critical error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+          
+      - alert: ApplicationDown
+        expr: up{job="idlr-pts-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "Application is down"
+          description: "Application has been down for more than 1 minute"
+          
+      # Cache Alerts
+      - alert: LowCacheHitRate
+        expr: rate(cache_hits_total[5m]) / (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m])) < 0.50
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} (threshold: 50%)"
+          
+      - alert: CacheDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis has been down for more than 1 minute"
+          
+      - alert: HighCacheMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.90
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "High cache memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }} (threshold: 90%)"
+          
+      # Database Alerts
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database is down"
+          description: "PostgreSQL has been down for more than 1 minute"
+          
+      - alert: HighDatabaseConnections
+        expr: database_connections_active > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connections"
+          description: "Active database connections: {{ $value }} (threshold: 80)"
+          
+      - alert: CriticalDatabaseConnections
+        expr: database_connections_active > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Critical database connections"
+          description: "Active database connections: {{ $value }} (threshold: 95)"
+          
+      - alert: SlowDatabaseQueries
+        expr: rate(database_query_duration_seconds_sum[5m]) / rate(database_query_duration_seconds_count[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Average query duration is {{ $value }}s (threshold: 1s)"
+          
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% (threshold: 80%)"
+          
+      - alert: CriticalCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical CPU usage"
+          description: "CPU usage is {{ $value }}% (threshold: 95%)"
+          
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / 1024 / 1024 / 1024 > 6
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}GB (threshold: 6GB)"
+          
+      - alert: CriticalMemoryUsage
+        expr: process_resident_memory_bytes / 1024 / 1024 / 1024 > 7
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical memory usage"
+          description: "Memory usage is {{ $value }}GB (threshold: 7GB)"
+          
+      # External Service Alerts
+      - alert: ExternalServiceDown
+        expr: external_service_up == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: integration
+        annotations:
+          summary: "External service {{ $labels.service }} is down"
+          description: "Service {{ $labels.service }} has been down for more than 5 minutes"
+          
+      - alert: ExternalServiceSlowResponse
+        expr: external_service_response_time_seconds > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: integration
+        annotations:
+          summary: "External service {{ $labels.service }} is slow"
+          description: "Service {{ $labels.service }} response time is {{ $value }}s (threshold: 5s)"
+          
+      # Business Logic Alerts
+      - alert: NoRecentTransactions
+        expr: rate(transactions_total[1h]) == 0
+        for: 1h
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "No transactions in the last hour"
+          description: "No transactions have been processed in the last hour"
+          
+      - alert: HighTransactionFailureRate
+        expr: rate(transactions_failed_total[5m]) / rate(transactions_total[5m]) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "High transaction failure rate"
+          description: "Transaction failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+          
+      # Security Alerts
+      - alert: HighAuthenticationFailures
+        expr: rate(authentication_failures_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failures: {{ $value }}/sec (threshold: 10/sec)"
+          
+      - alert: SuspiciousActivity
+        expr: rate(http_requests_total{status="403"}[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Suspicious activity detected"
+          description: "High rate of 403 responses: {{ $value }}/sec (threshold: 5/sec)"

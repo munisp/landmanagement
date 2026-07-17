@@ -1,0 +1,112 @@
+version: '3.9'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idlr-pts-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL:-postgresql://idlr:idlr@postgres:5432/idlr_pts}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      APP_VERSION: ${APP_VERSION:-2026.04.15}
+      SESSION_SECRET: ${SESSION_SECRET:-idlr-pts-session-secret}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-}
+      FLUVIO_API_URL: ${FLUVIO_API_URL:-}
+      DAPR_HTTP_URL: ${DAPR_HTTP_URL:-}
+      APISIX_ADMIN_URL: ${APISIX_ADMIN_URL:-}
+      APISIX_API_KEY: ${APISIX_API_KEY:-}
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-}
+      PERMIFY_URL: ${PERMIFY_URL:-}
+      OPENAPPSEC_URL: ${OPENAPPSEC_URL:-}
+      LAKEHOUSE_API_URL: ${LAKEHOUSE_API_URL:-}
+      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-}
+      FABRIC_GATEWAY_URL: ${FABRIC_GATEWAY_URL:-}
+      MOJALOOP_API_URL: ${MOJALOOP_API_URL:-}
+      TIGERBEETLE_CLUSTER_ID: ${TIGERBEETLE_CLUSTER_ID:-}
+      TIGERBEETLE_REPLICAS: ${TIGERBEETLE_REPLICAS:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./server/data:/app/server/data
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - idlr_net
+
+  postgres:
+    image: postgres:16-bookworm
+    container_name: idlr-pts-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-idlr_pts}
+      POSTGRES_USER: ${POSTGRES_USER:-idlr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-idlr}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts:/docker-entrypoint-initdb.d/scripts:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-idlr} -d ${POSTGRES_DB:-idlr_pts}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - idlr_net
+
+  redis:
+    image: redis:7-bookworm
+    container_name: idlr-pts-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - idlr_net
+
+  nginx:
+    image: nginx:1.27-bookworm
+    container_name: idlr-pts-nginx
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    networks:
+      - idlr_net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  idlr_net:
+    driver: bridge

@@ -1,0 +1,9 @@
+{
+  "query": "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE '%mortgage%' OR table_name LIKE '%tax%' OR table_name LIKE '%insurance%' OR table_name LIKE '%cadastral%' ORDER BY table_name;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user NzNswwN3cq6gauf.53d7f32ec8a4 --database Md9ypRHK4yuz574ZuX5amw --execute SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE '%mortgage%' OR table_name LIKE '%tax%' OR table_name LIKE '%insurance%' OR table_name LIKE '%cadastral%' ORDER BY table_name;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 3380
+}

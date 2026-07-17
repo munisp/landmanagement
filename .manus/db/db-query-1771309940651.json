@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE users \nADD COLUMN IF NOT EXISTS suspended BOOLEAN DEFAULT FALSE NOT NULL,\nADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP,\nADD COLUMN IF NOT EXISTS suspended_by INTEGER REFERENCES users(id),\nADD COLUMN IF NOT EXISTS suspension_reason TEXT,\nADD COLUMN IF NOT EXISTS last_active TIMESTAMP DEFAULT NOW() NOT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user NzNswwN3cq6gauf.53d7f32ec8a4 --database Md9ypRHK4yuz574ZuX5amw --execute ALTER TABLE users \nADD COLUMN IF NOT EXISTS suspended BOOLEAN DEFAULT FALSE NOT NULL,\nADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP,\nADD COLUMN IF NOT EXISTS suspended_by INTEGER REFERENCES users(id),\nADD COLUMN IF NOT EXISTS suspension_reason TEXT,\nADD COLUMN IF NOT EXISTS last_active TIMESTAMP DEFAULT NOW() NOT NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 4012
+}

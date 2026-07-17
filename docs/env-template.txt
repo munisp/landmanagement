@@ -1,0 +1,114 @@
+# IDLR-PTS Platform - Environment Variables Template
+# Copy this file to .env.staging or .env.production and fill in the values
+
+# =============================================================================
+# CRITICAL: Database & Cache
+# =============================================================================
+
+# PostgreSQL Database
+POSTGRES_PASSWORD=CHANGE_ME_secure_password_123
+
+# Redis Cache
+REDIS_PASSWORD=CHANGE_ME_redis_password_456
+
+# =============================================================================
+# Docker Configuration
+# =============================================================================
+
+# Docker Registry (if using private registry)
+DOCKER_REGISTRY=registry.example.com
+VERSION=latest
+
+# =============================================================================
+# Monitoring & Visualization
+# =============================================================================
+
+# Grafana Admin Password
+GRAFANA_ADMIN_PASSWORD=admin
+
+# =============================================================================
+# Alert Notifications (Optional - can configure later)
+# =============================================================================
+
+# Slack Webhook URL for alerts
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+
+# Email recipients for alerts (comma-separated)
+ALERT_EMAIL_RECIPIENTS=admin@example.com,ops@example.com
+
+# Alert channels (comma-separated: email, slack, webhook)
+ALERT_CHANNELS=slack
+
+# =============================================================================
+# Error Tracking (Optional - can configure later)
+# =============================================================================
+
+# Sentry DSN for error tracking
+SENTRY_DSN=https://YOUR_KEY@sentry.io/YOUR_PROJECT
+
+# =============================================================================
+# External Services (Optional - can configure later)
+# =============================================================================
+
+# Hyperledger Fabric (Blockchain)
+FABRIC_GATEWAY_URL=grpc://fabric:7051
+FABRIC_MSP_ID=Org1MSP
+FABRIC_CERT_PATH=/path/to/cert.pem
+FABRIC_KEY_PATH=/path/to/key.pem
+FABRIC_CHANNEL_NAME=mychannel
+FABRIC_CHAINCODE_NAME=basic
+
+# Mojaloop (Payment Processing)
+MOJALOOP_API_URL=https://mojaloop-staging:8080
+MOJALOOP_PARTICIPANT_ID=land-registry-fsp
+MOJALOOP_API_KEY=your-api-key
+
+# TigerBeetle (Financial Ledger)
+TIGERBEETLE_CLUSTER_ID=0
+TIGERBEETLE_REPLICAS=3001,3002,3003
+
+# Apache Kafka (Event Streaming)
+KAFKA_BROKERS=kafka:9092
+KAFKA_CLIENT_ID=idlr-pts
+KAFKA_GROUP_ID=idlr-pts-consumers
+
+# Temporal (Workflow Orchestration)
+TEMPORAL_ADDRESS=temporal:7233
+TEMPORAL_NAMESPACE=default
+
+# Elasticsearch (Search & Analytics)
+ELASTICSEARCH_URL=http://elasticsearch:9200
+ELASTICSEARCH_USERNAME=elastic
+ELASTICSEARCH_PASSWORD=changeme
+
+# =============================================================================
+# Manus Platform (Auto-injected in production, manual in staging)
+# =============================================================================
+
+# JWT Secret for session signing
+JWT_SECRET=your-jwt-secret-here-change-me
+
+# Manus OAuth Application ID
+VITE_APP_ID=your-app-id
+
+# Manus OAuth Server URL
+OAUTH_SERVER_URL=https://api.manus.im
+
+# Manus OAuth Portal URL (frontend)
+VITE_OAUTH_PORTAL_URL=https://portal.manus.im
+
+# Platform Owner Information
+OWNER_OPEN_ID=owner-id
+OWNER_NAME=Owner Name
+
+# Manus Built-in APIs
+BUILT_IN_FORGE_API_URL=https://forge.manus.im
+BUILT_IN_FORGE_API_KEY=your-server-api-key
+VITE_FRONTEND_FORGE_API_KEY=your-frontend-api-key
+VITE_FRONTEND_FORGE_API_URL=https://forge.manus.im
+
+# Application Title
+VITE_APP_TITLE=IDLR-PTS Staging
+
+# Application Logo URL (optional)
+VITE_APP_LOGO=https://example.com/logo.png

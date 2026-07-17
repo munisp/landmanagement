@@ -1,0 +1,128 @@
+{
+  "parcels": [
+    {
+      "id": 1,
+      "parcelNumber": "LG-VI-2024-001",
+      "surveyPlanNumber": "SP/2024/001",
+      "state": "Lagos",
+      "lga": "Victoria Island",
+      "ward": "Ward 1",
+      "streetAddress": "123 Ahmadu Bello Way, Victoria Island",
+      "areaSquareMeters": 1200.5,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 150000000,
+      "notes": "Prime coastal residential parcel with clear survey history.",
+      "coordinates": {
+        "lat": 6.4281,
+        "lng": 3.4219
+      },
+      "boundaryCoordinates": "6.4281,3.4219;6.4285,3.4219;6.4285,3.4225;6.4281,3.4225",
+      "surveyorId": "system",
+      "verifierId": "registry-admin",
+      "verifiedAt": "2024-01-20T10:00:00.000Z",
+      "createdAt": "2024-01-15T09:00:00.000Z",
+      "updatedAt": "2024-01-20T10:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "parcelNumber": "AB-FCT-2024-002",
+      "surveyPlanNumber": "SP/2024/002",
+      "state": "Abuja",
+      "lga": "Garki",
+      "ward": "Ward 3",
+      "streetAddress": "45 Herbert Macaulay Way, Garki",
+      "areaSquareMeters": 850,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "commercial",
+      "status": "registered",
+      "estimatedValue": 200000000,
+      "notes": "Commercial asset with completed registry workflow.",
+      "coordinates": {
+        "lat": 9.0428,
+        "lng": 7.4891
+      },
+      "boundaryCoordinates": "9.0428,7.4891;9.0430,7.4891;9.0430,7.4895;9.0428,7.4895",
+      "surveyorId": "system",
+      "verifierId": "registry-admin",
+      "verifiedAt": "2024-02-12T13:00:00.000Z",
+      "createdAt": "2024-02-10T09:00:00.000Z",
+      "updatedAt": "2024-02-12T13:00:00.000Z"
+    },
+    {
+      "id": 3,
+      "parcelNumber": "KN-KN-2024-003",
+      "surveyPlanNumber": "SP/2024/003",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "ward": "Ward 5",
+      "streetAddress": "Plot 12 Murtala Mohammed Road",
+      "areaSquareMeters": 2500,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "agricultural",
+      "status": "pending_verification",
+      "estimatedValue": 50000000,
+      "notes": "Awaiting land office verification and title perfection.",
+      "coordinates": {
+        "lat": 12.0022,
+        "lng": 8.5919
+      },
+      "boundaryCoordinates": "12.0022,8.5919;12.0027,8.5919;12.0027,8.5925;12.0022,8.5925",
+      "surveyorId": "surveyor-1",
+      "createdAt": "2024-03-01T09:00:00.000Z",
+      "updatedAt": "2024-03-01T09:00:00.000Z"
+    },
+    {
+      "id": 4,
+      "parcelNumber": "LG-IK-2024-004",
+      "surveyPlanNumber": "SP/2024/004",
+      "state": "Lagos",
+      "lga": "Ikeja",
+      "ward": "Ward 2",
+      "streetAddress": "Plot 8 Industrial Avenue, Ikeja",
+      "areaSquareMeters": 3000,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "industrial",
+      "status": "verified",
+      "estimatedValue": 300000000,
+      "notes": "Industrial plot cleared for secured lending workflows.",
+      "coordinates": {
+        "lat": 6.6018,
+        "lng": 3.3515
+      },
+      "boundaryCoordinates": "6.6018,3.3515;6.6022,3.3515;6.6022,3.3521;6.6018,3.3521",
+      "surveyorId": "system",
+      "verifierId": "registry-admin",
+      "verifiedAt": "2024-01-25T12:00:00.000Z",
+      "createdAt": "2024-01-20T09:00:00.000Z",
+      "updatedAt": "2024-01-25T12:00:00.000Z"
+    },
+    {
+      "id": 5,
+      "parcelNumber": "AB-MA-2024-005",
+      "surveyPlanNumber": "SP/2024/005",
+      "state": "Abuja",
+      "lga": "Maitama",
+      "ward": "Ward 1",
+      "streetAddress": "15 Aguiyi Ironsi Street, Maitama",
+      "areaSquareMeters": 1500,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 250000000,
+      "notes": "High-value residential parcel suitable for premium mortgage products.",
+      "coordinates": {
+        "lat": 9.0952,
+        "lng": 7.4956
+      },
+      "boundaryCoordinates": "9.0952,7.4956;9.0956,7.4956;9.0956,7.4960;9.0952,7.4960",
+      "surveyorId": "system",
+      "verifierId": "registry-admin",
+      "verifiedAt": "2024-02-05T14:00:00.000Z",
+      "createdAt": "2024-02-01T09:00:00.000Z",
+      "updatedAt": "2024-02-05T14:00:00.000Z"
+    }
+  ],
+  "nextId": 6
+}

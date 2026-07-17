@@ -1,0 +1,361 @@
+---
+# Open Policy Agent (OPA) Deployment
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opa-policies
+  namespace: security
+data:
+  rbac.rego: |
+    package rbac
+    
+    import future.keywords.if
+    import future.keywords.in
+    
+    default allow := false
+    
+    # Admin users can do anything
+    allow if {
+      input.user.role == "admin"
+    }
+    
+    # Regular users can read their own data
+    allow if {
+      input.user.role == "user"
+      input.action == "read"
+      input.resource.owner == input.user.id
+    }
+    
+    # Registrars can approve transactions
+    allow if {
+      input.user.role == "registrar"
+      input.action in ["approve", "reject"]
+      input.resource.type == "transaction"
+    }
+  
+  violations.rego: |
+    package violations
+    
+    import future.keywords.if
+    import future.keywords.in
+    
+    # Track policy violations
+    violations[violation] if {
+      not data.rbac.allow
+      violation := {
+        "id": sprintf("%s-%d", [input.user.id, time.now_ns()]),
+        "policy": "rbac_policy",
+        "resource": input.resource.path,
+        "action": input.action,
+        "user": input.user.email,
+        "timestamp": time.now_ns(),
+        "severity": severity,
+        "message": sprintf("User %s attempted %s on %s without permission", 
+                          [input.user.email, input.action, input.resource.path])
+      }
+    }
+    
+    severity := "high" if {
+      input.action in ["delete", "modify"]
+    } else := "medium" if {
+      input.action == "create"
+    } else := "low"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opa
+  namespace: security
+  labels:
+    app: opa
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: opa
+  template:
+    metadata:
+      labels:
+        app: opa
+    spec:
+      containers:
+      - name: opa
+        image: openpolicyagent/opa:0.61.0
+        args:
+        - "run"
+        - "--server"
+        - "--addr=0.0.0.0:8181"
+        - "--log-level=info"
+        - "--log-format=json"
+        - "/policies"
+        ports:
+        - containerPort: 8181
+          name: http
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: policies
+          mountPath: /policies
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8181
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health?bundle=true
+            port: 8181
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: policies
+        configMap:
+          name: opa-policies
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opa
+  namespace: security
+  labels:
+    app: opa
+spec:
+  selector:
+    app: opa
+  ports:
+  - port: 8181
+    targetPort: 8181
+    name: http
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: opa-hpa
+  namespace: security
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: opa
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+# Kubecost Deployment
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubecost
+  namespace: security
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubecost
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - pods
+  - services
+  - resourcequotas
+  - replicationcontrollers
+  - limitranges
+  - persistentvolumeclaims
+  - persistentvolumes
+  - namespaces
+  - endpoints
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources:
+  - daemonsets
+  - deployments
+  - replicasets
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources:
+  - statefulsets
+  - deployments
+  - daemonsets
+  - replicasets
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources:
+  - cronjobs
+  - jobs
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["autoscaling"]
+  resources:
+  - horizontalpodautoscalers
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["policy"]
+  resources:
+  - poddisruptionbudgets
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["storage.k8s.io"]
+  resources:
+  - storageclasses
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubecost
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubecost
+subjects:
+- kind: ServiceAccount
+  name: kubecost
+  namespace: security
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubecost-config
+  namespace: security
+data:
+  prometheus-server-endpoint: "http://prometheus-server.monitoring:80"
+  kubecostToken: ""
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubecost
+  namespace: security
+  labels:
+    app: kubecost
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubecost
+  template:
+    metadata:
+      labels:
+        app: kubecost
+    spec:
+      serviceAccountName: kubecost
+      containers:
+      - name: kubecost-frontend
+        image: gcr.io/kubecost1/frontend:prod-1.108.1
+        ports:
+        - containerPort: 9090
+          name: http
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: persistent-configs
+          mountPath: /var/configs
+      - name: kubecost-cost-model
+        image: gcr.io/kubecost1/cost-model:prod-1.108.1
+        ports:
+        - containerPort: 9003
+          name: metrics
+        env:
+        - name: PROMETHEUS_SERVER_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: kubecost-config
+              key: prometheus-server-endpoint
+        - name: CLOUD_PROVIDER_API_KEY
+          value: "AIzaSyDXQPG_MHUEy9neR7stolq6l0ujXmjJlvk"
+        - name: CLUSTER_ID
+          value: "idlr-production-cluster"
+        - name: KUBECOST_NAMESPACE
+          value: "security"
+        - name: KUBECOST_TOKEN
+          valueFrom:
+            configMapKeyRef:
+              name: kubecost-config
+              key: kubecostToken
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 9003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 9003
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: persistent-configs
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubecost
+  namespace: security
+  labels:
+    app: kubecost
+spec:
+  selector:
+    app: kubecost
+  ports:
+  - port: 9090
+    targetPort: 9090
+    name: http
+  - port: 9003
+    targetPort: 9003
+    name: metrics
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubecost-ingress
+  namespace: security
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: kubecost.idlr.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kubecost
+            port:
+              number: 9090

@@ -1,0 +1,216 @@
+syntax = "proto3";
+
+package ledger;
+
+option go_package = "github.com/idlr-pts/tigerbeetle-service/proto";
+
+// LedgerService provides financial ledger operations using TigerBeetle
+service LedgerService {
+  // Account operations
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+  rpc GetAccountBalance(GetAccountBalanceRequest) returns (GetAccountBalanceResponse);
+  
+  // Transfer operations
+  rpc CreateTransfer(CreateTransferRequest) returns (CreateTransferResponse);
+  rpc GetTransfer(GetTransferRequest) returns (GetTransferResponse);
+  rpc GetAccountTransfers(GetAccountTransfersRequest) returns (GetAccountTransfersResponse);
+  
+  // Two-phase commit operations
+  rpc CreatePendingTransfer(CreatePendingTransferRequest) returns (CreatePendingTransferResponse);
+  rpc PostPendingTransfer(PostPendingTransferRequest) returns (PostPendingTransferResponse);
+  rpc VoidPendingTransfer(VoidPendingTransferRequest) returns (VoidPendingTransferResponse);
+  
+  // Reconciliation operations
+  rpc ReconcilePayment(ReconcilePaymentRequest) returns (ReconcilePaymentResponse);
+  rpc GetLedgerBalance(GetLedgerBalanceRequest) returns (GetLedgerBalanceResponse);
+}
+
+// Account types
+enum AccountType {
+  ACCOUNT_TYPE_UNSPECIFIED = 0;
+  ACCOUNT_TYPE_ASSET = 1;        // Property escrow, user wallets
+  ACCOUNT_TYPE_LIABILITY = 2;    // Pending payments, obligations
+  ACCOUNT_TYPE_EQUITY = 3;       // Platform equity accounts
+  ACCOUNT_TYPE_REVENUE = 4;      // Transaction fees, service charges
+  ACCOUNT_TYPE_EXPENSE = 5;      // Operating expenses, gas fees
+}
+
+// Transfer status
+enum TransferStatus {
+  TRANSFER_STATUS_UNSPECIFIED = 0;
+  TRANSFER_STATUS_PENDING = 1;
+  TRANSFER_STATUS_POSTED = 2;
+  TRANSFER_STATUS_VOIDED = 3;
+}
+
+// Account messages
+message CreateAccountRequest {
+  string account_id = 1;          // Unique account identifier (UUID or custom ID)
+  uint32 ledger_id = 2;           // Ledger identifier (e.g., 1 for main ledger)
+  uint32 code = 3;                // Account code (chart of accounts)
+  AccountType type = 4;           // Account type
+  string user_data_128 = 5;       // Custom metadata (128 bytes)
+}
+
+message CreateAccountResponse {
+  bool success = 1;
+  string error = 2;
+  Account account = 3;
+}
+
+message GetAccountRequest {
+  string account_id = 1;
+}
+
+message GetAccountResponse {
+  bool success = 1;
+  string error = 2;
+  Account account = 3;
+}
+
+message GetAccountBalanceRequest {
+  string account_id = 1;
+}
+
+message GetAccountBalanceResponse {
+  bool success = 1;
+  string error = 2;
+  int64 debits_posted = 3;
+  int64 credits_posted = 4;
+  int64 debits_pending = 5;
+  int64 credits_pending = 6;
+  int64 balance = 7;              // credits - debits
+}
+
+message Account {
+  string account_id = 1;
+  uint32 ledger_id = 2;
+  uint32 code = 3;
+  AccountType type = 4;
+  int64 debits_posted = 5;
+  int64 credits_posted = 6;
+  int64 debits_pending = 7;
+  int64 credits_pending = 8;
+  string user_data_128 = 9;
+  int64 timestamp = 10;
+}
+
+// Transfer messages
+message CreateTransferRequest {
+  string transfer_id = 1;         // Unique transfer identifier
+  string debit_account_id = 2;    // Source account
+  string credit_account_id = 3;   // Destination account
+  int64 amount = 4;               // Amount in smallest currency unit (e.g., cents)
+  uint32 ledger_id = 5;           // Ledger identifier
+  uint32 code = 6;                // Transfer code (reason/category)
+  string user_data_128 = 7;       // Custom metadata
+  int64 timeout = 8;              // Timeout for pending transfers (nanoseconds)
+}
+
+message CreateTransferResponse {
+  bool success = 1;
+  string error = 2;
+  Transfer transfer = 3;
+}
+
+message GetTransferRequest {
+  string transfer_id = 1;
+}
+
+message GetTransferResponse {
+  bool success = 1;
+  string error = 2;
+  Transfer transfer = 3;
+}
+
+message GetAccountTransfersRequest {
+  string account_id = 1;
+  int32 limit = 2;                // Maximum number of transfers to return
+  int64 timestamp_min = 3;        // Filter by minimum timestamp
+  int64 timestamp_max = 4;        // Filter by maximum timestamp
+}
+
+message GetAccountTransfersResponse {
+  bool success = 1;
+  string error = 2;
+  repeated Transfer transfers = 3;
+}
+
+message Transfer {
+  string transfer_id = 1;
+  string debit_account_id = 2;
+  string credit_account_id = 3;
+  int64 amount = 4;
+  uint32 ledger_id = 5;
+  uint32 code = 6;
+  TransferStatus status = 7;
+  string user_data_128 = 8;
+  int64 timestamp = 9;
+}
+
+// Two-phase commit messages
+message CreatePendingTransferRequest {
+  string transfer_id = 1;
+  string debit_account_id = 2;
+  string credit_account_id = 3;
+  int64 amount = 4;
+  uint32 ledger_id = 5;
+  uint32 code = 6;
+  string user_data_128 = 7;
+  int64 timeout = 8;              // Timeout in nanoseconds (0 = no timeout)
+}
+
+message CreatePendingTransferResponse {
+  bool success = 1;
+  string error = 2;
+  Transfer transfer = 3;
+}
+
+message PostPendingTransferRequest {
+  string transfer_id = 1;
+}
+
+message PostPendingTransferResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message VoidPendingTransferRequest {
+  string transfer_id = 1;
+}
+
+message VoidPendingTransferResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// Reconciliation messages
+message ReconcilePaymentRequest {
+  string payment_id = 1;          // Mojaloop payment ID
+  string transaction_hash = 2;    // Blockchain transaction hash
+  string debit_account_id = 3;    // Payer account
+  string credit_account_id = 4;   // Payee account
+  int64 amount = 5;
+  uint32 code = 6;                // Transfer code
+  string metadata = 7;            // Additional metadata (JSON)
+}
+
+message ReconcilePaymentResponse {
+  bool success = 1;
+  string error = 2;
+  string transfer_id = 3;
+  int64 timestamp = 4;
+}
+
+message GetLedgerBalanceRequest {
+  uint32 ledger_id = 1;
+}
+
+message GetLedgerBalanceResponse {
+  bool success = 1;
+  string error = 2;
+  int64 total_debits = 3;
+  int64 total_credits = 4;
+  int64 balance = 5;
+}

@@ -1,0 +1,14 @@
+{
+  "query": "\nCREATE TABLE IF NOT EXISTS document_processing_results (\n  id SERIAL PRIMARY KEY,\n  document_id INTEGER NOT NULL,\n  document_type VARCHAR(50),\n  ocr_text TEXT,\n  extracted_fields JSONB,\n  confidence_score DECIMAL(5,2),\n  fraud_indicators JSONB,\n  validation_status VARCHAR(20) DEFAULT 'pending',\n  processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  processed_by INTEGER\n);\n\nCREATE INDEX IF NOT EXISTS idx_doc_processing_document_id ON document_processing_results(document_id);\nCREATE INDEX IF NOT EXISTS idx_doc_processing_type ON document_processing_results(document_type);\nCREATE INDEX IF NOT EXISTS idx_doc_processing_status ON document_processing_results(validation_status);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user NzNswwN3cq6gauf.53d7f32ec8a4 --database Md9ypRHK4yuz574ZuX5amw --execute \nCREATE TABLE IF NOT EXISTS document_processing_results (\n  id SERIAL PRIMARY KEY,\n  document_id INTEGER NOT NULL,\n  document_type VARCHAR(50),\n  ocr_text TEXT,\n  extracted_fields JSONB,\n  confidence_score DECIMAL(5,2),\n  fraud_indicators JSONB,\n  validation_status VARCHAR(20) DEFAULT 'pending',\n  processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  processed_by INTEGER\n);\n\nCREATE INDEX IF NOT EXISTS idx_doc_processing_document_id ON document_processing_results(document_id);\nCREATE INDEX IF NOT EXISTS idx_doc_processing_type ON document_processing_results(document_type);\nCREATE INDEX IF NOT EXISTS idx_doc_processing_status ON document_processing_results(validation_status);\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 2: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 6 column 25 near \"JSONB,",
+    "  confidence_score DECIMAL(5,2),",
+    "  fraud_indicators JSONB,",
+    "  validation_status VARCHAR(20) DEFAULT 'pending',",
+    "  processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,",
+    "  processed_by INTEGER",
+    ")\""
+  ]
+}

@@ -1,0 +1,585 @@
+{
+  "common": {
+    "welcome": "Welcome",
+    "login": "Login",
+    "logout": "Logout",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Information"
+  },
+  "nav": {
+    "home": "Home",
+    "parcels": "Parcels",
+    "transactions": "Transactions",
+    "documents": "Documents",
+    "blockchain": "Blockchain",
+    "analytics": "Analytics",
+    "settings": "Settings",
+    "profile": "Profile"
+  },
+  "parcel": {
+    "title": "Land Parcels",
+    "register": "Register Parcel",
+    "search": "Search Parcels",
+    "id": "Parcel ID",
+    "owner": "Owner",
+    "location": "Location",
+    "area": "Land Area",
+    "value": "Estimated Value",
+    "status": "Status",
+    "landUse": "Land Use Type",
+    "state": "State",
+    "lga": "Local Government Area",
+    "address": "Address",
+    "coordinates": "Coordinates",
+    "active": "Active",
+    "pending": "Pending",
+    "disputed": "Disputed",
+    "inactive": "Inactive"
+  },
+  "transaction": {
+    "title": "Transactions",
+    "initiate": "Initiate Transaction",
+    "type": "Transaction Type",
+    "transfer": "Transfer",
+    "mortgage": "Mortgage",
+    "lease": "Lease",
+    "subdivision": "Subdivision",
+    "consolidation": "Consolidation",
+    "amount": "Amount",
+    "from": "From",
+    "to": "To",
+    "date": "Date",
+    "status": "Status",
+    "approved": "Approved",
+    "completed": "Completed",
+    "rejected": "Rejected",
+    "cancelled": "Cancelled"
+  },
+  "document": {
+    "title": "Documents",
+    "upload": "Upload Document",
+    "type": "Document Type",
+    "titleDeed": "Title Deed",
+    "surveyPlan": "Survey Plan",
+    "cof": "Certificate of Occupancy",
+    "receipt": "Receipt",
+    "contract": "Contract",
+    "filename": "File Name",
+    "uploadedAt": "Uploaded At"
+  },
+  "blockchain": {
+    "title": "Blockchain Verification",
+    "verify": "Verify on Blockchain",
+    "txHash": "Transaction Hash",
+    "blockNumber": "Block Number",
+    "verified": "Verified",
+    "notVerified": "Not Verified"
+  },
+  "analytics": {
+    "title": "Analytics Dashboard",
+    "totalTransactions": "Total Transactions",
+    "totalValue": "Total Value",
+    "averageValue": "Average Value",
+    "byType": "By Type",
+    "byStatus": "By Status",
+    "byState": "By State",
+    "trend": "Trend",
+    "revenue": "Revenue",
+    "growth": "Growth"
+  },
+  "validation": {
+    "required": "This field is required",
+    "invalidEmail": "Invalid email address",
+    "invalidPhone": "Invalid phone number",
+    "minLength": "Minimum length is {{min}} characters",
+    "maxLength": "Maximum length is {{max}} characters",
+    "invalidFormat": "Invalid format"
+  },
+  "messages": {
+    "loginSuccess": "Login successful",
+    "logoutSuccess": "Logout successful",
+    "saveSuccess": "Saved successfully",
+    "deleteSuccess": "Deleted successfully",
+    "updateSuccess": "Updated successfully",
+    "errorOccurred": "An error occurred",
+    "noResults": "No results found",
+    "confirmDelete": "Are you sure you want to delete this item?"
+  },
+  "admin": {
+    "userManagement": {
+      "title": "User Management",
+      "totalUsers": "Total Users",
+      "activeUsers": "Active Users",
+      "suspendedUsers": "Suspended Users",
+      "adminUsers": "Admin Users",
+      "userList": "User List",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "status": "Status",
+      "lastActive": "Last Active",
+      "actions": "Actions",
+      "changeRole": "Change Role",
+      "suspend": "Suspend",
+      "activate": "Activate",
+      "viewActivity": "View Activity",
+      "active": "Active",
+      "suspended": "Suspended",
+      "roleUser": "User",
+      "roleSurveyor": "Surveyor",
+      "roleRegistrar": "Registrar",
+      "roleAdmin": "Administrator",
+      "changeRoleTitle": "Change User Role",
+      "changeRoleDesc": "Select a new role for this user",
+      "selectRole": "Select role",
+      "suspendUserTitle": "Suspend User",
+      "suspendUserDesc": "Please provide a reason for suspension",
+      "suspensionReason": "Suspension Reason",
+      "enterReason": "Enter suspension reason...",
+      "activityLog": "Activity Log",
+      "noActivity": "No activity recorded",
+      "roleChanged": "Role changed successfully",
+      "userSuspended": "User suspended successfully",
+      "userActivated": "User activated successfully",
+      "pagination": "Page {{current}} of {{total}}"
+    },
+    "verification": {
+      "title": "Parcel Verification Workflow",
+      "stats": {
+        "totalRequests": "Total Requests",
+        "pending": "Pending Review",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "requestList": "Verification Requests",
+      "parcelId": "Parcel ID",
+      "requester": "Requester",
+      "reviewer": "Reviewer",
+      "status": "Status",
+      "submittedAt": "Submitted At",
+      "actions": "Actions",
+      "viewDetails": "View Details",
+      "assignReviewer": "Assign Reviewer",
+      "approve": "Approve",
+      "reject": "Reject",
+      "statusDraft": "Draft",
+      "statusSubmitted": "Submitted",
+      "statusUnderReview": "Under Review",
+      "statusApproved": "Approved",
+      "statusRejected": "Rejected",
+      "documents": "Documents",
+      "history": "History",
+      "noDocuments": "No documents uploaded",
+      "noHistory": "No history available",
+      "assignReviewerTitle": "Assign Reviewer",
+      "assignReviewerDesc": "Select a reviewer for this verification request",
+      "selectReviewer": "Select reviewer",
+      "rejectTitle": "Reject Verification",
+      "rejectDesc": "Please provide a reason for rejection",
+      "rejectionReason": "Rejection Reason",
+      "enterReason": "Enter rejection reason...",
+      "reviewerAssigned": "Reviewer assigned successfully",
+      "verificationApproved": "Verification approved successfully",
+      "verificationRejected": "Verification rejected successfully"
+    },
+    "executive": {
+      "title": "Executive Dashboard",
+      "overview": "Overview",
+      "kpis": "Key Performance Indicators",
+      "totalTransactions": "Total Transactions",
+      "totalRevenue": "Total Revenue",
+      "avgProcessingTime": "Avg Processing Time",
+      "completionRate": "Completion Rate",
+      "transactionVolume": "Transaction Volume",
+      "revenueBreakdown": "Revenue Breakdown",
+      "processingTimes": "Processing Times",
+      "predictiveAnalytics": "Predictive Analytics",
+      "workloadForecast": "30-Day Workload Forecast",
+      "trendAnalysis": "Trend Analysis",
+      "periodComparison": "Period Comparison",
+      "thisMonth": "This Month",
+      "lastMonth": "Last Month",
+      "change": "Change",
+      "transactions": "Transactions",
+      "revenue": "Revenue",
+      "avgTime": "Avg Time",
+      "hours": "hours",
+      "days": "days",
+      "byType": "By Type",
+      "byStatus": "By Status",
+      "sale": "Sale",
+      "transfer": "Transfer",
+      "lease": "Lease",
+      "mortgage": "Mortgage",
+      "completed": "Completed",
+      "pending": "Pending",
+      "failed": "Failed",
+      "forecast": "Forecast",
+      "actual": "Actual",
+      "predicted": "Predicted"
+    },
+    "reporting": {
+      "title": "Advanced Reporting",
+      "subtitle": "Generate and schedule reports with multiple export formats",
+      "generateNow": "Generate Now",
+      "scheduleReport": "Schedule Report",
+      "scheduledReports": "Scheduled Reports",
+      "reportHistory": "Report History",
+      "reportType": "Report Type",
+      "format": "Format",
+      "frequency": "Frequency",
+      "reportName": "Report Name",
+      "description": "Description",
+      "emailDelivery": "Email Delivery",
+      "generateReportTitle": "Generate Report",
+      "generateReportDesc": "Generate a report immediately and download it",
+      "scheduleReportTitle": "Schedule Report",
+      "scheduleReportDesc": "Create a scheduled report that runs automatically",
+      "generating": "Generating...",
+      "generate": "Generate",
+      "schedule": "Schedule",
+      "reportTypes": {
+        "parcel_registry": "Parcel Registry",
+        "transaction_summary": "Transaction Summary",
+        "verification_status": "Verification Status",
+        "user_activity": "User Activity"
+      },
+      "formats": {
+        "pdf": "PDF",
+        "excel": "Excel (XLSX)",
+        "csv": "CSV"
+      },
+      "frequencies": {
+        "once": "One-time",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly"
+      },
+      "name": "Name",
+      "nextRun": "Next Run",
+      "lastRun": "Last Run",
+      "actions": "Actions",
+      "delete": "Delete",
+      "generatedAt": "Generated At",
+      "download": "Download",
+      "noScheduledReports": "No scheduled reports",
+      "noReportHistory": "No report history",
+      "reportCreated": "Scheduled report created successfully",
+      "reportGenerated": "Report generated successfully",
+      "reportDeleted": "Scheduled report deleted",
+      "enterReportName": "Please enter a report name",
+      "reportFailed": "Failed to generate report"
+    },
+    "security": {
+      "title": "Security Monitoring",
+      "subtitle": "Monitor security events and manage IP blocking",
+      "stats": "Security Statistics",
+      "totalEvents": "Total Events",
+      "criticalEvents": "Critical Events",
+      "blockedIPs": "Blocked IPs",
+      "failedLogins": "Failed Logins",
+      "securityEvents": "Security Events",
+      "blockedIPList": "Blocked IP Addresses",
+      "timeRange": "Time Range",
+      "eventType": "Event Type",
+      "severity": "Severity",
+      "blockIP": "Block IP",
+      "unblock": "Unblock",
+      "ipAddress": "IP Address",
+      "reason": "Reason",
+      "blockedAt": "Blocked At",
+      "expiresAt": "Expires At",
+      "permanent": "Permanent",
+      "blockDuration": "Block Duration (minutes)",
+      "blockIPTitle": "Block IP Address",
+      "blockIPDesc": "Block an IP address from accessing the system",
+      "enterIP": "Enter IP address",
+      "enterReason": "Enter reason for blocking",
+      "isPermanent": "Permanent Block",
+      "ipBlocked": "IP address blocked successfully",
+      "ipUnblocked": "IP address unblocked successfully",
+      "confirmUnblock": "Are you sure you want to unblock",
+      "fillAllFields": "Please fill in all fields",
+      "severities": {
+        "critical": "Critical",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      }
+    },
+    "documentValidation": {
+      "title": "Document Validation",
+      "subtitle": "AI-powered document verification and validation",
+      "uploadDocument": "Upload Document",
+      "validationQueue": "Validation Queue",
+      "validationHistory": "Validation History",
+      "documentType": "Document Type",
+      "status": "Status",
+      "confidence": "Confidence",
+      "validatedAt": "Validated At",
+      "actions": "Actions",
+      "viewDetails": "View Details",
+      "revalidate": "Revalidate",
+      "approve": "Approve",
+      "reject": "Reject",
+      "pending": "Pending",
+      "validated": "Validated",
+      "failed": "Failed",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "verificationAnalytics": {
+      "title": "Verification Analytics",
+      "subtitle": "Detailed analytics and insights on verification processes",
+      "overview": "Overview",
+      "trends": "Trends",
+      "performance": "Performance",
+      "totalVerifications": "Total Verifications",
+      "avgProcessingTime": "Avg Processing Time",
+      "approvalRate": "Approval Rate",
+      "rejectionRate": "Rejection Rate",
+      "verificationVolume": "Verification Volume",
+      "processingTimes": "Processing Times",
+      "statusDistribution": "Status Distribution",
+      "reviewerPerformance": "Reviewer Performance"
+    },
+    "blockchain": {
+      "title": "Blockchain Transactions",
+      "subtitle": "View and verify blockchain transactions",
+      "recentTransactions": "Recent Transactions",
+      "transactionHash": "Transaction Hash",
+      "blockNumber": "Block Number",
+      "timestamp": "Timestamp",
+      "type": "Type",
+      "status": "Status",
+      "viewOnExplorer": "View on Explorer",
+      "verify": "Verify",
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "failed": "Failed",
+      "propertyTransfer": "Property Transfer",
+      "escrow": "Escrow",
+      "multiSig": "Multi-Signature"
+    },
+    "home": {
+      "header": {
+        "title": "IDLR-PTS",
+        "subtitle": "Integrated Digital Land Registry",
+        "dashboard": "Dashboard",
+        "searchParcels": "Search Parcels",
+        "admin": "Admin",
+        "reports": "Reports",
+        "bulkImport": "Bulk Import",
+        "profile": "Profile",
+        "signIn": "Sign In"
+      },
+      "hero": {
+        "title": "Secure, Transparent Land Registry System",
+        "subtitle": "Blockchain-powered land title management with AI-assisted boundary detection, real-time verification, and seamless payment processing.",
+        "searchParcels": "Search Parcels",
+        "getStarted": "Get Started"
+      },
+      "features": {
+        "title": "Platform Features",
+        "blockchainSecurity": {
+          "title": "Blockchain Security",
+          "description": "All land titles are recorded on Hyperledger Fabric with IPFS document storage"
+        },
+        "gisIntegration": {
+          "title": "GIS Integration",
+          "description": "PostGIS-powered geospatial queries with interactive map visualization"
+        },
+        "aiPoweredOCR": {
+          "title": "AI-Powered OCR",
+          "description": "Automated document text extraction using OLMOCR and GOT-OCR2.0"
+        },
+        "realTimeAnalytics": {
+          "title": "Real-Time Analytics",
+          "description": "Lakehouse architecture with Apache Spark and Flink for advanced analytics"
+        },
+        "multiRoleAccess": {
+          "title": "Multi-Role Access",
+          "description": "Separate portals for citizens, surveyors, registrars, and administrators"
+        },
+        "paymentIntegration": {
+          "title": "Payment Integration",
+          "description": "Mojaloop and TigerBeetle for secure, instant payment processing"
+        }
+      },
+      "howItWorks": {
+        "title": "How It Works",
+        "step1": {
+          "title": "Search & Verify",
+          "description": "Search for land parcels by location, parcel number, or owner. Verify ownership and boundaries."
+        },
+        "step2": {
+          "title": "Initiate Transaction",
+          "description": "Start registration, transfer, or other land transactions with automated workflow management."
+        },
+        "step3": {
+          "title": "Complete & Record",
+          "description": "Process payment, complete verification, and record on blockchain for permanent proof."
+        }
+      },
+      "cta": {
+        "title": "Ready to Get Started?",
+        "subtitle": "Join thousands of users managing their land titles securely and transparently",
+        "createAccount": "Create Account"
+      },
+      "footer": {
+        "about": {
+          "title": "About",
+          "aboutUs": "About Us",
+          "contact": "Contact",
+          "careers": "Careers"
+        },
+        "services": {
+          "title": "Services",
+          "searchParcels": "Search Parcels",
+          "registerLand": "Register Land",
+          "transferTitle": "Transfer Title"
+        },
+        "resources": {
+          "title": "Resources",
+          "apiDocumentation": "API Documentation",
+          "blockchainExplorer": "Blockchain Explorer",
+          "propertyValuation": "Property Valuation",
+          "disputeResolution": "Dispute Resolution",
+          "auditTrail": "Audit Trail"
+        },
+        "legal": {
+          "title": "Legal",
+          "privacyPolicy": "Privacy Policy",
+          "termsOfService": "Terms of Service",
+          "compliance": "Compliance"
+        },
+        "copyright": "© 2026 IDLR-PTS. All rights reserved. Powered by blockchain technology."
+      }
+    }
+  },
+  "searchParcels": {
+    "header": {
+      "backToHome": "← Back to Home"
+    },
+    "title": "Search Land Parcels",
+    "subtitle": "Search for land parcels using basic or advanced search criteria",
+    "searchCriteria": {
+      "title": "Search Criteria",
+      "description": "Enter search parameters to find land parcels"
+    },
+    "tabs": {
+      "basicSearch": "Basic Search",
+      "advancedFilters": "Advanced Filters"
+    },
+    "basicSearch": {
+      "parcelNumberLabel": "Parcel Number or Address",
+      "parcelNumberPlaceholder": "Enter parcel number or address...",
+      "stateLabel": "State",
+      "statePlaceholder": "Select state",
+      "allStates": "All States",
+      "lgaLabel": "Local Government Area",
+      "lgaPlaceholder": "Enter LGA...",
+      "statusLabel": "Status",
+      "statusPlaceholder": "Select status",
+      "allStatuses": "All Statuses",
+      "verified": "Verified",
+      "pendingVerification": "Pending Verification",
+      "registered": "Registered",
+      "disputed": "Disputed"
+    },
+    "advancedFilters": {
+      "priceRange": "Price Range (₦)",
+      "minPrice": "Min price",
+      "maxPrice": "Max price",
+      "areaRange": "Area Range (m²)",
+      "minArea": "Min area",
+      "maxArea": "Max area",
+      "landUseType": "Land Use Type",
+      "landUsePlaceholder": "Select land use",
+      "allTypes": "All Types",
+      "residential": "Residential",
+      "commercial": "Commercial",
+      "industrial": "Industrial",
+      "agricultural": "Agricultural",
+      "mixed": "Mixed Use",
+      "activeFilters": "Active Filters:",
+      "noFilters": "No advanced filters applied"
+    },
+    "buttons": {
+      "searching": "Searching...",
+      "searchParcels": "Search Parcels",
+      "clearFilters": "Clear Filters"
+    },
+    "results": {
+      "title": "Search Results",
+      "parcelsFound": "parcels found",
+      "area": "Area:",
+      "landUse": "Land Use:",
+      "surveyPlan": "Survey Plan:",
+      "viewDetails": "View Details",
+      "viewOnMap": "View on Map",
+      "noResults": "No parcels found matching your search criteria",
+      "enterCriteria": "Enter search criteria and click \"Search Parcels\" to begin"
+    }
+  },
+  "dashboard": {
+    "header": {
+      "dashboard": "Dashboard",
+      "search": "Search",
+      "mySurveys": "My Surveys",
+      "admin": "Admin",
+      "signOut": "Sign Out"
+    },
+    "title": "Dashboard",
+    "accessDenied": {
+      "title": "Access Denied",
+      "description": "Please sign in to access the dashboard"
+    },
+    "stats": {
+      "totalParcels": "Total Parcels",
+      "verified": "verified",
+      "propertyTitles": "Property Titles",
+      "active": "active",
+      "transactions": "Transactions",
+      "completed": "completed",
+      "pendingActions": "Pending Actions",
+      "requiresAction": "requires action"
+    },
+    "myTitles": {
+      "title": "My Property Titles",
+      "noTitles": "No property titles found",
+      "getTitles": "Start by searching for parcels or registering new land"
+    },
+    "recentTransactions": {
+      "title": "Recent Transactions",
+      "noTransactions": "No recent transactions",
+      "viewAll": "View All Transactions"
+    },
+    "quickActions": {
+      "title": "Quick Actions",
+      "searchParcels": "Search Parcels",
+      "registerLand": "Register Land",
+      "transferTitle": "Transfer Title",
+      "viewReports": "View Reports"
+    },
+    "activityFeed": {
+      "title": "Recent Activity"
+    }
+  }
+}

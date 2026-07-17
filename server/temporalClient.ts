@@ -1,0 +1,187 @@
+/**
+ * Temporal Client
+ * 
+ * Client for starting, querying, and managing Temporal workflows
+ */
+
+import { Client, Connection } from '@temporalio/client';
+import {
+  propertyTransactionWorkflow,
+  type PropertyTransactionInput,
+  type PropertyTransactionState,
+  approvePaymentSignal,
+  cancelTransactionSignal,
+  getStateQuery,
+  getProgressQuery,
+} from '../temporal/workflows/propertyTransactionWorkflow';
+
+let client: Client | null = null;
+
+/**
+ * Initialize Temporal client connection
+ */
+export async function initializeTemporalClient(): Promise<boolean> {
+  try {
+    const connection = await Connection.connect({
+      address: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
+      // TLS configuration for production
+      tls: process.env.TEMPORAL_TLS_ENABLED === 'true' ? {
+        clientCertPair: {
+          crt: Buffer.from(process.env.TEMPORAL_TLS_CERT || '', 'utf-8'),
+          key: Buffer.from(process.env.TEMPORAL_TLS_KEY || '', 'utf-8'),
+        },
+      } : undefined,
+    });
+
+    client = new Client({
+      connection,
+      namespace: process.env.TEMPORAL_NAMESPACE || 'default',
+    });
+
+    console.log('✅ Temporal client initialized');
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to initialize Temporal client:', error);
+    return false;
+  }
+}
+
+/**
+ * Get Temporal client instance
+ */
+export function getTemporalClient(): Client {
+  if (!client) {
+    throw new Error('Temporal client not initialized. Call initializeTemporalClient() first.');
+  }
+  return client;
+}
+
+/**
+ * Start a new property transaction workflow
+ */
+export async function startPropertyTransactionWorkflow(
+  input: PropertyTransactionInput
+): Promise<{ workflowId: string; runId: string }> {
+  const temporalClient = getTemporalClient();
+
+  const workflowId = `property-transaction-${input.propertyId}-${Date.now()}`;
+
+  const handle = await temporalClient.workflow.start(propertyTransactionWorkflow, {
+    taskQueue: 'property-transactions',
+    workflowId,
+    args: [input],
+    // Workflow timeout (max 7 days for long-running transactions)
+    workflowExecutionTimeout: '7 days',
+    // Workflow run timeout (max 24 hours per run)
+    workflowRunTimeout: '24 hours',
+    // Task timeout (max 1 minute per task)
+    workflowTaskTimeout: '1 minute',
+  });
+
+  return {
+    workflowId: handle.workflowId,
+    runId: handle.firstExecutionRunId,
+  };
+}
+
+/**
+ * Approve payment for a workflow
+ */
+export async function approvePaymentForWorkflow(
+  workflowId: string,
+  approvalCode: string
+): Promise<void> {
+  const temporalClient = getTemporalClient();
+
+  const handle = temporalClient.workflow.getHandle(workflowId);
+  await handle.signal(approvePaymentSignal, approvalCode);
+}
+
+/**
+ * Cancel a workflow
+ */
+export async function cancelWorkflow(workflowId: string): Promise<void> {
+  const temporalClient = getTemporalClient();
+
+  const handle = temporalClient.workflow.getHandle(workflowId);
+  await handle.signal(cancelTransactionSignal);
+}
+
+/**
+ * Get workflow state
+ */
+export async function getWorkflowState(workflowId: string): Promise<PropertyTransactionState> {
+  const temporalClient = getTemporalClient();
+
+  const handle = temporalClient.workflow.getHandle(workflowId);
+  return await handle.query(getStateQuery);
+}
+
+/**
+ * Get workflow progress (0-100%)
+ */
+export async function getWorkflowProgress(workflowId: string): Promise<number> {
+  const temporalClient = getTemporalClient();
+
+  const handle = temporalClient.workflow.getHandle(workflowId);
+  return await handle.query(getProgressQuery);
+}
+
+/**
+ * Wait for workflow completion
+ */
+export async function waitForWorkflowCompletion(
+  workflowId: string
+): Promise<PropertyTransactionState> {
+  const temporalClient = getTemporalClient();
+
+  const handle = temporalClient.workflow.getHandle(workflowId);
+  return await handle.result();
+}
+
+/**
+ * List all workflows for a property
+ */
+export async function listPropertyWorkflows(propertyId: string): Promise<any[]> {
+  const temporalClient = getTemporalClient();
+
+  const workflows = [];
+  
+  for await (const workflow of temporalClient.workflow.list({
+    query: `WorkflowId STARTS_WITH "property-transaction-${propertyId}-"`,
+  })) {
+    workflows.push({
+      workflowId: workflow.workflowId,
+      runId: workflow.runId,
+      status: workflow.status.name,
+      startTime: workflow.startTime,
+      closeTime: workflow.closeTime,
+    });
+  }
+
+  return workflows;
+}
+
+/**
+ * Terminate a workflow (force stop)
+ */
+export async function terminateWorkflow(
+  workflowId: string,
+  reason: string
+): Promise<void> {
+  const temporalClient = getTemporalClient();
+
+  const handle = temporalClient.workflow.getHandle(workflowId);
+  await handle.terminate(reason);
+}
+
+/**
+ * Shutdown Temporal client
+ */
+export async function shutdownTemporalClient(): Promise<void> {
+  if (client) {
+    client.connection.close();
+    client = null;
+    console.log('✅ Temporal client shut down');
+  }
+}

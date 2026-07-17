@@ -1,0 +1,65 @@
+{
+  "titles": [
+    {
+      "id": 1,
+      "titleNumber": "C-of-O-LG-VI-2024-001",
+      "parcelId": 1,
+      "ownerId": 1,
+      "ownerName": "Amina Bello",
+      "ownershipType": "sole",
+      "ownershipPercentage": 100,
+      "titleType": "certificate_of_occupancy",
+      "status": "verified",
+      "issuedAt": "2024-01-22T09:00:00.000Z",
+      "verifiedAt": "2024-01-22T09:00:00.000Z",
+      "createdAt": "2024-01-18T09:00:00.000Z",
+      "updatedAt": "2024-01-22T09:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "titleNumber": "R-of-O-AB-FCT-2024-002",
+      "parcelId": 2,
+      "ownerId": 2,
+      "ownerName": "Chinedu Okafor Holdings",
+      "ownershipType": "corporate",
+      "ownershipPercentage": 100,
+      "titleType": "right_of_occupancy",
+      "status": "registered",
+      "issuedAt": "2024-02-14T11:00:00.000Z",
+      "verifiedAt": "2024-02-13T15:00:00.000Z",
+      "createdAt": "2024-02-11T09:00:00.000Z",
+      "updatedAt": "2024-02-14T11:00:00.000Z"
+    },
+    {
+      "id": 3,
+      "titleNumber": "DEED-KN-KN-2024-003",
+      "parcelId": 3,
+      "ownerId": 3,
+      "ownerName": "Musa Garba Farms",
+      "ownershipType": "corporate",
+      "ownershipPercentage": 100,
+      "titleType": "deed_of_assignment",
+      "status": "pending_verification",
+      "encumbranceNotes": "Awaiting governor consent and registry review.",
+      "createdAt": "2024-03-02T09:00:00.000Z",
+      "updatedAt": "2024-03-02T09:00:00.000Z"
+    },
+    {
+      "id": 4,
+      "titleNumber": "C-of-O-LG-IK-2024-004",
+      "parcelId": 4,
+      "ownerId": 4,
+      "ownerName": "Industrial Assets Limited",
+      "ownershipType": "corporate",
+      "ownershipPercentage": 100,
+      "titleType": "certificate_of_occupancy",
+      "status": "encumbered",
+      "issuedAt": "2024-01-27T10:30:00.000Z",
+      "verifiedAt": "2024-01-26T17:00:00.000Z",
+      "encumbranceNotes": "Registered mortgage in favor of Unity Commercial Bank.",
+      "createdAt": "2024-01-23T09:00:00.000Z",
+      "updatedAt": "2024-02-28T10:00:00.000Z"
+    }
+  ],
+  "nextId": 5
+}

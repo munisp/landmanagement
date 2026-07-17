@@ -1,0 +1,311 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: idlr-pts-postgres
+    environment:
+      POSTGRES_DB: idlr_pts_staging
+      POSTGRES_USER: idlr_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U idlr_admin -d idlr_pts_staging"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - idlr-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: idlr-pts-redis
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - idlr-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # Application Server
+  app:
+    image: ${DOCKER_REGISTRY}/idlr-pts:${VERSION:-latest}
+    container_name: idlr-pts-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # System
+      NODE_ENV: staging
+      LOG_LEVEL: info
+      LOG_FORMAT: json
+      PORT: 3000
+      
+      # Database
+      DATABASE_URL: postgresql://idlr_admin:${POSTGRES_PASSWORD}@postgres:5432/idlr_pts_staging
+      DATABASE_POOL_MIN: 10
+      DATABASE_POOL_MAX: 100
+      DATABASE_IDLE_TIMEOUT: 30000
+      DATABASE_CONNECT_TIMEOUT: 10000
+      
+      # Cache
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_DB: 0
+      REDIS_MAX_RETRIES: 3
+      CACHE_ENABLED: "true"
+      CACHE_TTL_SHORT: 120
+      CACHE_TTL_MEDIUM: 300
+      CACHE_TTL_LONG: 1800
+      CACHE_TTL_VERY_LONG: 3600
+      
+      # External Services (configure as needed)
+      FABRIC_GATEWAY_URL: ${FABRIC_GATEWAY_URL:-grpc://fabric:7051}
+      FABRIC_MSP_ID: ${FABRIC_MSP_ID:-Org1MSP}
+      FABRIC_CHANNEL_NAME: ${FABRIC_CHANNEL_NAME:-mychannel}
+      FABRIC_CHAINCODE_NAME: ${FABRIC_CHAINCODE_NAME:-basic}
+      
+      MOJALOOP_API_URL: ${MOJALOOP_API_URL:-https://mojaloop-staging:8080}
+      MOJALOOP_PARTICIPANT_ID: ${MOJALOOP_PARTICIPANT_ID:-land-registry-fsp}
+      
+      TIGERBEETLE_CLUSTER_ID: ${TIGERBEETLE_CLUSTER_ID:-0}
+      TIGERBEETLE_REPLICAS: ${TIGERBEETLE_REPLICAS:-3001,3002,3003}
+      
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-idlr-pts-staging}
+      KAFKA_GROUP_ID: ${KAFKA_GROUP_ID:-idlr-pts-consumers}
+      
+      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      
+      # Monitoring
+      HEALTH_MONITOR_ENABLED: "true"
+      HEALTH_MONITOR_INTERVAL: 30000
+      METRICS_ENABLED: "true"
+      METRICS_PORT: 9090
+      
+      # Alerts
+      ALERTS_ENABLED: "true"
+      ALERT_CHANNELS: ${ALERT_CHANNELS:-slack}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+      ALERT_EMAIL_RECIPIENTS: ${ALERT_EMAIL_RECIPIENTS}
+      ALERT_THRESHOLD_RESPONSE_TIME: 5000
+      ALERT_THRESHOLD_ERROR_RATE: 0.05
+      ALERT_THRESHOLD_DOWNTIME: 300
+      
+      # Error Tracking
+      SENTRY_DSN: ${SENTRY_DSN}
+      SENTRY_ENVIRONMENT: staging
+      SENTRY_SAMPLE_RATE: 1.0
+      SENTRY_TRACES_SAMPLE_RATE: 0.1
+      
+      # Security
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX_REQUESTS: 100
+      
+      # Auto-injected by Manus (placeholders for reference)
+      JWT_SECRET: ${JWT_SECRET}
+      VITE_APP_ID: ${VITE_APP_ID}
+      OAUTH_SERVER_URL: ${OAUTH_SERVER_URL}
+      VITE_OAUTH_PORTAL_URL: ${VITE_OAUTH_PORTAL_URL}
+      OWNER_OPEN_ID: ${OWNER_OPEN_ID}
+      OWNER_NAME: ${OWNER_NAME}
+      BUILT_IN_FORGE_API_URL: ${BUILT_IN_FORGE_API_URL}
+      BUILT_IN_FORGE_API_KEY: ${BUILT_IN_FORGE_API_KEY}
+      VITE_FRONTEND_FORGE_API_KEY: ${VITE_FRONTEND_FORGE_API_KEY}
+      VITE_FRONTEND_FORGE_API_URL: ${VITE_FRONTEND_FORGE_API_URL}
+      VITE_APP_TITLE: ${VITE_APP_TITLE:-IDLR-PTS Staging}
+      VITE_APP_LOGO: ${VITE_APP_LOGO}
+    ports:
+      - "3000:3000"
+      - "9090:9090"
+    volumes:
+      - app_logs:/app/.manus-logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - idlr-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+  # Nginx Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: idlr-pts-nginx
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - idlr-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '1'
+          memory: 512M
+
+  # Prometheus (Monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: idlr-pts-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"
+    networks:
+      - idlr-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  # Alertmanager (Alert Routing)
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: idlr-pts-alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - idlr-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Grafana (Visualization)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: idlr-pts-grafana
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3001:3000"
+    networks:
+      - idlr-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  idlr-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

@@ -1,0 +1,190 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: idlr-keycloak
+    command: ["start-dev", "--http-port=8089"]
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-idlr_pts}
+      KC_DB_USERNAME: ${POSTGRES_USER:-idlr}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-idlr}
+      KC_HOSTNAME_STRICT: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8089:8089"
+    networks:
+      - idlr_net
+
+  permify:
+    image: ghcr.io/permify/permify:latest
+    container_name: idlr-permify
+    command: ["serve"]
+    environment:
+      PERMIFY_DATABASE_ENGINE: postgres
+      PERMIFY_DATABASE_URI: postgres://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3476:3476"
+      - "3478:3478"
+    networks:
+      - idlr_net
+
+  apisix-etcd:
+    image: bitnami/etcd:3.5
+    container_name: idlr-apisix-etcd
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: http://apisix-etcd:2379
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+    ports:
+      - "2379:2379"
+    networks:
+      - idlr_net
+
+  apisix:
+    image: apache/apisix:3.9.1-debian
+    container_name: idlr-apisix
+    depends_on:
+      apisix-etcd:
+        condition: service_started
+    environment:
+      APISIX_STAND_ALONE: "false"
+      APISIX_ENABLE_ADMIN: "true"
+      ETCD_HOST: http://apisix-etcd:2379
+      APISIX_ADMIN_KEY: ${APISIX_API_KEY:-apisix-placeholder-key}
+    ports:
+      - "9080:9080"
+      - "9180:9180"
+    networks:
+      - idlr_net
+
+  dapr-placement:
+    image: daprio/dapr:1.14.4
+    container_name: idlr-dapr-placement
+    command: ["./placement", "--port", "50006"]
+    ports:
+      - "50006:50006"
+    networks:
+      - idlr_net
+
+  dapr-sidecar:
+    image: daprio/daprd:1.14.4
+    container_name: idlr-dapr-sidecar
+    command:
+      - "./daprd"
+      - "--app-id"
+      - "idlr-pts-platform"
+      - "--app-port"
+      - "3000"
+      - "--placement-host-address"
+      - "dapr-placement:50006"
+      - "--dapr-http-port"
+      - "3500"
+      - "--dapr-grpc-port"
+      - "50001"
+      - "--resources-path"
+      - "/components"
+    depends_on:
+      app:
+        condition: service_started
+      dapr-placement:
+        condition: service_started
+    volumes:
+      - ./infrastructure/dapr/components:/components:ro
+    network_mode: service:app
+
+  fluvio-sc:
+    image: infinyon/fluvio:stable
+    container_name: idlr-fluvio-sc
+    command: ["fluvio", "run", "sc"]
+    ports:
+      - "9103:9003"
+    networks:
+      - idlr_net
+
+  lakehouse-api:
+    build:
+      context: .
+      dockerfile: lakehouse/Dockerfile
+    container_name: idlr-lakehouse-api
+    environment:
+      LAKEHOUSE_API_HOST: 0.0.0.0
+      LAKEHOUSE_API_PORT: 8000
+      POSTGRES_URL: ${POSTGRES_URL:-postgresql://idlr_user:idlr_password@postgres:5432/idlr_pts}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    networks:
+      - idlr_net
+
+  openappsec-agent:
+    image: ghcr.io/openappsec/openappsec:latest
+    container_name: idlr-openappsec
+    environment:
+      AGENT_TOKEN: ${OPENAPPSEC_AGENT_TOKEN:-openappsec-dev-token}
+    ports:
+      - "8099:8080"
+    networks:
+      - idlr_net
+
+  middleware-control-plane:
+    build:
+      context: .
+      dockerfile: rust-services/middleware-control-plane/Dockerfile
+    container_name: idlr-middleware-control-plane
+    environment:
+      PORT: 7010
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://keycloak:8089}
+      PERMIFY_URL: ${PERMIFY_URL:-http://permify:3476}
+      APISIX_ADMIN_URL: ${APISIX_ADMIN_URL:-http://apisix:9180}
+      OPENAPPSEC_URL: ${OPENAPPSEC_URL:-http://openappsec-agent:8080}
+    depends_on:
+      keycloak:
+        condition: service_started
+      permify:
+        condition: service_started
+      apisix:
+        condition: service_started
+      openappsec-agent:
+        condition: service_started
+    ports:
+      - "7010:7010"
+    networks:
+      - idlr_net
+
+  ops-bridge:
+    image: golang:1.22
+    container_name: idlr-ops-bridge
+    working_dir: /workspace
+    command: ["sh", "-c", "go run ./cmd/ops-bridge"]
+    environment:
+      PORT: 7011
+      POSTGRES_URL: ${POSTGRES_URL:-postgresql://idlr_user:idlr_password@postgres:5432/idlr_pts}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://idlr_user:idlr_password@postgres:5432/idlr_pts}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      TIGERBEETLE_GRPC_URL: ${TIGERBEETLE_GRPC_URL:-tigerbeetle:3002}
+      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./go-services/ops-bridge:/workspace
+    ports:
+      - "7011:7011"
+    networks:
+      - idlr_net
+
+networks:
+  idlr_net:
+    external: true
+    name: idlr_pts_idlr_net

@@ -1,0 +1,52 @@
+{
+  "transaction_initiated": {
+    "template": "IDLR-PTS: Transaction {{transactionId}} initiated for parcel {{parcelId}}. Amount: {{currency}}{{amount}}. Track status at {{shortUrl}}",
+    "maxLength": 160,
+    "variables": ["transactionId", "parcelId", "currency", "amount", "shortUrl"]
+  },
+  "transaction_approved": {
+    "template": "IDLR-PTS: Great news! Transaction {{transactionId}} has been APPROVED. View details at {{shortUrl}}",
+    "maxLength": 160,
+    "variables": ["transactionId", "shortUrl"]
+  },
+  "transaction_completed": {
+    "template": "IDLR-PTS: Transaction {{transactionId}} COMPLETED successfully! Blockchain hash: {{shortHash}}. Certificate available at {{shortUrl}}",
+    "maxLength": 160,
+    "variables": ["transactionId", "shortHash", "shortUrl"]
+  },
+  "transaction_rejected": {
+    "template": "IDLR-PTS: Transaction {{transactionId}} was REJECTED. Reason: {{shortReason}}. Details at {{shortUrl}}",
+    "maxLength": 160,
+    "variables": ["transactionId", "shortReason", "shortUrl"]
+  },
+  "verification_submitted": {
+    "template": "IDLR-PTS: Verification request {{requestId}} submitted for parcel {{parcelId}}. Expected review: {{reviewTime}}. Track at {{shortUrl}}",
+    "maxLength": 160,
+    "variables": ["requestId", "parcelId", "reviewTime", "shortUrl"]
+  },
+  "verification_approved": {
+    "template": "IDLR-PTS: Verification {{requestId}} APPROVED! Certificate {{certificateNumber}} ready. Download at {{shortUrl}}",
+    "maxLength": 160,
+    "variables": ["requestId", "certificateNumber", "shortUrl"]
+  },
+  "verification_rejected": {
+    "template": "IDLR-PTS: Verification {{requestId}} REJECTED. Reason: {{shortReason}}. Resubmit with corrections. Details at {{shortUrl}}",
+    "maxLength": 160,
+    "variables": ["requestId", "shortReason", "shortUrl"]
+  },
+  "payment_reminder": {
+    "template": "IDLR-PTS: Payment reminder for transaction {{transactionId}}. Amount: {{currency}}{{amount}}. Due: {{dueDate}}. Pay at {{shortUrl}}",
+    "maxLength": 160,
+    "variables": ["transactionId", "currency", "amount", "dueDate", "shortUrl"]
+  },
+  "document_expiring": {
+    "template": "IDLR-PTS: Your document {{documentType}} for parcel {{parcelId}} expires on {{expiryDate}}. Renew at {{shortUrl}}",
+    "maxLength": 160,
+    "variables": ["documentType", "parcelId", "expiryDate", "shortUrl"]
+  },
+  "appointment_reminder": {
+    "template": "IDLR-PTS: Appointment reminder for {{appointmentType}} on {{date}} at {{time}}. Location: {{location}}. Confirm at {{shortUrl}}",
+    "maxLength": 160,
+    "variables": ["appointmentType", "date", "time", "location", "shortUrl"]
+  }
+}

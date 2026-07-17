@@ -1,0 +1,373 @@
+import { describe, it, expect, beforeAll } from 'vitest';
+import { appRouter } from './routers';
+import type { User } from '../drizzle/schema';
+
+describe('Reporting API', () => {
+  let testUser: User;
+  let adminUser: User;
+
+  beforeAll(async () => {
+    // Mock users for testing
+    testUser = {
+      id: 1,
+      openId: 'test-user-reporting',
+      name: 'Test User',
+      email: 'test@example.com',
+      loginMethod: 'email',
+      role: 'user',
+      suspended: false,
+      suspendedAt: null,
+      suspendedBy: null,
+      suspensionReason: null,
+      lastActive: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    };
+
+    adminUser = {
+      ...testUser,
+      id: 2,
+      openId: 'admin-user-reporting',
+      role: 'admin',
+    };
+  });
+
+  describe('Generate Report', () => {
+    it('should generate a PDF report', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const result = await caller.reporting.generate({
+        reportType: 'user_activity',
+        format: 'pdf',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.fileUrl).toBeDefined();
+      expect(result.historyId).toBeDefined();
+    });
+
+    it('should generate an Excel report', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const result = await caller.reporting.generate({
+        reportType: 'user_activity',
+        format: 'excel',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.fileUrl).toBeDefined();
+    });
+
+    it('should generate a CSV report', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const result = await caller.reporting.generate({
+        reportType: 'user_activity',
+        format: 'csv',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.fileUrl).toBeDefined();
+    });
+
+    it('should apply filters when generating report', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const result = await caller.reporting.generate({
+        reportType: 'verification_status',
+        format: 'pdf',
+        filters: {
+          status: 'approved',
+        },
+      });
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('Scheduled Reports', () => {
+    it('should create a scheduled report', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const result = await caller.reporting.createScheduled({
+        name: 'Weekly User Activity Report',
+        description: 'Automated weekly report',
+        reportType: 'user_activity',
+        frequency: 'weekly',
+        format: 'pdf',
+        emailDelivery: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.reportId).toBeDefined();
+    });
+
+    it('should create a daily scheduled report with email delivery', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const result = await caller.reporting.createScheduled({
+        name: 'Daily Transaction Summary',
+        reportType: 'transaction_summary',
+        frequency: 'daily',
+        format: 'excel',
+        emailDelivery: true,
+        emailRecipients: ['admin@example.com'],
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should list scheduled reports for user', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      // Create a report first
+      await caller.reporting.createScheduled({
+        name: 'Test Scheduled Report',
+        reportType: 'parcel_registry',
+        frequency: 'monthly',
+        format: 'csv',
+        emailDelivery: false,
+      });
+
+      const reports = await caller.reporting.listScheduled({
+        includeInactive: false,
+      });
+
+      expect(Array.isArray(reports)).toBe(true);
+      expect(reports.length).toBeGreaterThan(0);
+      expect(reports[0]).toHaveProperty('name');
+      expect(reports[0]).toHaveProperty('frequency');
+    });
+
+    it('should update a scheduled report', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      // Create a report
+      const created = await caller.reporting.createScheduled({
+        name: 'Report to Update',
+        reportType: 'user_activity',
+        frequency: 'weekly',
+        format: 'pdf',
+        emailDelivery: false,
+      });
+
+      // Update it
+      const result = await caller.reporting.updateScheduled({
+        reportId: created.reportId!,
+        name: 'Updated Report Name',
+        frequency: 'daily',
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should delete a scheduled report', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      // Create a report
+      const created = await caller.reporting.createScheduled({
+        name: 'Report to Delete',
+        reportType: 'user_activity',
+        frequency: 'once',
+        format: 'pdf',
+        emailDelivery: false,
+      });
+
+      // Delete it
+      const result = await caller.reporting.deleteScheduled({
+        reportId: created.reportId!,
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should not allow user to delete another user\'s scheduled report', async () => {
+      const caller1 = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const caller2 = appRouter.createCaller({
+        user: adminUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      // User 1 creates a report
+      const created = await caller1.reporting.createScheduled({
+        name: 'User 1 Report',
+        reportType: 'user_activity',
+        frequency: 'weekly',
+        format: 'pdf',
+        emailDelivery: false,
+      });
+
+      // User 2 tries to delete it
+      const result = await caller2.reporting.deleteScheduled({
+        reportId: created.reportId!,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('unauthorized');
+    });
+  });
+
+  describe('Report History', () => {
+    it('should retrieve report history', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      // Generate a report to create history
+      await caller.reporting.generate({
+        reportType: 'user_activity',
+        format: 'pdf',
+      });
+
+      const history = await caller.reporting.getHistory({
+        limit: 10,
+      });
+
+      expect(Array.isArray(history)).toBe(true);
+      expect(history.length).toBeGreaterThan(0);
+      expect(history[0]).toHaveProperty('reportName');
+      expect(history[0]).toHaveProperty('status');
+      expect(history[0]).toHaveProperty('generatedAt');
+    });
+
+    it('should limit history results', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const history = await caller.reporting.getHistory({
+        limit: 5,
+      });
+
+      expect(history.length).toBeLessThanOrEqual(5);
+    });
+
+    it('should only show user\'s own report history', async () => {
+      const caller1 = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const caller2 = appRouter.createCaller({
+        user: adminUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      // User 1 generates a report
+      await caller1.reporting.generate({
+        reportType: 'user_activity',
+        format: 'pdf',
+      });
+
+      // User 2 checks their history
+      const history2 = await caller2.reporting.getHistory({ limit: 50 });
+
+      // User 2's history should not contain User 1's reports
+      const user1Reports = history2.filter((r) => r.userId === testUser.id);
+      expect(user1Reports.length).toBe(0);
+    });
+  });
+
+  describe('Report Templates', () => {
+    it('should retrieve available report templates', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const templates = await caller.reporting.getTemplates();
+
+      expect(Array.isArray(templates)).toBe(true);
+      // Templates might be empty initially, but should return an array
+    });
+  });
+
+  describe('Report Formats', () => {
+    it('should support all report types', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const reportTypes = ['parcel_registry', 'transaction_summary', 'verification_status', 'user_activity'];
+
+      for (const reportType of reportTypes) {
+        const result = await caller.reporting.generate({
+          reportType,
+          format: 'pdf',
+        });
+
+        expect(result.success).toBe(true);
+      }
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle invalid report type gracefully', async () => {
+      const caller = appRouter.createCaller({
+        user: testUser,
+        req: {} as any,
+        res: {} as any,
+      });
+
+      const result = await caller.reporting.generate({
+        reportType: 'invalid_type',
+        format: 'pdf',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+  });
+});

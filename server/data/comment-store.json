@@ -1,0 +1,25 @@
+{
+  "nextId": 11,
+  "comments": [
+    {
+      "id": 1,
+      "entityType": "parcel",
+      "entityId": "1",
+      "userId": 12,
+      "userName": "Registry Officer Amina Bello",
+      "content": "Boundary verification completed and supporting survey evidence has been attached.",
+      "createdAt": "2026-05-12T09:20:00.000Z",
+      "updatedAt": "2026-05-12T09:20:00.000Z"
+    },
+    {
+      "id": 2,
+      "entityType": "transaction",
+      "entityId": "1",
+      "userId": 34,
+      "userName": "Transaction Clerk Musa Yusuf",
+      "content": "Payment review is complete and the transaction is ready for registry approval.",
+      "createdAt": "2026-05-13T11:10:00.000Z",
+      "updatedAt": "2026-05-13T11:10:00.000Z"
+    }
+  ]
+}

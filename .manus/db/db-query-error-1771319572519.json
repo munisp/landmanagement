@@ -1,0 +1,20 @@
+{
+  "query": "\nCREATE TYPE notification_type AS ENUM (\n  'user_registration',\n  'suspicious_activity',\n  'system_error',\n  'verification_request',\n  'verification_approved',\n  'verification_rejected',\n  'transaction_initiated',\n  'transaction_completed',\n  'document_uploaded',\n  'role_changed',\n  'user_suspended'\n);\n\nCREATE TYPE notification_priority AS ENUM ('low', 'medium', 'high', 'critical');\n\nCREATE TABLE IF NOT EXISTS admin_notifications (\n  id SERIAL PRIMARY KEY,\n  recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  type notification_type NOT NULL,\n  priority notification_priority DEFAULT 'medium' NOT NULL,\n  title TEXT NOT NULL,\n  message TEXT NOT NULL,\n  metadata JSONB,\n  read BOOLEAN DEFAULT false NOT NULL,\n  read_at TIMESTAMP,\n  created_at TIMESTAMP DEFAULT NOW() NOT NULL\n);\n\nCREATE INDEX admin_notifications_recipient_idx ON admin_notifications(recipient_id);\nCREATE INDEX admin_notifications_type_idx ON admin_notifications(type);\nCREATE INDEX admin_notifications_read_idx ON admin_notifications(read);\nCREATE INDEX admin_notifications_created_at_idx ON admin_notifications(created_at);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user NzNswwN3cq6gauf.53d7f32ec8a4 --database Md9ypRHK4yuz574ZuX5amw --execute \nCREATE TYPE notification_type AS ENUM (\n  'user_registration',\n  'suspicious_activity',\n  'system_error',\n  'verification_request',\n  'verification_approved',\n  'verification_rejected',\n  'transaction_initiated',\n  'transaction_completed',\n  'document_uploaded',\n  'role_changed',\n  'user_suspended'\n);\n\nCREATE TYPE notification_priority AS ENUM ('low', 'medium', 'high', 'critical');\n\nCREATE TABLE IF NOT EXISTS admin_notifications (\n  id SERIAL PRIMARY KEY,\n  recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  type notification_type NOT NULL,\n  priority notification_priority DEFAULT 'medium' NOT NULL,\n  title TEXT NOT NULL,\n  message TEXT NOT NULL,\n  metadata JSONB,\n  read BOOLEAN DEFAULT false NOT NULL,\n  read_at TIMESTAMP,\n  created_at TIMESTAMP DEFAULT NOW() NOT NULL\n);\n\nCREATE INDEX admin_notifications_recipient_idx ON admin_notifications(recipient_id);\nCREATE INDEX admin_notifications_type_idx ON admin_notifications(type);\nCREATE INDEX admin_notifications_read_idx ON admin_notifications(read);\nCREATE INDEX admin_notifications_created_at_idx ON admin_notifications(created_at);\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 2: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 1 column 11 near \"TYPE notification_type AS ENUM (",
+    "  'user_registration',",
+    "  'suspicious_activity',",
+    "  'system_error',",
+    "  'verification_request',",
+    "  'verification_approved',",
+    "  'verification_rejected',",
+    "  'transaction_initiated',",
+    "  'transaction_completed',",
+    "  'document_uploaded',",
+    "  'role_changed',",
+    "  'user_suspended'",
+    ")\""
+  ]
+}

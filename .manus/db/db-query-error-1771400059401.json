@@ -1,0 +1,13 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS field_data (\n  id SERIAL PRIMARY KEY,\n  user_id INTEGER NOT NULL REFERENCES users(id),\n  parcel_number VARCHAR(255) NOT NULL,\n  location_lat DECIMAL(10, 8),\n  location_lng DECIMAL(11, 8),\n  area VARCHAR(255),\n  boundaries TEXT,\n  notes TEXT,\n  photos TEXT[],\n  timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  synced_at TIMESTAMP,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\n\nCREATE INDEX IF NOT EXISTS idx_field_data_user_id ON field_data(user_id);\nCREATE INDEX IF NOT EXISTS idx_field_data_parcel_number ON field_data(parcel_number);\nCREATE INDEX IF NOT EXISTS idx_field_data_timestamp ON field_data(timestamp);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user NzNswwN3cq6gauf.53d7f32ec8a4 --database Md9ypRHK4yuz574ZuX5amw --execute CREATE TABLE IF NOT EXISTS field_data (\n  id SERIAL PRIMARY KEY,\n  user_id INTEGER NOT NULL REFERENCES users(id),\n  parcel_number VARCHAR(255) NOT NULL,\n  location_lat DECIMAL(10, 8),\n  location_lng DECIMAL(11, 8),\n  area VARCHAR(255),\n  boundaries TEXT,\n  notes TEXT,\n  photos TEXT[],\n  timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  synced_at TIMESTAMP,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\n\nCREATE INDEX IF NOT EXISTS idx_field_data_user_id ON field_data(user_id);\nCREATE INDEX IF NOT EXISTS idx_field_data_parcel_number ON field_data(parcel_number);\nCREATE INDEX IF NOT EXISTS idx_field_data_timestamp ON field_data(timestamp);",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 10 column 15 near \"[],",
+    "  timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,",
+    "  synced_at TIMESTAMP,",
+    "  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,",
+    "  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    ")\""
+  ]
+}
