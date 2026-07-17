@@ -42,6 +42,8 @@ A broad platform hardening pass removed remaining PostgreSQL-only and service-on
 | Intelligent form filling | Added document-driven mortgage application prefilling backed by existing processed-document extraction results in the live stakeholder workflow. |
 | Land suitability analysis | Added a concrete parcel suitability scoring model using land use, terrain, flood exposure, solar yield, viewshed quality, and density signals, then surfaced the score and drivers in the live 3D building visualization experience. |
 | Privacy and data-rights controls | Added an authenticated privacy workspace with consent management, privacy-policy acknowledgement, personal-data export, portability packaging, anonymization/right-to-be-forgotten flows, breach-notification visibility, and offline-capable GDPR service hardening. |
+| QA, CI/CD, and i18n tracker closure pass | Confirmed repository-backed Playwright, integration, OWASP-style security, performance, k6 load testing, deployment workflows, staged rollout logic, French/Arabic locale assets, RTL behavior, and locale-aware formatting, then corrected the corresponding roadmap entries. |
+| Final integration documentation pass | Added comprehensive user documentation and a UAT/integration validation summary while aligning monitoring and disaster-recovery checklist items with the existing operational surfaces. |
 | Unified dashboard validation hardening | Corrected the offline payment-system status contract in the unified dashboard router and widened the typed status model to include the valid `initiated` state uncovered during final validation. |
 | TODO normalization | Removed duplicated historical roadmap blocks from `todo.md` and refreshed the audit note to reflect that the remaining unchecked count is still inflated by future-program scope, not unresolved core-product defects. |
 
@@ -58,4 +60,4 @@ A broad platform hardening pass removed remaining PostgreSQL-only and service-on
 
 ## Delivery State
 
-The repository is now in a materially improved production-readiness state with the requested infrastructure integration surface substantially implemented, broader schema coverage in place, stakeholder workflows hardened for degraded environments, the latest privacy-compliance controls implemented, the last core product-surface closures completed, and the automated regression surface passing in the current sandbox.
+The repository is now in a materially improved production-readiness state with the requested infrastructure integration surface substantially implemented, broader schema coverage in place, stakeholder workflows hardened for degraded environments, the latest privacy-compliance controls implemented, additional QA/CI/CD/i18n/final-integration tracker drift removed, and the automated regression surface passing in the current sandbox.

@@ -1,6 +1,66 @@
 {
   "keys": [
     {
+      "id": "e1367bf2-13c7-4777-ae18-1e400a01b6f3",
+      "userId": "901",
+      "name": "Testing Key",
+      "key": "idlr_1ad5ec7046ea739d37f360b9ba4ec02921ad935802b4a83151a7c1c1cfe5c78d",
+      "isActive": false,
+      "createdAt": "2026-07-17T22:48:56.246Z",
+      "lastUsedAt": null,
+      "expiresAt": null,
+      "requestCount": 0,
+      "rateLimit": 1000
+    },
+    {
+      "id": "ff29c942-edfa-4c65-aa63-39ebdeba9c5f",
+      "userId": "901",
+      "name": "Development Key",
+      "key": "idlr_f4d26d3fa1eb5cb2c9b1cbd28a6dddf488d332c0b13064c6213d3761b6c4894d",
+      "isActive": false,
+      "createdAt": "2026-07-17T22:48:56.242Z",
+      "lastUsedAt": null,
+      "expiresAt": null,
+      "requestCount": 0,
+      "rateLimit": 1000
+    },
+    {
+      "id": "04a0575c-5aa4-41bb-a7a4-5a37d0461585",
+      "userId": "901",
+      "name": "Production Key",
+      "key": "idlr_5c0213ce1ff13c9779c6007f34b35c03be97d4da3542923978a9cdeebcc369b8",
+      "isActive": false,
+      "createdAt": "2026-07-17T22:48:56.240Z",
+      "lastUsedAt": null,
+      "expiresAt": null,
+      "requestCount": 0,
+      "rateLimit": 1000
+    },
+    {
+      "id": "0b2932a1-4983-4c3c-b8ec-937cc07ce8f0",
+      "userId": "901",
+      "name": "Test Key",
+      "key": "idlr_935336bf7e9670334ff54a3a93c0ca3c4212e68ea01e3f34c958edad6e9695a0",
+      "isActive": false,
+      "createdAt": "2026-07-17T22:48:56.224Z",
+      "lastUsedAt": null,
+      "expiresAt": null,
+      "requestCount": 0,
+      "rateLimit": 1000
+    },
+    {
+      "id": "7863d48e-f142-457a-b4e2-f252810b9171",
+      "userId": "901",
+      "name": "Test Key",
+      "key": "idlr_e0b5f34bdb366566d66c176503a17f29a26e30816b1ace9e77acc1e99dc5f763",
+      "isActive": false,
+      "createdAt": "2026-07-17T22:48:56.193Z",
+      "lastUsedAt": "2026-07-17T22:48:56.203Z",
+      "expiresAt": null,
+      "requestCount": 1,
+      "rateLimit": 1000
+    },
+    {
       "id": "94098de1-61fb-4ffc-856d-b3668e7f585a",
       "userId": "901",
       "name": "Testing Key",

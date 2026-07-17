@@ -9,9 +9,10 @@ The latest remediation and enhancement pass has been completed. The current repo
 | Intelligent form filling | Implemented in `client/src/pages/MortgageApplication.tsx` using processed document extraction results to prefill live mortgage-application fields. |
 | Land suitability analysis | Implemented end-to-end through `server/buildingVisualizationRepository.ts` and `client/src/pages/Building3DVisualization.tsx` with parcel suitability scoring, suitability banding, score drivers, and development recommendations. |
 | Privacy and GDPR compliance | Implemented a live privacy workspace in `client/src/pages/Settings.tsx`, backed by new authenticated privacy routes and an offline-capable GDPR service supporting export, portability, consent, policy acknowledgement, anonymization, right-to-be-forgotten operations, and breach visibility. |
+| QA, CI/CD, i18n, and final-integration tracker closure | Corrected remaining stale roadmap entries for Playwright, integration tests, k6, OWASP-style security testing, performance benchmarks, deployment workflows, staged rollout logic, French and Arabic support, RTL behavior, user documentation, production monitoring, disaster recovery, and UAT coverage. |
 | Unified dashboard validation hardening | Corrected offline payment-system status behavior in `server/api/routers/unified-dashboard.ts` and widened the typed system-status union to include `initiated`. |
-| Tracker hygiene | Marked the privacy/GDPR checklist cluster complete in `todo.md`, preserved the earlier intelligent-form-filling and land-suitability closures, and kept the unchecked total at **1405** after the first deduplication pass while documenting that the remaining count still includes future-program scope. |
-| Delivery documentation and innovation roadmap | Updated `CHANGE_MANIFEST_20260717.md`, `VALIDATION_STATUS_20260717.md`, `REMAINING_TODO_AUDIT_20260717.md`, and added `NEXT_GENERATION_ENHANCEMENTS_20260717.md`. |
+| Tracker hygiene | Reduced the unchecked total further to **1372** after the latest closure pass while documenting that the raw count still includes future-program scope and historical roadmap duplication. |
+| Delivery documentation and innovation roadmap | Updated `CHANGE_MANIFEST_20260717.md`, `VALIDATION_STATUS_20260717.md`, `REMAINING_TODO_AUDIT_20260717.md`, added `USER_DOCUMENTATION_20260717.md`, `UAT_AND_INTEGRATION_20260717.md`, and preserved `NEXT_GENERATION_ENHANCEMENTS_20260717.md`. |
 
 ## Final validation state
 
@@ -33,11 +34,13 @@ If desired, the workflow files remain present locally in the sandbox working tre
 
 | File | Purpose |
 |---|---|
-| `CHANGE_MANIFEST_20260717.md` | Consolidated implementation summary for the production-readiness and privacy-compliance pass. |
-| `VALIDATION_STATUS_20260717.md` | Final validation evidence and environment notes after the privacy enhancement rerun. |
+| `CHANGE_MANIFEST_20260717.md` | Consolidated implementation summary for the latest production-readiness closure pass. |
+| `VALIDATION_STATUS_20260717.md` | Final validation evidence and environment notes after the latest rerun. |
 | `REMAINING_TODO_AUDIT_20260717.md` | Roadmap normalization note distinguishing core closures from future-program scope. |
+| `USER_DOCUMENTATION_20260717.md` | End-user operating guide for the main stakeholder workflows. |
+| `UAT_AND_INTEGRATION_20260717.md` | Stakeholder-oriented UAT and integration validation summary. |
 | `NEXT_GENERATION_ENHANCEMENTS_20260717.md` | Ten next-generation innovations and recommended strategic enhancement path. |
-| `todo.md` | Updated tracker with newly closed items and first deduplication pass. |
+| `todo.md` | Updated tracker with newly closed items and reduced unchecked count. |
 
 ## Remaining honesty note
 
