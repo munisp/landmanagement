@@ -48,6 +48,7 @@ A broad platform hardening pass removed remaining PostgreSQL-only and service-on
 | Marketing workflow implementation | Added an end-to-end marketing-center workflow with email, SMS, and push campaigns, landing-page management, A/B experiments, and marketing analytics. |
 | Advanced-security workflow implementation | Added an end-to-end security-monitoring extension with behavioral analytics, honeypot trap visibility, and incident-response automation. |
 | IoT operations workflow implementation | Added an end-to-end IoT operations workspace with smart-property sensors, environmental monitoring, access control, utility meters, device management, and predictive maintenance. |
+| Phase 4 application-workflow normalization | Corrected stale unchecked roadmap entries for already implemented 3D visualization, mortgage workflow, tax operations, and insurance operations after confirming repository-backed end-to-end coverage. |
 | Unified dashboard validation hardening | Corrected the offline payment-system status contract in the unified dashboard router and widened the typed status model to include the valid `initiated` state uncovered during final validation. |
 | TODO normalization | Removed duplicated historical roadmap blocks from `todo.md` and refreshed the audit note to reflect that the remaining unchecked count is still inflated by future-program scope, not unresolved core-product defects. |
 
@@ -64,4 +65,4 @@ A broad platform hardening pass removed remaining PostgreSQL-only and service-on
 
 ## Delivery State
 
-The repository is now in a materially improved production-readiness state with the requested infrastructure integration surface substantially implemented, broader schema coverage in place, stakeholder workflows hardened for degraded environments, the latest privacy-compliance controls implemented, additional support, marketing, advanced-security, and IoT workflows delivered, additional QA/CI/CD/i18n/final-integration tracker drift removed, and the automated regression surface passing in the current sandbox.
+The repository is now in a materially improved production-readiness state with the requested infrastructure integration surface substantially implemented, broader schema coverage in place, stakeholder workflows hardened for degraded environments, the latest privacy-compliance controls implemented, additional support, marketing, advanced-security, and IoT workflows delivered, additional Phase 4 application-workflow tracker drift removed, additional QA/CI/CD/i18n/final-integration tracker drift removed, and the automated regression surface passing in the current sandbox.

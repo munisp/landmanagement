@@ -13,8 +13,9 @@ The latest remediation and enhancement pass has been completed. The current repo
 | Customer support system | Implemented an end-to-end support center with ticketing, live support conversation threads, knowledge-base publishing, FAQ management, analytics, and SLA tracking. |
 | Marketing and communication | Implemented an end-to-end marketing center with email, SMS, and push campaigns, landing-page management, A/B testing, and marketing analytics. |
 | Advanced security and IoT operations | Implemented end-to-end behavioral analytics, honeypot detections, incident-response automation, smart-property sensors, environmental monitoring, access control, utility-meter telemetry, device management, and predictive maintenance workflows. |
+| Phase 4 application-workflow normalization | Closed stale unchecked tracker entries for already implemented 3D visualization, mortgage workflow, tax operations, and insurance operations based on repository-backed end-to-end evidence. |
 | Unified dashboard validation hardening | Corrected offline payment-system status behavior in `server/api/routers/unified-dashboard.ts` and widened the typed system-status union to include `initiated`. |
-| Tracker hygiene | Reduced the unchecked total further to **1351** after the latest closure pass while documenting that the raw count still includes future-program scope and historical roadmap duplication. |
+| Tracker hygiene | Reduced the unchecked total further to **1323** after the latest closure pass while documenting that the raw count still includes future-program scope and historical roadmap duplication. |
 | Delivery documentation and innovation roadmap | Updated `CHANGE_MANIFEST_20260717.md`, `VALIDATION_STATUS_20260717.md`, `REMAINING_TODO_AUDIT_20260717.md`, added `USER_DOCUMENTATION_20260717.md`, `UAT_AND_INTEGRATION_20260717.md`, and preserved `NEXT_GENERATION_ENHANCEMENTS_20260717.md`. |
 
 ## Final validation state
@@ -25,7 +26,7 @@ The latest remediation and enhancement pass has been completed. The current repo
 | Production build | Passed (`BUILD_EXIT_CODE=0`) |
 | Automated tests | Passed (`TEST_EXIT_CODE=0`) with **17 test files passed**, **141 tests passed**, **1 skipped** |
 
-The final automated validation run completed cleanly after the advanced-security and IoT implementation pass. The sandbox still lacked live PostgreSQL, Redis, Fabric, and other external middleware services during validation, but the platform's offline-capable continuity paths remained stable and allowed the complete regression suite to pass.
+The final automated validation run completed cleanly after the stale Phase 4 application-workflow cluster closures. The sandbox still lacked live PostgreSQL, Redis, Fabric, and other external middleware services during validation, but the platform's offline-capable continuity paths remained stable and allowed the complete regression suite to pass.
 
 ## GitHub and workflow-file caveat
 
@@ -43,7 +44,7 @@ If desired, the workflow files remain present locally in the sandbox working tre
 | `USER_DOCUMENTATION_20260717.md` | End-user operating guide for the main stakeholder workflows. |
 | `UAT_AND_INTEGRATION_20260717.md` | Stakeholder-oriented UAT and integration validation summary. |
 | `NEXT_GENERATION_ENHANCEMENTS_20260717.md` | Ten next-generation innovations and recommended strategic enhancement path. |
-| `todo.md` | Updated tracker with newly closed items and reduced unchecked count to 1351. |
+| `todo.md` | Updated tracker with newly closed items and reduced unchecked count to 1323. |
 
 ## Remaining honesty note
 
