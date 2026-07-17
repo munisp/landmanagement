@@ -1,6 +1,25 @@
 {
   "mortgages": [
     {
+      "id": 12,
+      "createdAt": "2026-07-17T23:01:37.888Z",
+      "updatedAt": "2026-07-17T23:01:37.888Z",
+      "applicationId": "MORT-1784329297881-vlho27kuo",
+      "transactionId": "TXN-PHASE4-OFFLINE-001",
+      "lenderName": "Test Bank",
+      "loanAmount": 5000000,
+      "interestRate": "5.5",
+      "loanTerm": 240,
+      "monthlyPayment": 34000,
+      "applicantId": 1401,
+      "status": "pending",
+      "approvedAt": null,
+      "reviewedAt": null,
+      "rejectedAt": null,
+      "disbursedAt": null,
+      "rejectionReason": null
+    },
+    {
       "id": 11,
       "createdAt": "2026-07-17T22:48:58.130Z",
       "updatedAt": "2026-07-17T22:48:58.130Z",
@@ -229,6 +248,23 @@
   ],
   "taxes": [
     {
+      "id": 12,
+      "createdAt": "2026-07-17T23:01:37.916Z",
+      "updatedAt": "2026-07-17T23:01:37.916Z",
+      "clearanceId": "TAX-1784329297903-q9m52rlrj",
+      "transactionId": "TXN-PHASE4-OFFLINE-001",
+      "taxAuthority": "Federal Inland Revenue Service",
+      "amountDue": 500000,
+      "amountPaid": 500000,
+      "certificateNumber": null,
+      "firsReferenceNumber": null,
+      "certificateUrl": null,
+      "ownerId": 1401,
+      "status": "pending",
+      "issuedAt": null,
+      "verifiedAt": null
+    },
+    {
       "id": 11,
       "createdAt": "2026-07-17T22:48:58.144Z",
       "updatedAt": "2026-07-17T22:48:58.144Z",
@@ -427,6 +463,20 @@
     }
   ],
   "insurance": [
+    {
+      "id": 11,
+      "createdAt": "2026-07-17T23:01:37.933Z",
+      "updatedAt": "2026-07-17T23:01:37.933Z",
+      "policyId": "INS-1784329297926-1gipunfyc",
+      "transactionId": "TXN-PHASE4-OFFLINE-001",
+      "providerName": "Test Insurance Co.",
+      "policyNumber": "TEST-INSURANCE-CO.-INS-1784329297926-1gipunfyc",
+      "premiumAmount": 200000,
+      "startDate": "2026-07-17T23:01:37.926Z",
+      "endDate": "2027-07-17T23:01:37.926Z",
+      "policyHolderId": 1401,
+      "status": "pending"
+    },
     {
       "id": 10,
       "createdAt": "2026-07-17T22:48:58.173Z",

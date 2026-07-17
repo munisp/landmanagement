@@ -10,8 +10,10 @@ The latest remediation and enhancement pass has been completed. The current repo
 | Land suitability analysis | Implemented end-to-end through `server/buildingVisualizationRepository.ts` and `client/src/pages/Building3DVisualization.tsx` with parcel suitability scoring, suitability banding, score drivers, and development recommendations. |
 | Privacy and GDPR compliance | Implemented a live privacy workspace in `client/src/pages/Settings.tsx`, backed by new authenticated privacy routes and an offline-capable GDPR service supporting export, portability, consent, policy acknowledgement, anonymization, right-to-be-forgotten operations, and breach visibility. |
 | QA, CI/CD, i18n, and final-integration tracker closure | Corrected remaining stale roadmap entries for Playwright, integration tests, k6, OWASP-style security testing, performance benchmarks, deployment workflows, staged rollout logic, French and Arabic support, RTL behavior, user documentation, production monitoring, disaster recovery, and UAT coverage. |
+| Customer support system | Implemented an end-to-end support center with ticketing, live support conversation threads, knowledge-base publishing, FAQ management, analytics, and SLA tracking. |
+| Marketing and communication | Implemented an end-to-end marketing center with email, SMS, and push campaigns, landing-page management, A/B testing, and marketing analytics. |
 | Unified dashboard validation hardening | Corrected offline payment-system status behavior in `server/api/routers/unified-dashboard.ts` and widened the typed system-status union to include `initiated`. |
-| Tracker hygiene | Reduced the unchecked total further to **1372** after the latest closure pass while documenting that the raw count still includes future-program scope and historical roadmap duplication. |
+| Tracker hygiene | Reduced the unchecked total further to **1360** after the latest closure pass while documenting that the raw count still includes future-program scope and historical roadmap duplication. |
 | Delivery documentation and innovation roadmap | Updated `CHANGE_MANIFEST_20260717.md`, `VALIDATION_STATUS_20260717.md`, `REMAINING_TODO_AUDIT_20260717.md`, added `USER_DOCUMENTATION_20260717.md`, `UAT_AND_INTEGRATION_20260717.md`, and preserved `NEXT_GENERATION_ENHANCEMENTS_20260717.md`. |
 
 ## Final validation state
@@ -22,7 +24,7 @@ The latest remediation and enhancement pass has been completed. The current repo
 | Production build | Passed (`BUILD_EXIT_CODE=0`) |
 | Automated tests | Passed (`TEST_EXIT_CODE=0`) with **17 test files passed**, **141 tests passed**, **1 skipped** |
 
-The final automated validation run completed cleanly after the privacy enhancement pass. The sandbox still lacked live PostgreSQL, Redis, Fabric, and other external middleware services during validation, but the platform's offline-capable continuity paths remained stable and allowed the complete regression suite to pass.
+The final automated validation run completed cleanly after the support and marketing implementation pass. The sandbox still lacked live PostgreSQL, Redis, Fabric, and other external middleware services during validation, but the platform's offline-capable continuity paths remained stable and allowed the complete regression suite to pass.
 
 ## GitHub and workflow-file caveat
 
@@ -40,7 +42,7 @@ If desired, the workflow files remain present locally in the sandbox working tre
 | `USER_DOCUMENTATION_20260717.md` | End-user operating guide for the main stakeholder workflows. |
 | `UAT_AND_INTEGRATION_20260717.md` | Stakeholder-oriented UAT and integration validation summary. |
 | `NEXT_GENERATION_ENHANCEMENTS_20260717.md` | Ten next-generation innovations and recommended strategic enhancement path. |
-| `todo.md` | Updated tracker with newly closed items and reduced unchecked count. |
+| `todo.md` | Updated tracker with newly closed items and reduced unchecked count to 1360. |
 
 ## Remaining honesty note
 

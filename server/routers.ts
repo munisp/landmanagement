@@ -389,6 +389,140 @@ export const appRouter = router({
       }),
   }),
 
+  support: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./supportRepository');
+      return {
+        tickets: repo.listSupportTickets(),
+        analytics: repo.getSupportAnalytics(),
+        knowledgeBase: repo.listKnowledgeBaseArticles(),
+        faqs: repo.listFaqs(),
+      };
+    }),
+
+    createTicket: protectedProcedure
+      .input(z.object({
+        subject: z.string().min(5),
+        category: z.enum(['account', 'payments', 'registry', 'technical', 'compliance']),
+        priority: z.enum(['low', 'medium', 'high', 'urgent']),
+        channel: z.enum(['portal', 'live_chat', 'email']).default('portal'),
+        customerName: z.string().min(2),
+        customerEmail: z.string().email(),
+        message: z.string().min(5),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./supportRepository');
+        return repo.createSupportTicket(input);
+      }),
+
+    addMessage: protectedProcedure
+      .input(z.object({
+        ticketId: z.number(),
+        senderType: z.enum(['customer', 'support']),
+        senderName: z.string().min(2),
+        message: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./supportRepository');
+        return repo.addSupportMessage(input);
+      }),
+
+    updateStatus: protectedProcedure
+      .input(z.object({
+        ticketId: z.number(),
+        status: z.enum(['open', 'in_progress', 'waiting_on_customer', 'resolved']),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./supportRepository');
+        return repo.updateSupportTicketStatus(input);
+      }),
+
+    createKnowledgeBaseArticle: protectedProcedure
+      .input(z.object({
+        title: z.string().min(5),
+        category: z.enum(['getting_started', 'payments', 'verification', 'privacy', 'registry']),
+        summary: z.string().min(10),
+        content: z.string().min(20),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!['admin', 'registrar'].includes(ctx.user.role || 'user')) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Only privileged users can publish knowledge-base content' });
+        }
+        const repo = await import('./supportRepository');
+        return repo.createKnowledgeBaseArticle(input);
+      }),
+
+    createFaq: protectedProcedure
+      .input(z.object({
+        question: z.string().min(5),
+        answer: z.string().min(10),
+        category: z.string().min(2),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!['admin', 'registrar'].includes(ctx.user.role || 'user')) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Only privileged users can manage FAQ content' });
+        }
+        const repo = await import('./supportRepository');
+        return repo.createFaq(input);
+      }),
+  }),
+
+  marketing: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./marketingRepository');
+      return repo.getMarketingOverview();
+    }),
+
+    createCampaign: protectedProcedure
+      .input(z.object({
+        name: z.string().min(3),
+        channel: z.enum(['email', 'sms', 'push']),
+        audience: z.string().min(2),
+        scheduledFor: z.string().min(5),
+        message: z.string().min(10),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./marketingRepository');
+        return repo.createCampaign(input);
+      }),
+
+    updateCampaignStatus: protectedProcedure
+      .input(z.object({
+        campaignId: z.number(),
+        status: z.enum(['draft', 'scheduled', 'active', 'completed']),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./marketingRepository');
+        return repo.updateCampaignStatus(input);
+      }),
+
+    createLandingPage: protectedProcedure
+      .input(z.object({
+        name: z.string().min(3),
+        slug: z.string().min(3),
+        headline: z.string().min(5),
+        body: z.string().min(10),
+        ctaLabel: z.string().min(2),
+        variant: z.enum(['A', 'B']),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./marketingRepository');
+        return repo.createLandingPage(input);
+      }),
+
+    createExperiment: protectedProcedure
+      .input(z.object({
+        name: z.string().min(3),
+        hypothesis: z.string().min(10),
+        variantA: z.string().min(3),
+        variantB: z.string().min(3),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./marketingRepository');
+        return repo.createExperiment(input);
+      }),
+  }),
+
   // Parcel Management
   parcels: router({
     search: publicProcedure

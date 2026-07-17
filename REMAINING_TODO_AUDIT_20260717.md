@@ -25,9 +25,11 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 | Quality assurance and security testing | Implemented and tracker-corrected | Playwright end-to-end coverage, integration tests, OWASP-oriented security tests, performance benchmarks, and k6 load-test assets are present in the repository. |
 | CI/CD and deployment automation | Implemented in repository scope and tracker-corrected | GitHub Actions workflows, staged deployment automation, rollback logic, and blue-green deployment definitions are present in the repository workspace, though workflow publication still depends on token permissions. |
 | Internationalization | Implemented and tracker-corrected | French and Arabic locale assets, RTL behavior, currency preferences, and locale-aware formatting are present in the application. |
+| Customer support system | Implemented and tracker-corrected | The repository now includes a live support center with ticketing, conversation threads, knowledge-base content, FAQ management, analytics, and SLA tracking. |
+| Marketing and communication | Implemented and tracker-corrected | The repository now includes a marketing center with email, SMS, and push campaigns, landing-page management, A/B experiments, and marketing analytics. |
 | Final integration, monitoring, and DR | Implemented and tracker-corrected | The repository now includes end-to-end validation evidence, security-audit-oriented automated tests, user documentation, monitoring dashboards, backup/recovery workflows, and UAT coverage documentation. |
 | Advanced security foundation | Partially implemented and tracker-corrected | Zero-trust-style authorization, WAF/API protection, and threat-intelligence integration are present; behavioral analytics, honeypots, and incident-response automation remain open. |
-| Large future-platform roadmap items | Still unchecked and materially broader than the already-remediated core platform | Includes full Fabric network rollout execution, customer-support expansion, marketing, IoT, and other future programs. |
+| Large future-platform roadmap items | Still unchecked and materially broader than the already-remediated core platform | Includes full Fabric network rollout execution, IoT, and other future programs, plus a smaller set of remaining advanced-security items. |
 
 ## Verified Fixes Completed in This Pass
 
@@ -48,6 +50,8 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 | `.github/workflows/main.yml` and related workflow definitions | Confirmed repository-backed CI/CD, staged deployment, blue-green rollout, rollback, and deployment-monitoring automation for the DevOps checklist cluster. |
 | `client/src/i18n.ts`, `client/src/components/LanguageSwitcher.tsx`, `public/locales/fr.json`, and `public/locales/ar.json` | Confirmed French and Arabic locale support, RTL behavior, JSON-based translation management, currency preference controls, and locale-aware formatting support. |
 | `USER_DOCUMENTATION_20260717.md`, `UAT_AND_INTEGRATION_20260717.md`, `client/src/pages/SecurityDashboard.tsx`, and `client/src/pages/BackupRecovery.tsx` | Added comprehensive user documentation and UAT coverage while confirming live production-monitoring and disaster-recovery surfaces. |
+| `server/supportRepository.ts`, `server/routers.ts`, and `client/src/pages/SupportCenter.tsx` | Added an end-to-end support-center workflow covering helpdesk ticketing, live support conversations, knowledge-base publishing, FAQ management, analytics, and SLA tracking. |
+| `server/marketingRepository.ts`, `server/routers.ts`, and `client/src/pages/MarketingCenter.tsx` | Added an end-to-end marketing workflow covering email, SMS, and push campaigns, landing-page management, A/B experimentation, and marketing analytics. |
 | `fabric-network/deploy.sh` and related Fabric manifests | Confirmed repository-level automation for packaging, approving, committing, and initializing Hyperledger Fabric chaincode in a three-organization network. |
 | `server/smartContractIntegration.ts`, `server/blockchainService.ts`, and related routes | Confirmed title-transfer, automated escrow, explorer integration, multisignature coverage, and blockchain audit-trail retrieval for most of the blockchain roadmap cluster. |
 | `server/api/routers/search.ts` | Exposed popular-search analytics through a live backend contract so search analytics are not backend-only telemetry. |
@@ -59,14 +63,14 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 | Priority | Reason |
 |---|---|
 | Normalize duplicate historical roadmap sections in `todo.md` | The unchecked total has been reduced further, but future-program and historical-planning entries still inflate the raw count. |
-| Reclassify broad expansion clusters | Customer support, marketing systems, IoT, and other future programs should be separated from the already-remediated core production application. |
+| Reclassify broad expansion clusters | IoT and other long-horizon future programs should be separated from the already-remediated core production application. |
 | Decide whether to mark repository-level Fabric deployment automation complete in the tracker | The deployment script and manifests exist, but live environment execution is distinct from repository completeness. |
-| Refresh final delivery documents after validation | The manifest, audit note, and handoff should reflect the privacy, testing, CI/CD, i18n, and final-integration closure work. |
+| Refresh final delivery documents after validation | The manifest, audit note, and handoff should reflect the new support and marketing closure work. |
 
 ## Current Validation Status Relevant to This Pass
 
 > TypeScript validation returns successfully after the broker commission, database helper, document comparison, search analytics, intelligent mortgage prefill, and land-suitability follow-on fixes.
 
-Current remaining unchecked count in `todo.md` after the latest closure pass is **1372**, but that figure still includes broader future-program entries and historical roadmap duplication and therefore does not equal the actual count of unresolved core-product defects.
+Current remaining unchecked count in `todo.md` after the latest closure pass is **1360**, but that figure still includes broader future-program entries and historical roadmap duplication and therefore does not equal the actual count of unresolved core-product defects.
 
 This file is an audit note, not a final certification that all remaining unchecked roadmap items are complete.

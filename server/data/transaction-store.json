@@ -1,6 +1,66 @@
 {
   "transactions": [
     {
+      "id": 75,
+      "type": "mortgage",
+      "parcelId": 1,
+      "initiatorId": 1,
+      "initiatorName": "Test User",
+      "status": "pending_approval",
+      "considerationAmount": 10000000,
+      "workflowStage": "submission",
+      "paymentStatus": "unpaid",
+      "documentStatus": "pending",
+      "notes": "Mortgage registration",
+      "createdAt": "2026-07-17T23:01:41.447Z",
+      "updatedAt": "2026-07-17T23:01:41.447Z"
+    },
+    {
+      "id": 74,
+      "type": "subdivision",
+      "parcelId": 1,
+      "initiatorId": 1,
+      "initiatorName": "Test User",
+      "status": "pending_approval",
+      "considerationAmount": 0,
+      "workflowStage": "submission",
+      "paymentStatus": "unpaid",
+      "documentStatus": "pending",
+      "notes": "Subdivide parcel into 4 plots",
+      "createdAt": "2026-07-17T23:01:41.443Z",
+      "updatedAt": "2026-07-17T23:01:41.443Z"
+    },
+    {
+      "id": 73,
+      "type": "transfer",
+      "parcelId": 1,
+      "initiatorId": 1,
+      "initiatorName": "Test User",
+      "counterpartyName": "Owner 2",
+      "status": "pending_approval",
+      "considerationAmount": 5000000,
+      "workflowStage": "submission",
+      "paymentStatus": "unpaid",
+      "documentStatus": "pending",
+      "notes": "Property transfer to new owner",
+      "createdAt": "2026-07-17T23:01:41.440Z",
+      "updatedAt": "2026-07-17T23:01:41.440Z"
+    },
+    {
+      "id": 72,
+      "type": "registration",
+      "parcelId": 1,
+      "initiatorId": 1,
+      "initiatorName": "Test User",
+      "status": "pending_approval",
+      "considerationAmount": 0,
+      "workflowStage": "submission",
+      "paymentStatus": "unpaid",
+      "documentStatus": "pending",
+      "createdAt": "2026-07-17T23:01:41.435Z",
+      "updatedAt": "2026-07-17T23:01:41.435Z"
+    },
+    {
       "id": 71,
       "type": "mortgage",
       "parcelId": 1,
@@ -1071,5 +1131,5 @@
       "updatedAt": "2024-03-09T12:00:00.000Z"
     }
   ],
-  "nextId": 72
+  "nextId": 76
 }

@@ -59,6 +59,8 @@ const ReportSchedulerDashboard = lazy(() => import('./pages/ReportSchedulerDashb
 const ReportHistoryDashboard = lazy(() => import('./pages/ReportHistoryDashboard'));
 const IntegrationHealthDashboard = lazy(() => import('./pages/IntegrationHealthDashboard'));
 const WebhookTestingDashboard = lazy(() => import('./pages/WebhookTestingDashboard'));
+const SupportCenter = lazy(() => import('./pages/SupportCenter'));
+const MarketingCenter = lazy(() => import('./pages/MarketingCenter'));
 const AIDocumentProcessing = lazy(() => import("./pages/AIDocumentProcessing"));
 const DroneProcessing = lazy(() => import("./pages/DroneProcessing"));
 const TaxAssessment = lazy(() => import("./pages/TaxAssessment"));
@@ -194,6 +196,8 @@ function Router() {
       <Route path="/report-history" component={ReportHistoryDashboard} />
       <Route path="/webhook-testing" component={WebhookTestingDashboard} />
       <Route path="/integration-health" component={IntegrationHealthDashboard} />
+      <Route path="/support-center" component={SupportCenter} />
+      <Route path="/marketing-center" component={MarketingCenter} />
       <Route path="/ai-document-processing" component={AIDocumentProcessing} />
       <Route path="/drone-processing" component={DroneProcessing} />
       <Route path="/tax-assessment" component={TaxAssessment} />

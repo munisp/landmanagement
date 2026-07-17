@@ -6,16 +6,16 @@ The current production-readiness validation pass completed successfully across t
 
 | Validation Area | Status | Notes |
 |---|---|---|
-| TypeScript validation | Passed | The latest rerun after the remaining-gap closure pass completed with `TSC_EXIT_CODE=0`. |
-| Production build | Passed | The latest rerun after the tracker, documentation, privacy, and readiness closure pass completed with `BUILD_EXIT_CODE=0`. |
+| TypeScript validation | Passed | The latest rerun after the new support and marketing implementations completed with `TSC_EXIT_CODE=0`. |
+| Production build | Passed | The latest rerun after the new support and marketing implementations completed with `BUILD_EXIT_CODE=0`. |
 | Python lakehouse API syntax validation | Passed | The PostgreSQL-backed lakehouse service remains syntactically valid after the prior mock-removal remediation. |
 | Go middleware bridge build | Passed | The stdlib-only operations bridge remains buildable for PostgreSQL, Redis, TigerBeetle, and Temporal health surfaces. |
 | Rust middleware control-plane build | Passed | The stdlib-only control-plane service remains buildable for Keycloak, Permify, APISIX, and OpenAppSec coordination. |
-| Automated regression suite | Passed | The latest regression rerun after the remaining-gap closure pass completed with `TEST_EXIT_CODE=0`, **17 test files passed**, **141 tests passed**, and **1 skipped** test case. |
+| Automated regression suite | Passed | The latest regression rerun after the new support and marketing implementations completed with `TEST_EXIT_CODE=0`, **17 test files passed**, **141 tests passed**, and **1 skipped** test case. |
 
 ## Key Validation Outcomes
 
-The final regression pass succeeded after hardening the platform for offline-capable execution in the absence of PostgreSQL, Redis, Fabric, and related external infrastructure. The most recent closure pass also aligned the remaining-scope audit with repository-backed QA, CI/CD, internationalization, security-monitoring, disaster-recovery, and user-acceptance evidence. The resulting suite preserves clean validation across Mojaloop payment workflows, blockchain verification flows, Phase 4 workflows, unified dashboard reporting, verification lifecycle continuity, administration workflows, reporting fallbacks, comments, saved searches, activity logs, API key management, live privacy-compliance operations, and the newly documented operational readiness surfaces.
+The final regression pass succeeded after hardening the platform for offline-capable execution in the absence of PostgreSQL, Redis, Fabric, and related external infrastructure. The most recent closure pass also aligned the remaining-scope audit with repository-backed QA, CI/CD, internationalization, security-monitoring, disaster-recovery, user-acceptance evidence, and the newly implemented support and marketing workflows. The resulting suite preserves clean validation across Mojaloop payment workflows, blockchain verification flows, Phase 4 workflows, unified dashboard reporting, verification lifecycle continuity, administration workflows, reporting fallbacks, comments, saved searches, activity logs, API key management, live privacy-compliance operations, customer-support operations, and marketing operations.
 
 ## Environment Notes
 
