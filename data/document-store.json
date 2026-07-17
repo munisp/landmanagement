@@ -1,6 +1,59 @@
 {
-  "nextId": 56,
+  "nextId": 60,
   "documents": [
+    {
+      "id": 59,
+      "parcelId": 1,
+      "type": "document",
+      "title": "Certificate of Occupancy",
+      "description": "Original Certificate of Occupancy issued in 2020",
+      "fileKey": "documents/1234567890-c-of-o.pdf",
+      "fileUrl": "https://storage.example.com/documents/1234567890-c-of-o.pdf",
+      "fileName": "c-of-o.pdf",
+      "uploadedBy": 1,
+      "uploadedAt": "2026-07-17T21:22:55.263Z",
+      "verified": false
+    },
+    {
+      "id": 58,
+      "parcelId": 1,
+      "type": "image",
+      "title": "Property Photo",
+      "fileKey": "documents/1234567890-property-photo.jpg",
+      "fileUrl": "https://storage.example.com/documents/1234567890-property-photo.jpg",
+      "fileName": "property-photo.jpg",
+      "fileSize": 2048000,
+      "mimeType": "image/jpeg",
+      "uploadedBy": 1,
+      "uploadedAt": "2026-07-17T21:22:55.261Z",
+      "verified": false
+    },
+    {
+      "id": 57,
+      "transactionId": 1,
+      "type": "document",
+      "title": "Transfer Agreement",
+      "fileKey": "documents/1234567890-transfer-agreement.pdf",
+      "fileUrl": "https://storage.example.com/documents/1234567890-transfer-agreement.pdf",
+      "fileName": "transfer-agreement.pdf",
+      "fileSize": 1024000,
+      "mimeType": "application/pdf",
+      "uploadedBy": 1,
+      "uploadedAt": "2026-07-17T21:22:55.256Z",
+      "verified": false
+    },
+    {
+      "id": 56,
+      "parcelId": 1,
+      "type": "document",
+      "title": "Survey Plan",
+      "fileKey": "documents/1234567890-survey-plan.pdf",
+      "fileUrl": "https://storage.example.com/documents/1234567890-survey-plan.pdf",
+      "fileName": "survey-plan.pdf",
+      "uploadedBy": 1,
+      "uploadedAt": "2026-07-17T21:22:55.249Z",
+      "verified": false
+    },
     {
       "id": 55,
       "parcelId": 1,

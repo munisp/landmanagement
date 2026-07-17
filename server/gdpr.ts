@@ -8,6 +8,7 @@ import path from 'path';
 import { eq } from 'drizzle-orm';
 import { users } from '../drizzle/schema';
 import { getDb } from './db';
+import { getAccountSettings, updateAccountProfile } from './accountSettingsRepository';
 
 const GDPR_STORE_DIR = path.join(process.cwd(), 'server', 'data', 'gdpr');
 const CONSENT_LOG_PATH = path.join(GDPR_STORE_DIR, 'consent-log.json');
@@ -36,6 +37,13 @@ interface GDPRActivityRecord {
   createdAt: string;
 }
 
+interface PrivacyProfileFallback {
+  name?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+}
+
 async function ensureGdprStore() {
   await fs.mkdir(GDPR_STORE_DIR, { recursive: true });
 
@@ -59,10 +67,28 @@ async function writeJsonArray<T>(filePath: string, value: T[]): Promise<void> {
   await fs.writeFile(filePath, JSON.stringify(value, null, 2) + '\n', 'utf8');
 }
 
-async function getUserRecord(userId: number) {
+async function getUserRecord(userId: number, fallbackProfile?: PrivacyProfileFallback) {
   const db = await getDb();
   if (!db) {
-    throw new Error('Database not available');
+    const offlineAccount = getAccountSettings(userId, {
+      name: fallbackProfile?.name || `User ${userId}`,
+      email: fallbackProfile?.email || `user${userId}@idlr.local`,
+      phone: fallbackProfile?.phone || '+234 000 000 0000',
+      role: fallbackProfile?.role || 'user',
+    });
+
+    return {
+      db: null,
+      user: {
+        id: userId,
+        name: offlineAccount.profile.name,
+        email: offlineAccount.profile.email,
+        role: offlineAccount.profile.role,
+        phone: offlineAccount.profile.phone,
+        createdAt: offlineAccount.profile.updatedAt,
+        updatedAt: offlineAccount.profile.updatedAt,
+      },
+    };
   }
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
@@ -94,8 +120,8 @@ async function writeUserExport(userId: number, payload: Record<string, any>, for
  * Right to Access (Article 15)
  * Export all personal data for a user
  */
-export async function exportUserData(userId: number): Promise<{ url: string }> {
-  const { user } = await getUserRecord(userId);
+export async function exportUserData(userId: number, fallbackProfile?: PrivacyProfileFallback): Promise<{ url: string }> {
+  const { user } = await getUserRecord(userId, fallbackProfile);
   const filePath = await writeUserExport(userId, { exportedAt: new Date().toISOString(), user }, 'json');
   await logGDPRActivity(userId, 'export_user_data', { filePath });
 
@@ -108,15 +134,30 @@ export async function exportUserData(userId: number): Promise<{ url: string }> {
  * Right to Rectification (Article 16)
  * Update incorrect personal data
  */
-export async function rectifyUserData(userId: number, updates: Record<string, any>): Promise<void> {
-  const { db } = await getUserRecord(userId);
+export async function rectifyUserData(userId: number, updates: Record<string, any>, fallbackProfile?: PrivacyProfileFallback): Promise<void> {
+  const { db, user } = await getUserRecord(userId, fallbackProfile);
   const allowedUpdates = {
-    name: typeof updates.name === 'string' ? updates.name : undefined,
-    email: typeof updates.email === 'string' ? updates.email : undefined,
+    name: typeof updates.name === 'string' ? updates.name : user.name,
+    email: typeof updates.email === 'string' ? updates.email : user.email,
+    phone: typeof updates.phone === 'string' ? updates.phone : (user as any).phone,
     updatedAt: new Date(),
   };
 
-  await db.update(users).set(allowedUpdates).where(eq(users.id, userId));
+  updateAccountProfile(userId, {
+    name: allowedUpdates.name,
+    email: allowedUpdates.email,
+    phone: allowedUpdates.phone || '+234 000 000 0000',
+    role: fallbackProfile?.role || (user as any).role || 'user',
+  });
+
+  if (db) {
+    await db.update(users).set({
+      name: allowedUpdates.name,
+      email: allowedUpdates.email,
+      updatedAt: new Date(),
+    }).where(eq(users.id, userId));
+  }
+
   await logGDPRActivity(userId, 'rectify_user_data', { fields: Object.keys(updates) });
 }
 
@@ -124,20 +165,36 @@ export async function rectifyUserData(userId: number, updates: Record<string, an
  * Right to Erasure (Article 17) - "Right to be Forgotten"
  * Delete or anonymize personal data
  */
-export async function eraseUserData(userId: number, anonymize: boolean = true): Promise<void> {
-  const { db } = await getUserRecord(userId);
+export async function eraseUserData(userId: number, anonymize: boolean = true, fallbackProfile?: PrivacyProfileFallback): Promise<void> {
+  const { db, user } = await getUserRecord(userId, fallbackProfile);
 
   if (anonymize) {
-    await db
-      .update(users)
-      .set({
-        name: `Anonymized User ${userId}`,
-        email: `anonymized+${userId}@example.invalid`,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId));
-  } else {
+    updateAccountProfile(userId, {
+      name: `Anonymized User ${userId}`,
+      email: `anonymized+${userId}@example.invalid`,
+      phone: 'REDACTED',
+      role: fallbackProfile?.role || (user as any).role || 'user',
+    });
+
+    if (db) {
+      await db
+        .update(users)
+        .set({
+          name: `Anonymized User ${userId}`,
+          email: `anonymized+${userId}@example.invalid`,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+    }
+  } else if (db) {
     await db.delete(users).where(eq(users.id, userId));
+  } else {
+    updateAccountProfile(userId, {
+      name: `Deleted User ${userId}`,
+      email: `deleted+${userId}@example.invalid`,
+      phone: 'REDACTED',
+      role: fallbackProfile?.role || (user as any).role || 'user',
+    });
   }
 
   await logGDPRActivity(userId, anonymize ? 'anonymize_user_data' : 'delete_user_data', { anonymize });
@@ -147,8 +204,8 @@ export async function eraseUserData(userId: number, anonymize: boolean = true): 
  * Right to Data Portability (Article 20)
  * Export data in machine-readable format
  */
-export async function portUserData(userId: number, format: 'json' | 'csv' | 'xml' = 'json'): Promise<{ url: string }> {
-  const { user } = await getUserRecord(userId);
+export async function portUserData(userId: number, format: 'json' | 'csv' | 'xml' = 'json', fallbackProfile?: PrivacyProfileFallback): Promise<{ url: string }> {
+  const { user } = await getUserRecord(userId, fallbackProfile);
   const normalizedFormat = format === 'xml' ? 'json' : format;
   const filePath = await writeUserExport(userId, { portableAt: new Date().toISOString(), user }, normalizedFormat);
   await logGDPRActivity(userId, 'port_user_data', { filePath, format });
@@ -219,4 +276,43 @@ export async function logGDPRActivity(
     createdAt: new Date().toISOString(),
   });
   await writeJsonArray(GDPR_ACTIVITY_LOG_PATH, activities.slice(0, 5000));
+}
+
+export async function getConsentHistory(userId: number): Promise<ConsentRecord[]> {
+  const records = await readJsonArray<ConsentRecord>(CONSENT_LOG_PATH);
+  return records.filter((record) => record.userId === userId);
+}
+
+export async function getBreachNotifications(userId: number): Promise<BreachRecord[]> {
+  const records = await readJsonArray<BreachRecord>(BREACH_LOG_PATH);
+  return records.filter((record) => record.affectedUsers.includes(userId));
+}
+
+export async function getGDPRActivity(userId: number): Promise<GDPRActivityRecord[]> {
+  const activities = await readJsonArray<GDPRActivityRecord>(GDPR_ACTIVITY_LOG_PATH);
+  return activities.filter((record) => record.userId === userId);
+}
+
+export async function getPrivacyOverview(userId: number, fallbackProfile?: PrivacyProfileFallback) {
+  const { user } = await getUserRecord(userId, fallbackProfile);
+  const [consents, breaches, activities] = await Promise.all([
+    getConsentHistory(userId),
+    getBreachNotifications(userId),
+    getGDPRActivity(userId),
+  ]);
+
+  const latestConsentByPurpose = new Map<string, ConsentRecord>();
+  for (const item of consents) {
+    if (!latestConsentByPurpose.has(item.purpose)) {
+      latestConsentByPurpose.set(item.purpose, item);
+    }
+  }
+
+  return {
+    profile: user,
+    consentHistory: consents.slice(0, 20),
+    activeConsents: Array.from(latestConsentByPurpose.values()),
+    breachNotifications: breaches.slice(0, 10),
+    recentActivity: activities.slice(0, 20),
+  };
 }

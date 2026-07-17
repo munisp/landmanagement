@@ -21,7 +21,8 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 | Advanced GIS core | Implemented and tracker-corrected | 3D visualization, terrain analysis, flood-risk layers, land-suitability scoring, viewshed analysis, and solar potential mapping are live in the building-visualization workflow. |
 | Advanced reporting core | Implemented and tracker-corrected | Custom builder, scheduled delivery, visualization, templates, sharing, and visible version tracking are now present in the live reporting dashboards. |
 | Blockchain core | Implemented in application scope; deployment remains environment-specific | Title-transfer contracts, automated escrow, explorer integration, multisignature approvals, blockchain audit-trail retrieval, and Fabric deployment automation are present; live network rollout remains an environment execution concern rather than a missing application workflow. |
-| Large future-platform roadmap items | Still unchecked and materially broader than the already-remediated core platform | Includes full Fabric network rollout execution, CI/CD hardening expansion, marketing, privacy expansion, IoT, and other future programs. |
+| Data privacy and GDPR compliance | Implemented and tracker-corrected | An authenticated privacy workspace now exposes consent management, privacy-policy acknowledgement, portability export, anonymization, right-to-be-forgotten controls, and breach-notification visibility backed by the GDPR service. |
+| Large future-platform roadmap items | Still unchecked and materially broader than the already-remediated core platform | Includes full Fabric network rollout execution, CI/CD hardening expansion, marketing, IoT, and other future programs. |
 
 ## Verified Fixes Completed in This Pass
 
@@ -37,6 +38,7 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 | `client/src/pages/MarketplaceListing.tsx` | Added a side-by-side property comparison experience for active marketplace listings. |
 | `client/src/pages/ReportHistoryDashboard.tsx` | Added collaboration-based report sharing and visible report version tracking on generated history. |
 | `server/buildingVisualizationRepository.ts` and `client/src/pages/Building3DVisualization.tsx` | Added a concrete land-suitability scoring model and exposed the suitability band, score drivers, and development recommendation in the live GIS visualization experience. |
+| `server/gdpr.ts`, `server/routers.ts`, and `client/src/pages/Settings.tsx` | Added an authenticated privacy workspace with consent management, privacy-policy acknowledgement, personal-data export, portability packaging, anonymization/right-to-be-forgotten controls, breach visibility, and offline-capable GDPR service hardening. |
 | `fabric-network/deploy.sh` and related Fabric manifests | Confirmed repository-level automation for packaging, approving, committing, and initializing Hyperledger Fabric chaincode in a three-organization network. |
 | `server/smartContractIntegration.ts`, `server/blockchainService.ts`, and related routes | Confirmed title-transfer, automated escrow, explorer integration, multisignature coverage, and blockchain audit-trail retrieval for most of the blockchain roadmap cluster. |
 | `server/api/routers/search.ts` | Exposed popular-search analytics through a live backend contract so search analytics are not backend-only telemetry. |
@@ -48,7 +50,7 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 | Priority | Reason |
 |---|---|
 | Normalize duplicate historical roadmap sections in `todo.md` | The unchecked total is still inflated by repeated planning blocks and cannot serve as a truthful completion counter until deduplicated. |
-| Reclassify broad expansion clusters | CI/CD hardening, future support operations, marketing systems, and privacy/IoT expansions should be separated from the already-remediated core production application. |
+| Reclassify broad expansion clusters | CI/CD hardening, future support operations, marketing systems, and IoT expansions should be separated from the already-remediated core production application. |
 | Decide whether to mark repository-level Fabric deployment automation complete in the tracker | The deployment script and manifests exist, but live environment execution is distinct from repository completeness. |
 | Refresh final delivery documents after validation | The manifest and validation report should reflect the intelligent prefill and land-suitability closure work. |
 

@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { User, Settings as SettingsIcon, Bell, Shield } from 'lucide-react';
+import { User, Settings as SettingsIcon, Bell, Shield, Database } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
 
@@ -37,6 +37,8 @@ export default function Settings() {
   const utils = trpc.useUtils();
   const { data: preferences, isLoading: preferencesLoading } = trpc.preferences.get.useQuery();
   const { data: accountSettings, isLoading: accountLoading } = trpc.accountSettings.get.useQuery();
+  const { data: privacyOverview, isLoading: privacyLoading } = trpc.privacy.overview.useQuery();
+  const { data: privacyPolicy } = trpc.privacy.policy.useQuery();
 
   const updatePreferences = trpc.preferences.update.useMutation({
     onSuccess: async () => {
@@ -89,6 +91,57 @@ export default function Settings() {
     },
   });
 
+  const exportPrivacyData = trpc.privacy.exportData.useMutation({
+    onSuccess: async (result) => {
+      await utils.privacy.overview.invalidate();
+      toast.success(`Privacy export prepared at ${result.url}`);
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to export privacy data');
+    },
+  });
+
+  const portPrivacyData = trpc.privacy.portData.useMutation({
+    onSuccess: async (result) => {
+      await utils.privacy.overview.invalidate();
+      toast.success(`Portable data package prepared at ${result.url}`);
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to create portable data package');
+    },
+  });
+
+  const recordPrivacyConsent = trpc.privacy.recordConsent.useMutation({
+    onSuccess: async () => {
+      await utils.privacy.overview.invalidate();
+      toast.success('Consent preference updated');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to update consent preference');
+    },
+  });
+
+  const erasePrivacyData = trpc.privacy.eraseData.useMutation({
+    onSuccess: async (_, variables) => {
+      await utils.accountSettings.get.invalidate();
+      await utils.privacy.overview.invalidate();
+      toast.success(variables.anonymize ? 'Personal data anonymized successfully' : 'Personal data erasure workflow completed');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to process privacy erasure request');
+    },
+  });
+
+  const acknowledgePrivacyPolicy = trpc.privacy.acknowledgePolicy.useMutation({
+    onSuccess: async () => {
+      await utils.privacy.overview.invalidate();
+      toast.success('Privacy policy acknowledgement updated');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to update policy acknowledgement');
+    },
+  });
+
   const [profile, setProfile] = useState<ProfileFormState>({
     name: '',
     email: '',
@@ -111,7 +164,7 @@ export default function Settings() {
     }
   }, [accountSettings?.profile]);
 
-  const isLoading = preferencesLoading || accountLoading;
+  const isLoading = preferencesLoading || accountLoading || privacyLoading;
 
   const securitySummary = useMemo(() => {
     if (!accountSettings?.security) {
@@ -190,6 +243,24 @@ export default function Settings() {
     );
   }
 
+  const consentPurposes = [
+    {
+      purpose: 'transaction_updates',
+      label: 'Transaction updates',
+      description: 'Allow processing and notifications required to keep your transaction workflows current.',
+    },
+    {
+      purpose: 'marketing_communications',
+      label: 'Marketing communications',
+      description: 'Allow campaign, promotional, and outreach messaging.',
+    },
+    {
+      purpose: 'analytics_improvement',
+      label: 'Analytics improvement',
+      description: 'Allow aggregated behavioral telemetry to improve service reliability and experience design.',
+    },
+  ];
+
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8">
@@ -200,7 +271,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[760px]">
           <TabsTrigger value="profile">
             <User className="mr-2 h-4 w-4" />
             Profile
@@ -216,6 +287,10 @@ export default function Settings() {
           <TabsTrigger value="security">
             <Shield className="mr-2 h-4 w-4" />
             Security
+          </TabsTrigger>
+          <TabsTrigger value="privacy">
+            <Database className="mr-2 h-4 w-4" />
+            Privacy
           </TabsTrigger>
         </TabsList>
 
@@ -568,6 +643,121 @@ export default function Settings() {
                     No active sessions found.
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="privacy">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Privacy and Data Rights</CardTitle>
+                <CardDescription>
+                  Manage consent, export your data, request machine-readable portability packages, and trigger anonymization controls.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-lg border p-4">
+                    <p className="text-sm text-muted-foreground">Recent privacy activities</p>
+                    <p className="mt-2 text-2xl font-semibold">{privacyOverview?.recentActivity?.length ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg border p-4">
+                    <p className="text-sm text-muted-foreground">Tracked consent purposes</p>
+                    <p className="mt-2 text-2xl font-semibold">{privacyOverview?.activeConsents?.length ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg border p-4">
+                    <p className="text-sm text-muted-foreground">Breach notices on file</p>
+                    <p className="mt-2 text-2xl font-semibold">{privacyOverview?.breachNotifications?.length ?? 0}</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Button onClick={() => exportPrivacyData.mutate()} disabled={exportPrivacyData.isPending}>
+                    {exportPrivacyData.isPending ? 'Preparing export...' : 'Export Personal Data'}
+                  </Button>
+                  <Button variant="outline" onClick={() => portPrivacyData.mutate({ format: 'csv' })} disabled={portPrivacyData.isPending}>
+                    {portPrivacyData.isPending ? 'Preparing package...' : 'Create Portable Package'}
+                  </Button>
+                  <Button variant="destructive" onClick={() => erasePrivacyData.mutate({ anonymize: true })} disabled={erasePrivacyData.isPending}>
+                    {erasePrivacyData.isPending ? 'Processing...' : 'Anonymize Personal Data'}
+                  </Button>
+                </div>
+
+                <div className="rounded-lg border p-4 space-y-4">
+                  <div>
+                    <p className="font-medium">Consent Management</p>
+                    <p className="text-sm text-muted-foreground">Adjust how the platform may process your data for specific operational purposes.</p>
+                  </div>
+                  {consentPurposes.map((item) => {
+                    const latest = privacyOverview?.activeConsents?.find((consent: any) => consent.purpose === item.purpose);
+                    const checked = latest?.granted ?? false;
+                    return (
+                      <div key={item.purpose} className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-1 pr-4">
+                          <p className="font-medium">{item.label}</p>
+                          <p className="text-sm text-muted-foreground">{item.description}</p>
+                        </div>
+                        <Switch
+                          checked={checked}
+                          onCheckedChange={(granted) => recordPrivacyConsent.mutate({ purpose: item.purpose, granted })}
+                          disabled={recordPrivacyConsent.isPending}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="rounded-lg border p-4 space-y-4">
+                  <div>
+                    <p className="font-medium">Privacy Policy</p>
+                    <p className="text-sm text-muted-foreground">{privacyPolicy?.title} v{privacyPolicy?.version} • Updated {privacyPolicy ? new Date(privacyPolicy.updatedAt).toLocaleDateString() : 'N/A'}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">{privacyPolicy?.summary}</p>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-1 pr-4">
+                      <p className="font-medium">Policy acknowledgement</p>
+                      <p className="text-sm text-muted-foreground">Record acceptance of the current privacy policy version for regulated data processing.</p>
+                    </div>
+                    <Switch
+                      checked={Boolean(privacyOverview?.activeConsents?.find((consent: any) => consent.purpose === privacyPolicy?.requiredPurpose)?.granted)}
+                      onCheckedChange={(granted) => acknowledgePrivacyPolicy.mutate({ granted })}
+                      disabled={acknowledgePrivacyPolicy.isPending}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-lg border p-4 space-y-3">
+                    <p className="font-medium">Recent Privacy Activity</p>
+                    {(privacyOverview?.recentActivity?.length ?? 0) > 0 ? (
+                      privacyOverview?.recentActivity?.map((activity: any) => (
+                        <div key={`${activity.activity}-${activity.createdAt}`} className="rounded border bg-muted/30 px-3 py-2">
+                          <p className="text-sm font-medium">{String(activity.activity).replace(/_/g, ' ')}</p>
+                          <p className="text-xs text-muted-foreground">{new Date(activity.createdAt).toLocaleString()}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded border px-3 py-4 text-sm text-muted-foreground">No privacy activity has been recorded yet.</div>
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border p-4 space-y-3">
+                    <p className="font-medium">Breach Notifications</p>
+                    {(privacyOverview?.breachNotifications?.length ?? 0) > 0 ? (
+                      privacyOverview?.breachNotifications?.map((breach: any) => (
+                        <div key={`${breach.description}-${breach.notifiedAt}`} className="rounded border bg-muted/30 px-3 py-2">
+                          <p className="text-sm font-medium capitalize">{breach.severity} severity</p>
+                          <p className="text-sm">{breach.description}</p>
+                          <p className="text-xs text-muted-foreground">{new Date(breach.notifiedAt).toLocaleString()}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded border px-3 py-4 text-sm text-muted-foreground">No breach notifications are currently recorded for this account.</div>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>

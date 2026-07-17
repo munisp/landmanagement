@@ -281,6 +281,114 @@ export const appRouter = router({
       }),
   }),
 
+  privacy: router({
+    overview: protectedProcedure.query(async ({ ctx }) => {
+      const gdpr = await import('./gdpr');
+      return gdpr.getPrivacyOverview(Number(ctx.user.id), {
+        name: ctx.user.name || `User ${ctx.user.id}`,
+        email: ctx.user.email || `user${ctx.user.id}@idlr.local`,
+        role: ctx.user.role || 'user',
+      });
+    }),
+
+    exportData: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        const gdpr = await import('./gdpr');
+        return gdpr.exportUserData(Number(ctx.user.id), {
+          name: ctx.user.name || `User ${ctx.user.id}`,
+          email: ctx.user.email || `user${ctx.user.id}@idlr.local`,
+          role: ctx.user.role || 'user',
+        });
+      }),
+
+    portData: protectedProcedure
+      .input(z.object({ format: z.enum(['json', 'csv', 'xml']).default('json') }))
+      .mutation(async ({ ctx, input }) => {
+        const gdpr = await import('./gdpr');
+        return gdpr.portUserData(Number(ctx.user.id), input.format, {
+          name: ctx.user.name || `User ${ctx.user.id}`,
+          email: ctx.user.email || `user${ctx.user.id}@idlr.local`,
+          role: ctx.user.role || 'user',
+        });
+      }),
+
+    rectifyProfile: protectedProcedure
+      .input(z.object({
+        name: z.string().min(2).optional(),
+        email: z.string().email().optional(),
+        phone: z.string().min(7).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const gdpr = await import('./gdpr');
+        await gdpr.rectifyUserData(Number(ctx.user.id), input, {
+          name: ctx.user.name || `User ${ctx.user.id}`,
+          email: ctx.user.email || `user${ctx.user.id}@idlr.local`,
+          role: ctx.user.role || 'user',
+        });
+        return { success: true };
+      }),
+
+    recordConsent: protectedProcedure
+      .input(z.object({ purpose: z.string().min(2), granted: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        const gdpr = await import('./gdpr');
+        await gdpr.recordConsent(Number(ctx.user.id), input.purpose, input.granted);
+        return { success: true };
+      }),
+
+    policy: protectedProcedure.query(async () => ({
+      version: '2026.07',
+      title: 'IDLR PTS Privacy Policy',
+      summary: 'This policy governs identity data, land-registry workflow data, transaction records, document processing outputs, and audit evidence retained by the platform.',
+      updatedAt: new Date('2026-07-17T00:00:00.000Z'),
+      requiredPurpose: 'privacy_policy_2026_07',
+    })),
+
+    acknowledgePolicy: protectedProcedure
+      .input(z.object({ granted: z.boolean().default(true) }))
+      .mutation(async ({ ctx, input }) => {
+        const gdpr = await import('./gdpr');
+        await gdpr.recordConsent(Number(ctx.user.id), 'privacy_policy_2026_07', input.granted);
+        return { success: true };
+      }),
+
+    reportBreach: protectedProcedure
+      .input(z.object({
+        description: z.string().min(10),
+        affectedUsers: z.array(z.number()).min(1),
+        dataCategories: z.array(z.string().min(2)).min(1),
+        severity: z.enum(['low', 'medium', 'high', 'critical']),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if ((ctx.user.role || 'user') !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Only admins can report privacy breaches' });
+        }
+        const gdpr = await import('./gdpr');
+        await gdpr.notifyDataBreach(input);
+        return { success: true };
+      }),
+
+    withdrawConsent: protectedProcedure
+      .input(z.object({ purpose: z.string().min(2) }))
+      .mutation(async ({ ctx, input }) => {
+        const gdpr = await import('./gdpr');
+        await gdpr.withdrawConsent(Number(ctx.user.id), input.purpose);
+        return { success: true };
+      }),
+
+    eraseData: protectedProcedure
+      .input(z.object({ anonymize: z.boolean().default(true) }))
+      .mutation(async ({ ctx, input }) => {
+        const gdpr = await import('./gdpr');
+        await gdpr.eraseUserData(Number(ctx.user.id), input.anonymize, {
+          name: ctx.user.name || `User ${ctx.user.id}`,
+          email: ctx.user.email || `user${ctx.user.id}@idlr.local`,
+          role: ctx.user.role || 'user',
+        });
+        return { success: true };
+      }),
+  }),
+
   // Parcel Management
   parcels: router({
     search: publicProcedure
