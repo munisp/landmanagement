@@ -523,6 +523,74 @@ export const appRouter = router({
       }),
   }),
 
+  iot: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./iotRepository');
+      return repo.getIoTOverview();
+    }),
+
+    registerDevice: protectedProcedure
+      .input(z.object({
+        name: z.string().min(3),
+        category: z.enum(['environmental_sensor', 'access_control', 'utility_meter']),
+        location: z.string().min(3),
+        status: z.enum(['online', 'offline', 'maintenance']),
+        firmwareVersion: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./iotRepository');
+        return repo.registerIoTDevice(input);
+      }),
+
+    addEnvironmentalReading: protectedProcedure
+      .input(z.object({
+        deviceId: z.number(),
+        temperatureCelsius: z.number(),
+        humidityPercent: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./iotRepository');
+        return repo.addEnvironmentalReading(input);
+      }),
+
+    addAccessControlEvent: protectedProcedure
+      .input(z.object({
+        deviceId: z.number(),
+        actor: z.string().min(2),
+        credentialType: z.enum(['badge', 'biometric', 'temporary_code']),
+        outcome: z.enum(['granted', 'denied']),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./iotRepository');
+        return repo.addAccessControlEvent(input);
+      }),
+
+    addUtilityMeterReading: protectedProcedure
+      .input(z.object({
+        deviceId: z.number(),
+        meterType: z.enum(['electricity', 'water', 'gas']),
+        usage: z.number(),
+        unit: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./iotRepository');
+        return repo.addUtilityMeterReading(input);
+      }),
+
+    createMaintenanceAlert: protectedProcedure
+      .input(z.object({
+        deviceId: z.number(),
+        severity: z.enum(['medium', 'high']),
+        title: z.string().min(5),
+        recommendation: z.string().min(10),
+        predictedFailureWindow: z.string().min(3),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./iotRepository');
+        return repo.createMaintenanceAlert(input);
+      }),
+  }),
+
   // Parcel Management
   parcels: router({
     search: publicProcedure
@@ -2691,6 +2759,55 @@ export const appRouter = router({
         const startDate = input.startDate ? new Date(input.startDate) : undefined;
         const endDate = input.endDate ? new Date(input.endDate) : undefined;
         return await getSecurityStats(startDate, endDate);
+      }),
+
+    responseOverview: protectedProcedure
+      .query(async () => {
+        const repo = await import('./securityResponseRepository');
+        return repo.getSecurityResponseOverview();
+      }),
+
+    createBehavioralSignal: protectedProcedure
+      .input(z.object({
+        userId: z.number(),
+        userLabel: z.string().min(2),
+        signalType: z.enum(['velocity', 'device_shift', 'location_jump', 'after_hours_access']),
+        riskLevel: z.enum(['low', 'medium', 'high']),
+        score: z.number().min(0).max(100),
+        description: z.string().min(10),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./securityResponseRepository');
+        return repo.createBehavioralSignal(input);
+      }),
+
+    registerHoneypotEvent: protectedProcedure
+      .input(z.object({
+        sourceIp: z.string().min(3),
+        endpoint: z.string().min(2),
+        payloadSnippet: z.string().min(3),
+        severity: z.enum(['medium', 'high', 'critical']),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./securityResponseRepository');
+        return repo.registerHoneypotEvent(input);
+      }),
+
+    createIncidentFromHoneypot: protectedProcedure
+      .input(z.object({ eventId: z.number() }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./securityResponseRepository');
+        return repo.createIncidentFromHoneypot(input.eventId);
+      }),
+
+    updateIncidentStatus: protectedProcedure
+      .input(z.object({
+        incidentId: z.number(),
+        status: z.enum(['open', 'investigating', 'contained', 'resolved']),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./securityResponseRepository');
+        return repo.updateIncidentStatus(input);
       }),
 
     blockIP: protectedProcedure

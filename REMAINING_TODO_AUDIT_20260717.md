@@ -28,8 +28,9 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 | Customer support system | Implemented and tracker-corrected | The repository now includes a live support center with ticketing, conversation threads, knowledge-base content, FAQ management, analytics, and SLA tracking. |
 | Marketing and communication | Implemented and tracker-corrected | The repository now includes a marketing center with email, SMS, and push campaigns, landing-page management, A/B experiments, and marketing analytics. |
 | Final integration, monitoring, and DR | Implemented and tracker-corrected | The repository now includes end-to-end validation evidence, security-audit-oriented automated tests, user documentation, monitoring dashboards, backup/recovery workflows, and UAT coverage documentation. |
-| Advanced security foundation | Partially implemented and tracker-corrected | Zero-trust-style authorization, WAF/API protection, and threat-intelligence integration are present; behavioral analytics, honeypots, and incident-response automation remain open. |
-| Large future-platform roadmap items | Still unchecked and materially broader than the already-remediated core platform | Includes full Fabric network rollout execution, IoT, and other future programs, plus a smaller set of remaining advanced-security items. |
+| Advanced security foundation | Implemented and tracker-corrected | Zero-trust-style authorization, WAF/API protection, threat-intelligence integration, behavioral analytics, honeypot monitoring, and incident-response automation are now exposed through the live security-monitoring workflow. |
+| IoT operations | Implemented and tracker-corrected | The repository now includes a live IoT operations workspace covering smart sensors, environmental monitoring, access control, utility-meter readings, device management, and predictive maintenance. |
+| Large future-platform roadmap items | Still unchecked and materially broader than the already-remediated core platform | Includes full Fabric network rollout execution and other long-horizon future programs, but no longer the previously open advanced-security or IoT clusters completed in this pass. |
 
 ## Verified Fixes Completed in This Pass
 
@@ -52,6 +53,8 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 | `USER_DOCUMENTATION_20260717.md`, `UAT_AND_INTEGRATION_20260717.md`, `client/src/pages/SecurityDashboard.tsx`, and `client/src/pages/BackupRecovery.tsx` | Added comprehensive user documentation and UAT coverage while confirming live production-monitoring and disaster-recovery surfaces. |
 | `server/supportRepository.ts`, `server/routers.ts`, and `client/src/pages/SupportCenter.tsx` | Added an end-to-end support-center workflow covering helpdesk ticketing, live support conversations, knowledge-base publishing, FAQ management, analytics, and SLA tracking. |
 | `server/marketingRepository.ts`, `server/routers.ts`, and `client/src/pages/MarketingCenter.tsx` | Added an end-to-end marketing workflow covering email, SMS, and push campaigns, landing-page management, A/B experimentation, and marketing analytics. |
+| `server/securityResponseRepository.ts`, `server/routers.ts`, and `client/src/pages/SecurityMonitoring.tsx` | Added an end-to-end advanced-security workflow covering behavioral analytics, honeypot detections, and incident-response automation on top of the existing monitoring stack. |
+| `server/iotRepository.ts`, `server/routers.ts`, `client/src/pages/IoTOperations.tsx`, and `client/src/App.tsx` | Added an end-to-end IoT operations workflow covering smart-property sensors, environmental monitoring, access control, utility-meter telemetry, device management, and predictive maintenance. |
 | `fabric-network/deploy.sh` and related Fabric manifests | Confirmed repository-level automation for packaging, approving, committing, and initializing Hyperledger Fabric chaincode in a three-organization network. |
 | `server/smartContractIntegration.ts`, `server/blockchainService.ts`, and related routes | Confirmed title-transfer, automated escrow, explorer integration, multisignature coverage, and blockchain audit-trail retrieval for most of the blockchain roadmap cluster. |
 | `server/api/routers/search.ts` | Exposed popular-search analytics through a live backend contract so search analytics are not backend-only telemetry. |
@@ -63,14 +66,14 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 | Priority | Reason |
 |---|---|
 | Normalize duplicate historical roadmap sections in `todo.md` | The unchecked total has been reduced further, but future-program and historical-planning entries still inflate the raw count. |
-| Reclassify broad expansion clusters | IoT and other long-horizon future programs should be separated from the already-remediated core production application. |
+| Reclassify broad expansion clusters | Remaining long-horizon future programs should be separated from the already-remediated core production application. |
 | Decide whether to mark repository-level Fabric deployment automation complete in the tracker | The deployment script and manifests exist, but live environment execution is distinct from repository completeness. |
-| Refresh final delivery documents after validation | The manifest, audit note, and handoff should reflect the new support and marketing closure work. |
+| Refresh final delivery documents after validation | The manifest, audit note, and handoff should reflect the new advanced-security and IoT closure work. |
 
 ## Current Validation Status Relevant to This Pass
 
 > TypeScript validation returns successfully after the broker commission, database helper, document comparison, search analytics, intelligent mortgage prefill, and land-suitability follow-on fixes.
 
-Current remaining unchecked count in `todo.md` after the latest closure pass is **1360**, but that figure still includes broader future-program entries and historical roadmap duplication and therefore does not equal the actual count of unresolved core-product defects.
+Current remaining unchecked count in `todo.md` after the latest closure pass is **1351**, but that figure still includes broader future-program entries and historical roadmap duplication and therefore does not equal the actual count of unresolved core-product defects.
 
 This file is an audit note, not a final certification that all remaining unchecked roadmap items are complete.

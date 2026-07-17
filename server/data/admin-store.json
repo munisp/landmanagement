@@ -26,7 +26,7 @@
       "suspendedBy": null,
       "suspensionReason": null,
       "createdAt": "2024-01-02T09:00:00.000Z",
-      "updatedAt": "2026-07-17T23:01:34.485Z",
+      "updatedAt": "2026-07-17T23:13:04.654Z",
       "lastActive": "2024-03-14T09:00:00.000Z",
       "lastSignedIn": "2024-03-14T09:00:00.000Z"
     },
@@ -47,6 +47,143 @@
     }
   ],
   "activityLogs": [
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "role_changed",
+      "timestamp": "2026-07-17T23:13:04.654Z",
+      "details": {
+        "role": "user",
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "role_changed",
+      "timestamp": "2026-07-17T23:13:04.650Z",
+      "details": {
+        "role": "admin",
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "role_changed",
+      "timestamp": "2026-07-17T23:13:04.636Z",
+      "details": {
+        "role": "registrar",
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "role_changed",
+      "timestamp": "2026-07-17T23:13:04.632Z",
+      "details": {
+        "role": "surveyor",
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "role_changed",
+      "timestamp": "2026-07-17T23:13:04.628Z",
+      "details": {
+        "role": "user",
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "user_activated",
+      "timestamp": "2026-07-17T23:13:04.621Z",
+      "details": {
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "user_suspended",
+      "timestamp": "2026-07-17T23:13:04.617Z",
+      "details": {
+        "reason": "Second suspension",
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "user_activated",
+      "timestamp": "2026-07-17T23:13:04.612Z",
+      "details": {
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "user_suspended",
+      "timestamp": "2026-07-17T23:13:04.607Z",
+      "details": {
+        "reason": "First suspension",
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "user_activated",
+      "timestamp": "2026-07-17T23:13:04.581Z",
+      "details": {
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "user_suspended",
+      "timestamp": "2026-07-17T23:13:04.563Z",
+      "details": {
+        "reason": "Violation of terms of service",
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "role_changed",
+      "timestamp": "2026-07-17T23:13:04.560Z",
+      "details": {
+        "role": "user",
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "role_changed",
+      "timestamp": "2026-07-17T23:13:04.555Z",
+      "details": {
+        "role": "registrar",
+        "adminId": 901
+      }
+    },
+    {
+      "userId": 902,
+      "userName": "Offline Test User",
+      "action": "role_changed",
+      "timestamp": "2026-07-17T23:13:04.552Z",
+      "details": {
+        "role": "surveyor",
+        "adminId": 901
+      }
+    },
     {
       "userId": 902,
       "userName": "Offline Test User",
