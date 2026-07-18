@@ -10,7 +10,7 @@
  */
 
 import { and, desc, eq } from 'drizzle-orm';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { dataExchangeAudits } from '../drizzle/schema';
 import * as gdpr from './gdpr';
 
@@ -90,8 +90,6 @@ function loadPolicies(): Record<string, PurposePolicy> {
 
 const ALLOWED_JURISDICTIONS = new Set((process.env.DATA_EXCHANGE_JURISDICTIONS ?? 'NG').split(',').map((j) => j.trim().toUpperCase()));
 
-const memoryAudits: Array<ExchangeAuthorization & { id: number; request: ExchangeRequest }> = [];
-let memoryId = 1;
 
 async function hasPendingErasure(subjectUserId: number): Promise<boolean> {
   try {
@@ -176,33 +174,23 @@ export async function authorizeExchange(request: ExchangeRequest): Promise<Excha
     evaluatedAt: new Date().toISOString(),
   };
 
-  // Persist audit
-  const db = await getDb();
-  if (db) {
-    try {
-      const inserted = await db
-        .insert(dataExchangeAudits)
-        .values({
-          subjectUserId: request.subjectUserId,
-          requestorUserId: request.requestorUserId ?? null,
-          requestorRole: request.requestorRole,
-          purpose: request.purpose,
-          jurisdiction,
-          dataCategories: request.dataCategories,
-          decision,
-          decisionReasons: reasons,
-          conditions,
-        })
-        .returning();
-      authorization.auditId = inserted[0]?.id;
-      return authorization;
-    } catch (error) {
-      console.warn('[DataExchange] Audit persist failed, using memory fallback:', (error as Error).message);
-    }
-  }
-  const id = memoryId++;
-  memoryAudits.unshift({ ...authorization, id, request });
-  authorization.auditId = id;
+  // Persist audit to PostgreSQL — hard-fails when the database is unavailable.
+  const db = await requireDb();
+  const inserted = await db
+    .insert(dataExchangeAudits)
+    .values({
+      subjectUserId: request.subjectUserId,
+      requestorUserId: request.requestorUserId ?? null,
+      requestorRole: request.requestorRole,
+      purpose: request.purpose,
+      jurisdiction,
+      dataCategories: request.dataCategories,
+      decision,
+      decisionReasons: reasons,
+      conditions,
+    })
+    .returning();
+  authorization.auditId = inserted[0]?.id;
   return authorization;
 }
 
@@ -213,56 +201,30 @@ export async function listExchangeAudits(filter: {
   purpose?: string;
   limit?: number;
 } = {}) {
-  const db = await getDb();
-  if (db) {
-    try {
-      const conditions = [] as any[];
-      if (filter.subjectUserId) conditions.push(eq(dataExchangeAudits.subjectUserId, filter.subjectUserId));
-      if (filter.decision) conditions.push(eq(dataExchangeAudits.decision, filter.decision));
-      if (filter.purpose) conditions.push(eq(dataExchangeAudits.purpose, filter.purpose));
-      const rows = await db
-        .select()
-        .from(dataExchangeAudits)
-        .where(conditions.length ? and(...conditions) : undefined)
-        .orderBy(desc(dataExchangeAudits.createdAt))
-        .limit(filter.limit ?? 100);
-      return rows.map((row: any) => ({
-        id: row.id,
-        subjectUserId: row.subjectUserId,
-        requestorUserId: row.requestorUserId ?? undefined,
-        requestorRole: row.requestorRole,
-        purpose: row.purpose,
-        jurisdiction: row.jurisdiction,
-        dataCategories: (row.dataCategories as string[]) ?? [],
-        decision: row.decision,
-        reasons: (row.decisionReasons as string[]) ?? [],
-        conditions: (row.conditions as string[]) ?? [],
-        createdAt: row.createdAt?.toISOString?.() ?? String(row.createdAt),
-      }));
-    } catch (error) {
-      console.warn('[DataExchange] Audit list failed, using memory fallback:', (error as Error).message);
-    }
-  }
-  return memoryAudits
-    .filter((a) =>
-      (!filter.subjectUserId || a.request.subjectUserId === filter.subjectUserId) &&
-      (!filter.decision || a.decision === filter.decision) &&
-      (!filter.purpose || a.request.purpose === filter.purpose)
-    )
-    .slice(0, filter.limit ?? 100)
-    .map((a) => ({
-      id: a.id,
-      subjectUserId: a.request.subjectUserId,
-      requestorUserId: a.request.requestorUserId,
-      requestorRole: a.request.requestorRole,
-      purpose: a.request.purpose,
-      jurisdiction: a.request.jurisdiction ?? 'NG',
-      dataCategories: a.request.dataCategories,
-      decision: a.decision,
-      reasons: a.reasons,
-      conditions: a.conditions,
-      createdAt: a.evaluatedAt,
-    }));
+  const db = await requireDb();
+  const conditions = [] as any[];
+  if (filter.subjectUserId) conditions.push(eq(dataExchangeAudits.subjectUserId, filter.subjectUserId));
+  if (filter.decision) conditions.push(eq(dataExchangeAudits.decision, filter.decision));
+  if (filter.purpose) conditions.push(eq(dataExchangeAudits.purpose, filter.purpose));
+  const rows = await db
+    .select()
+    .from(dataExchangeAudits)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(dataExchangeAudits.createdAt))
+    .limit(filter.limit ?? 100);
+  return rows.map((row: any) => ({
+    id: row.id,
+    subjectUserId: row.subjectUserId,
+    requestorUserId: row.requestorUserId ?? undefined,
+    requestorRole: row.requestorRole,
+    purpose: row.purpose,
+    jurisdiction: row.jurisdiction,
+    dataCategories: (row.dataCategories as string[]) ?? [],
+    decision: row.decision,
+    reasons: (row.decisionReasons as string[]) ?? [],
+    conditions: (row.conditions as string[]) ?? [],
+    createdAt: row.createdAt?.toISOString?.() ?? String(row.createdAt),
+  }));
 }
 
 /** Expose the active purpose policy map for admin UIs. */

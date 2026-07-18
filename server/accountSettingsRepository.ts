@@ -30,9 +30,7 @@ interface AccountSettingsState {
   sessions: SessionRecord[];
 }
 
-const globalState = globalThis as typeof globalThis & {
-  __accountSettingsState?: AccountSettingsState;
-};
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 function createDefaultState(): AccountSettingsState {
   const now = new Date().toISOString();
@@ -43,15 +41,12 @@ function createDefaultState(): AccountSettingsState {
   };
 }
 
-function getState(): AccountSettingsState {
-  if (!globalState.__accountSettingsState) {
-    globalState.__accountSettingsState = createDefaultState();
-  }
-  return globalState.__accountSettingsState;
+async function getState(): Promise<AccountSettingsState> {
+  return readJsonStore<AccountSettingsState>('account-settings-store', createDefaultState);
 }
 
-function ensureProfile(userId: number, defaults?: Partial<ProfileRecord>): ProfileRecord {
-  const state = getState();
+async function ensureProfile(userId: number, defaults?: Partial<ProfileRecord>): Promise<ProfileRecord> {
+  const state = await getState();
   let profile = state.profiles.find((item) => item.userId === userId);
   if (!profile) {
     profile = {
@@ -63,12 +58,13 @@ function ensureProfile(userId: number, defaults?: Partial<ProfileRecord>): Profi
       updatedAt: new Date().toISOString(),
     };
     state.profiles.push(profile);
+    await writeJsonStore('account-settings-store', state);
   }
   return profile;
 }
 
-function ensureSecurity(userId: number): SecurityRecord {
-  const state = getState();
+async function ensureSecurity(userId: number): Promise<SecurityRecord> {
+  const state = await getState();
   let security = state.security.find((item) => item.userId === userId);
   if (!security) {
     security = {
@@ -77,12 +73,13 @@ function ensureSecurity(userId: number): SecurityRecord {
       passwordUpdatedAt: new Date().toISOString(),
     };
     state.security.push(security);
+    await writeJsonStore('account-settings-store', state);
   }
   return security;
 }
 
-function ensureSessions(userId: number): SessionRecord[] {
-  const state = getState();
+async function ensureSessions(userId: number): Promise<SessionRecord[]> {
+  const state = await getState();
   const existing = state.sessions.filter((item) => item.userId === userId);
   if (existing.length > 0) {
     return existing;
@@ -112,18 +109,21 @@ function ensureSessions(userId: number): SessionRecord[] {
     },
   ];
   state.sessions.push(...seeded);
+  await writeJsonStore('account-settings-store', state);
   return seeded;
 }
 
-export function getAccountSettings(userId: number, defaults?: Partial<ProfileRecord>) {
-  const profile = ensureProfile(userId, defaults);
-  const security = ensureSecurity(userId);
-  const sessions = ensureSessions(userId).filter((session) => session.status === 'active');
+export async function getAccountSettings(userId: number, defaults?: Partial<ProfileRecord>) {
+  const profile = await ensureProfile(userId, defaults);
+  const security = await ensureSecurity(userId);
+  const sessions = (await ensureSessions(userId)).filter((session) => session.status === 'active');
   return { profile, security, sessions };
 }
 
-export function updateAccountProfile(userId: number, input: { name: string; email: string; phone: string; role?: string }) {
-  const profile = ensureProfile(userId);
+export async function updateAccountProfile(userId: number, input: { name: string; email: string; phone: string; role?: string }) {
+  await ensureProfile(userId);
+  const state = await getState();
+  const profile = state.profiles.find((item) => item.userId === userId)!;
   profile.name = input.name;
   profile.email = input.email;
   profile.phone = input.phone;
@@ -131,31 +131,39 @@ export function updateAccountProfile(userId: number, input: { name: string; emai
     profile.role = input.role;
   }
   profile.updatedAt = new Date().toISOString();
+  await writeJsonStore('account-settings-store', state);
   return profile;
 }
 
-export function changeAccountPassword(userId: number, input: { currentPassword: string; newPassword: string }) {
+export async function changeAccountPassword(userId: number, input: { currentPassword: string; newPassword: string }) {
   if (!input.currentPassword || !input.newPassword) {
     throw new Error('Current and new passwords are required');
   }
-  const security = ensureSecurity(userId);
+  await ensureSecurity(userId);
+  const state = await getState();
+  const security = state.security.find((item) => item.userId === userId)!;
   security.passwordUpdatedAt = new Date().toISOString();
+  await writeJsonStore('account-settings-store', state);
   return { success: true, passwordUpdatedAt: security.passwordUpdatedAt };
 }
 
-export function setTwoFactorEnabled(userId: number, enabled: boolean) {
-  const security = ensureSecurity(userId);
+export async function setTwoFactorEnabled(userId: number, enabled: boolean) {
+  await ensureSecurity(userId);
+  const state = await getState();
+  const security = state.security.find((item) => item.userId === userId)!;
   security.twoFactorEnabled = enabled;
+  await writeJsonStore('account-settings-store', state);
   return security;
 }
 
-export function revokeAccountSession(userId: number, sessionId: string) {
-  const state = getState();
+export async function revokeAccountSession(userId: number, sessionId: string) {
+  const state = await getState();
   const session = state.sessions.find((item) => item.userId === userId && item.id === sessionId);
   if (!session) {
     throw new Error('Session not found');
   }
   session.status = 'revoked';
   session.isCurrent = false;
+  await writeJsonStore('account-settings-store', state);
   return { success: true, sessionId };
 }

@@ -329,7 +329,8 @@ ALTER TABLE "document_verifications" ADD CONSTRAINT "document_verifications_appl
 ALTER TABLE "broker_application_submissions" ADD CONSTRAINT "broker_application_submissions_application_id_mortgage_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."mortgage_applications"("id") ON DELETE no action ON UPDATE no action;;--> statement-breakpoint
 ALTER TABLE "broker_commissions" ADD CONSTRAINT "broker_commissions_application_id_mortgage_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."mortgage_applications"("id") ON DELETE no action ON UPDATE no action;;--> statement-breakpoint
 ALTER TABLE "loan_pool_loans" ADD CONSTRAINT "loan_pool_loans_application_id_mortgage_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."mortgage_applications"("id") ON DELETE no action ON UPDATE no action;;--> statement-breakpoint
-ALTER TABLE "mortgage_decision_explanations" ADD CONSTRAINT "mortgage_decision_explanations_application_id_mortgage_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."mortgage_applications"("id") ON DELETE no action ON UPDATE no action;;--> statement-breakpoint
+-- application_id intentionally kept as a plain column (no FK): mortgage application records
+-- are currently dual-stored; consolidation tracked in the audit report.
 
 -- Nextgen transaction FKs (moved from 0011; registry_transactions is created in 0012).
 ALTER TABLE "agency_clearances" ADD CONSTRAINT "agency_clearances_transaction_id_transactions_id_fk" FOREIGN KEY ("transaction_id") REFERENCES "public"."registry_transactions"("id") ON DELETE no action ON UPDATE no action;;--> statement-breakpoint

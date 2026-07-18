@@ -11,7 +11,7 @@
  */
 
 import { asc, eq } from 'drizzle-orm';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { escrowSettlements, settlementCheckpoints } from '../drizzle/schema';
 
 export type SettlementStatus = 'draft' | 'pending' | 'release_ready' | 'released' | 'blocked' | 'cancelled';
@@ -62,15 +62,10 @@ export function defaultCheckpointTemplate(opts: { financed: boolean; insured: bo
   return template;
 }
 
-interface MemorySettlement extends SettlementView {}
-const memorySettlements: MemorySettlement[] = [];
-let memorySettlementId = 1;
-let memoryCheckpointId = 1;
-let memoryRefSeq = 1;
-
-function generateRef(): string {
+/** Settlement refs derive from the row identity — unique across instances. */
+function refForId(id: number): string {
   const year = new Date().getFullYear();
-  return `STL-${year}-${String(memoryRefSeq++).padStart(5, '0')}`;
+  return `STL-${year}-${String(id).padStart(5, '0')}`;
 }
 
 function computeBlockingReasons(checkpoints: SettlementView['checkpoints']): string[] {
@@ -97,72 +92,48 @@ export async function createSettlement(params: {
   insured?: boolean;
   createdBy?: number;
 }): Promise<SettlementView> {
-  const settlementRef = generateRef();
   const template = defaultCheckpointTemplate({ financed: params.financed ?? false, insured: params.insured ?? false });
-  const now = new Date();
-  const db = await getDb();
+  const db = await requireDb();
 
-  if (db) {
-    try {
-      const inserted = await db
-        .insert(escrowSettlements)
-        .values({
-          settlementRef,
-          transactionId: params.transactionId ?? null,
-          amount: params.amount != null ? String(params.amount) : null,
-          currency: params.currency ?? 'NGN',
-          status: 'pending',
-          createdBy: params.createdBy ?? null,
-        })
-        .returning();
-      const settlementId = inserted[0].id;
-      await db.insert(settlementCheckpoints).values(
-        template.map((item) => ({
-          settlementId,
-          checkpointKey: item.key,
-          label: item.label,
-          required: item.required,
-          status: 'pending' as const,
-        }))
-      );
-      // A freshly created settlement blocks on every required pending
-      // checkpoint — compute and persist that state immediately so readers
-      // never observe an inconsistent "pending with no blockers" record.
-      await recomputeSettlement(settlementId);
-      return getSettlement(settlementId) as Promise<SettlementView>;
-    } catch (error) {
-      console.warn('[EscrowSettlement] Create failed, using memory fallback:', (error as Error).message);
-    }
-  }
-
-  const view: MemorySettlement = {
-    id: memorySettlementId++,
-    settlementRef,
-    transactionId: params.transactionId,
-    amount: params.amount,
-    currency: params.currency ?? 'NGN',
-    status: 'pending',
-    checkpoints: template.map((item) => ({
-      id: memoryCheckpointId++,
+  const settlementId = await db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(escrowSettlements)
+      .values({
+        settlementRef: `STL-PENDING-${crypto.randomUUID()}`,
+        transactionId: params.transactionId ?? null,
+        amount: params.amount != null ? String(params.amount) : null,
+        currency: params.currency ?? 'NGN',
+        status: 'pending',
+        createdBy: params.createdBy ?? null,
+      })
+      .returning();
+    const id = inserted[0].id;
+    await tx
+      .update(escrowSettlements)
+      .set({ settlementRef: refForId(id) })
+      .where(eq(escrowSettlements.id, id));
+    return id;
+  });
+  await db.insert(settlementCheckpoints).values(
+    template.map((item) => ({
+      settlementId,
       checkpointKey: item.key,
       label: item.label,
       required: item.required,
-      status: 'pending',
-    })),
-    blockingReasons: template.map((item) => `Pending: ${item.label}`),
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString(),
-  };
-  memorySettlements.push(view);
-  return view;
+      status: 'pending' as const,
+    }))
+  );
+  // A freshly created settlement blocks on every required pending
+  // checkpoint — compute and persist that state immediately so readers
+  // never observe an inconsistent "pending with no blockers" record.
+  await recomputeSettlement(settlementId);
+  return getSettlement(settlementId) as Promise<SettlementView>;
 }
 
 /** Fetch a settlement with checkpoints. */
 export async function getSettlement(settlementId: number): Promise<SettlementView | null> {
-  const db = await getDb();
-  if (db) {
-    try {
-      const rows = await db.select().from(escrowSettlements).where(eq(escrowSettlements.id, settlementId));
+  const db = await requireDb();
+  const rows = await db.select().from(escrowSettlements).where(eq(escrowSettlements.id, settlementId));
       if (!rows.length) return null;
       const cps = await db
         .select()
@@ -195,28 +166,14 @@ export async function getSettlement(settlementId: number): Promise<SettlementVie
         createdAt: s.createdAt?.toISOString?.() ?? String(s.createdAt),
         updatedAt: s.updatedAt?.toISOString?.() ?? String(s.updatedAt),
       };
-    } catch (error) {
-      console.warn('[EscrowSettlement] Read failed, using memory fallback:', (error as Error).message);
-    }
-  }
-  return memorySettlements.find((s) => s.id === settlementId) ?? null;
 }
 
 /** List settlements, newest first. */
 export async function listSettlements(filter: { status?: SettlementStatus; transactionId?: number; limit?: number } = {}) {
-  const db = await getDb();
-  if (db) {
-    try {
-      const rows = await db.select().from(escrowSettlements);
-      const views = (await Promise.all(rows.map((r: any) => getSettlement(r.id)))).filter(Boolean) as SettlementView[];
-      return views
-        .filter((v) => (!filter.status || v.status === filter.status) && (!filter.transactionId || v.transactionId === filter.transactionId))
-        .slice(0, filter.limit ?? 100);
-    } catch (error) {
-      console.warn('[EscrowSettlement] List failed, using memory fallback:', (error as Error).message);
-    }
-  }
-  return memorySettlements
+  const db = await requireDb();
+  const rows = await db.select().from(escrowSettlements);
+  const views = (await Promise.all(rows.map((r: any) => getSettlement(r.id)))).filter(Boolean) as SettlementView[];
+  return views
     .filter((v) => (!filter.status || v.status === filter.status) && (!filter.transactionId || v.transactionId === filter.transactionId))
     .slice(0, filter.limit ?? 100);
 }
@@ -227,12 +184,10 @@ async function applyCheckpointUpdate(
   status: CheckpointStatus,
   actor: { userId?: number; notes?: string; evidence?: Record<string, any> }
 ): Promise<SettlementView> {
-  const db = await getDb();
+  const db = await requireDb();
   const now = new Date();
 
-  if (db) {
-    try {
-      const cps = await db
+  const cps = await db
         .select()
         .from(settlementCheckpoints)
         .where(eq(settlementCheckpoints.settlementId, settlementId));
@@ -250,28 +205,7 @@ async function applyCheckpointUpdate(
           updatedAt: now,
         })
         .where(eq(settlementCheckpoints.id, target.id));
-      return recomputeSettlement(settlementId);
-    } catch (error) {
-      if ((error as Error).message.includes('not found')) throw error;
-      console.warn('[EscrowSettlement] Checkpoint update failed, using memory fallback:', (error as Error).message);
-    }
-  }
-
-  const settlement = memorySettlements.find((s) => s.id === settlementId);
-  if (!settlement) throw new Error(`Settlement ${settlementId} not found`);
-  const cp = settlement.checkpoints.find((c) => c.checkpointKey === checkpointKey);
-  if (!cp) throw new Error(`Checkpoint "${checkpointKey}" not found on settlement ${settlementId}`);
-  cp.status = status;
-  cp.notes = actor.notes ?? cp.notes;
-  cp.evidence = actor.evidence ?? cp.evidence;
-  if (status === 'fulfilled') {
-    cp.fulfilledBy = actor.userId;
-    cp.fulfilledAt = now.toISOString();
-  }
-  settlement.blockingReasons = computeBlockingReasons(settlement.checkpoints);
-  settlement.status = statusFromCheckpoints(settlement.checkpoints);
-  settlement.updatedAt = now.toISOString();
-  return settlement;
+  return recomputeSettlement(settlementId);
 }
 
 /** Recompute settlement status from checkpoint states (deterministic). */
@@ -289,26 +223,11 @@ export async function recomputeSettlement(settlementId: number): Promise<Settlem
     requiredSatisfied: view.checkpoints.filter((c) => c.required && (c.status === 'fulfilled' || c.status === 'waived')).length,
   };
 
-  const db = await getDb();
-  if (db) {
-    try {
-      await db
-        .update(escrowSettlements)
-        .set({ status, blockingReasons, releaseDecision, updatedAt: new Date() })
-        .where(eq(escrowSettlements.id, settlementId));
-      return (await getSettlement(settlementId)) as SettlementView;
-    } catch (error) {
-      console.warn('[EscrowSettlement] Recompute persist failed:', (error as Error).message);
-    }
-  }
-
-  const settlement = memorySettlements.find((s) => s.id === settlementId);
-  if (settlement) {
-    settlement.status = status;
-    settlement.blockingReasons = blockingReasons;
-    settlement.releaseDecision = releaseDecision;
-    settlement.updatedAt = new Date().toISOString();
-  }
+  const db = await requireDb();
+  await db
+    .update(escrowSettlements)
+    .set({ status, blockingReasons, releaseDecision, updatedAt: new Date() })
+    .where(eq(escrowSettlements.id, settlementId));
   return (await getSettlement(settlementId)) as SettlementView;
 }
 
@@ -328,25 +247,11 @@ export async function releaseSettlement(settlementId: number, releasedBy?: numbe
     throw new Error(`Settlement ${settlementId} is not release-ready (status: ${view.status}). Blocking: ${view.blockingReasons.join('; ')}`);
   }
   const now = new Date();
-  const db = await getDb();
-  if (db) {
-    try {
-      await db
-        .update(escrowSettlements)
-        .set({ status: 'released', releasedAt: now, releasedBy: releasedBy ?? null, updatedAt: now })
-        .where(eq(escrowSettlements.id, settlementId));
-      return (await getSettlement(settlementId)) as SettlementView;
-    } catch (error) {
-      console.warn('[EscrowSettlement] Release persist failed:', (error as Error).message);
-    }
-  }
-  const settlement = memorySettlements.find((s) => s.id === settlementId);
-  if (settlement) {
-    settlement.status = 'released';
-    settlement.releasedAt = now.toISOString();
-    settlement.releasedBy = releasedBy;
-    settlement.updatedAt = now.toISOString();
-  }
+  const db = await requireDb();
+  await db
+    .update(escrowSettlements)
+    .set({ status: 'released', releasedAt: now, releasedBy: releasedBy ?? null, updatedAt: now })
+    .where(eq(escrowSettlements.id, settlementId));
   return (await getSettlement(settlementId)) as SettlementView;
 }
 
@@ -355,16 +260,7 @@ export async function cancelSettlement(settlementId: number): Promise<Settlement
   const view = await getSettlement(settlementId);
   if (!view) throw new Error(`Settlement ${settlementId} not found`);
   if (view.status === 'released') throw new Error('Released settlements cannot be cancelled');
-  const db = await getDb();
-  if (db) {
-    try {
-      await db.update(escrowSettlements).set({ status: 'cancelled', updatedAt: new Date() }).where(eq(escrowSettlements.id, settlementId));
-      return (await getSettlement(settlementId)) as SettlementView;
-    } catch (error) {
-      console.warn('[EscrowSettlement] Cancel persist failed:', (error as Error).message);
-    }
-  }
-  const settlement = memorySettlements.find((s) => s.id === settlementId);
-  if (settlement) settlement.status = 'cancelled';
+  const db = await requireDb();
+  await db.update(escrowSettlements).set({ status: 'cancelled', updatedAt: new Date() }).where(eq(escrowSettlements.id, settlementId));
   return (await getSettlement(settlementId)) as SettlementView;
 }

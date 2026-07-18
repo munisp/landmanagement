@@ -70,7 +70,7 @@ async function writeJsonArray<T>(filePath: string, value: T[]): Promise<void> {
 async function getUserRecord(userId: number, fallbackProfile?: PrivacyProfileFallback) {
   const db = await getDb();
   if (!db) {
-    const offlineAccount = getAccountSettings(userId, {
+    const offlineAccount = await getAccountSettings(userId, {
       name: fallbackProfile?.name || `User ${userId}`,
       email: fallbackProfile?.email || `user${userId}@idlr.local`,
       phone: fallbackProfile?.phone || '+234 000 000 0000',
@@ -143,7 +143,7 @@ export async function rectifyUserData(userId: number, updates: Record<string, an
     updatedAt: new Date(),
   };
 
-  updateAccountProfile(userId, {
+  await updateAccountProfile(userId, {
     name: allowedUpdates.name,
     email: allowedUpdates.email,
     phone: allowedUpdates.phone || '+234 000 000 0000',
@@ -169,7 +169,7 @@ export async function eraseUserData(userId: number, anonymize: boolean = true, f
   const { db, user } = await getUserRecord(userId, fallbackProfile);
 
   if (anonymize) {
-    updateAccountProfile(userId, {
+    await updateAccountProfile(userId, {
       name: `Anonymized User ${userId}`,
       email: `anonymized+${userId}@example.invalid`,
       phone: 'REDACTED',
@@ -189,7 +189,7 @@ export async function eraseUserData(userId: number, anonymize: boolean = true, f
   } else if (db) {
     await db.delete(users).where(eq(users.id, userId));
   } else {
-    updateAccountProfile(userId, {
+    await updateAccountProfile(userId, {
       name: `Deleted User ${userId}`,
       email: `deleted+${userId}@example.invalid`,
       phone: 'REDACTED',

@@ -10,7 +10,7 @@
  */
 
 import { and, eq } from 'drizzle-orm';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { agencyClearances } from '../drizzle/schema';
 
 export type ClearanceAgency =
@@ -64,8 +64,6 @@ export interface TransactionClearanceState {
   evaluatedAt: string;
 }
 
-const memoryClearances: Array<Omit<ClearanceRecord, 'overdue' | 'label' | 'required'>> = [];
-let memoryId = 1;
 
 function agencyDef(agency: string): AgencyDefinition {
   const def = AGENCY_CATALOG.find((a) => a.key === agency);
@@ -101,7 +99,7 @@ export async function initiateClearances(params: {
   const agencyKeys = params.agencies ?? AGENCY_CATALOG.map((a) => a.key);
   const now = new Date();
   const results: ClearanceRecord[] = [];
-  const db = await getDb();
+  const db = await requireDb();
 
   for (const agencyKey of agencyKeys) {
     const def = agencyDef(agencyKey);
@@ -111,48 +109,25 @@ export async function initiateClearances(params: {
       continue;
     }
     const slaDueAt = new Date(now.getTime() + def.slaHours * 3600 * 1000);
-    if (db) {
-      try {
-        const inserted = await db
-          .insert(agencyClearances)
-          .values({
-            transactionId: params.transactionId,
-            agency: agencyKey,
-            status: 'pending',
-            slaDueAt,
-          })
-          .returning();
-        results.push(decorate(inserted[0]));
-        continue;
-      } catch (error) {
-        console.warn('[ClearanceExchange] Initiate failed, using memory fallback:', (error as Error).message);
-      }
-    }
-    const record = {
-      id: memoryId++,
-      transactionId: params.transactionId,
-      agency: agencyKey,
-      status: 'pending' as ClearanceStatus,
-      slaDueAt: slaDueAt.toISOString(),
-    };
-    memoryClearances.push(record);
-    results.push(decorate(record));
+    const inserted = await db
+      .insert(agencyClearances)
+      .values({
+        transactionId: params.transactionId,
+        agency: agencyKey,
+        status: 'pending',
+        slaDueAt,
+      })
+      .returning();
+    results.push(decorate(inserted[0]));
   }
   return results;
 }
 
 /** List clearance records for a transaction. */
 export async function getClearances(transactionId: number): Promise<ClearanceRecord[]> {
-  const db = await getDb();
-  if (db) {
-    try {
-      const rows = await db.select().from(agencyClearances).where(eq(agencyClearances.transactionId, transactionId));
-      return (rows as any[]).map(decorate);
-    } catch (error) {
-      console.warn('[ClearanceExchange] Read failed, using memory fallback:', (error as Error).message);
-    }
-  }
-  return memoryClearances.filter((c) => c.transactionId === transactionId).map(decorate);
+  const db = await requireDb();
+  const rows = await db.select().from(agencyClearances).where(eq(agencyClearances.transactionId, transactionId));
+  return (rows as any[]).map(decorate);
 }
 
 /** Mark a clearance as submitted to the external agency. */
@@ -197,28 +172,14 @@ async function transition(
   if (extra.notes) patch.decisionNotes = extra.notes;
   if (extra.referenceNumber) patch.referenceNumber = extra.referenceNumber;
 
-  const db = await getDb();
-  if (db) {
-    try {
-      const updated = await db
-        .update(agencyClearances)
-        .set(patch)
-        .where(and(eq(agencyClearances.transactionId, transactionId), eq(agencyClearances.agency, agency)))
-        .returning();
-      if (!updated.length) throw new Error(`No clearance found for transaction ${transactionId} / agency ${agency}`);
-      return decorate(updated[0]);
-    } catch (error) {
-      if ((error as Error).message.includes('No clearance found')) throw error;
-      console.warn('[ClearanceExchange] Transition failed, using memory fallback:', (error as Error).message);
-    }
-  }
-  const record = memoryClearances.find((c) => c.transactionId === transactionId && c.agency === agency);
-  if (!record) throw new Error(`No clearance found for transaction ${transactionId} / agency ${agency}`);
-  Object.assign(record, patch, {
-    submittedAt: patch.submittedAt?.toISOString?.(),
-    decidedAt: patch.decidedAt?.toISOString?.(),
-  });
-  return decorate(record);
+  const db = await requireDb();
+  const updated = await db
+    .update(agencyClearances)
+    .set(patch)
+    .where(and(eq(agencyClearances.transactionId, transactionId), eq(agencyClearances.agency, agency)))
+    .returning();
+  if (!updated.length) throw new Error(`No clearance found for transaction ${transactionId} / agency ${agency}`);
+  return decorate(updated[0]);
 }
 
 /** Unified transaction-wide compliance state. */

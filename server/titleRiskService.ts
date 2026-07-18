@@ -11,7 +11,7 @@
  */
 
 import { and, desc, eq } from 'drizzle-orm';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { titleRiskAssessments } from '../drizzle/schema';
 import * as parcelRepository from './parcelRepository';
 import * as disputeRepository from './disputeRepository';
@@ -55,10 +55,6 @@ const ACTIVE_MORTGAGE_TX_STATUSES = new Set(['pending_approval', 'in_review', 'a
 const CADENCE_WINDOW_DAYS = 90;
 const CADENCE_ALERT_COUNT = 3;
 const VALUATION_JUMP_RATIO = 3;
-
-// In-memory persistence fallback (used when PostgreSQL is unavailable)
-const memoryAssessments: TitleRiskAssessmentResult[] = [];
-let memoryId = 1;
 
 export function bandForScore(score: number): RiskBand {
   if (score >= 75) return 'critical';
@@ -237,32 +233,22 @@ export async function assessTitleRisk(params: {
     assessedAt: new Date().toISOString(),
   };
 
-  // Persist (database when available, memory otherwise)
-  const db = await getDb();
-  if (db) {
-    try {
-      const inserted = await db
-        .insert(titleRiskAssessments)
-        .values({
-          parcelId,
-          transactionId: transactionId ?? null,
-          overallScore,
-          riskBand,
-          factorScores: factors,
-          drivers,
-          recommendations,
-          assessedBy: assessedBy ?? null,
-        })
-        .returning();
-      result.id = inserted[0]?.id;
-      return result;
-    } catch (error) {
-      console.warn('[TitleRisk] Persist failed, using in-memory fallback:', (error as Error).message);
-    }
-  }
-
-  result.id = memoryId++;
-  memoryAssessments.unshift(result);
+  // Persist to PostgreSQL — hard-fails when the database is unavailable.
+  const db = await requireDb();
+  const inserted = await db
+    .insert(titleRiskAssessments)
+    .values({
+      parcelId,
+      transactionId: transactionId ?? null,
+      overallScore,
+      riskBand,
+      factorScores: factors,
+      drivers,
+      recommendations,
+      assessedBy: assessedBy ?? null,
+    })
+    .returning();
+  result.id = inserted[0]?.id;
   return result;
 }
 
@@ -273,37 +259,27 @@ export async function listRiskAssessments(filter: {
   limit?: number;
 }): Promise<TitleRiskAssessmentResult[]> {
   const limit = filter.limit ?? 50;
-  const db = await getDb();
-  if (db) {
-    try {
-      const conditions = [] as any[];
-      if (filter.parcelId) conditions.push(eq(titleRiskAssessments.parcelId, filter.parcelId));
-      if (filter.riskBand) conditions.push(eq(titleRiskAssessments.riskBand, filter.riskBand));
-      const rows = await db
-        .select()
-        .from(titleRiskAssessments)
-        .where(conditions.length ? and(...conditions) : undefined)
-        .orderBy(desc(titleRiskAssessments.assessedAt))
-        .limit(limit);
-      return rows.map((row: any) => ({
-        id: row.id,
-        parcelId: row.parcelId,
-        transactionId: row.transactionId ?? undefined,
-        overallScore: row.overallScore,
-        riskBand: row.riskBand,
-        factors: (row.factorScores as RiskFactor[]) ?? [],
-        drivers: (row.drivers as string[]) ?? [],
-        recommendations: (row.recommendations as string[]) ?? [],
-        assessedAt: row.assessedAt?.toISOString?.() ?? String(row.assessedAt),
-      }));
-    } catch (error) {
-      console.warn('[TitleRisk] List failed, using in-memory fallback:', (error as Error).message);
-    }
-  }
-
-  return memoryAssessments
-    .filter((a) => (!filter.parcelId || a.parcelId === filter.parcelId) && (!filter.riskBand || a.riskBand === filter.riskBand))
-    .slice(0, limit);
+  const db = await requireDb();
+  const conditions = [] as any[];
+  if (filter.parcelId) conditions.push(eq(titleRiskAssessments.parcelId, filter.parcelId));
+  if (filter.riskBand) conditions.push(eq(titleRiskAssessments.riskBand, filter.riskBand));
+  const rows = await db
+    .select()
+    .from(titleRiskAssessments)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(titleRiskAssessments.assessedAt))
+    .limit(limit);
+  return rows.map((row: any) => ({
+    id: row.id,
+    parcelId: row.parcelId,
+    transactionId: row.transactionId ?? undefined,
+    overallScore: row.overallScore,
+    riskBand: row.riskBand,
+    factors: (row.factorScores as RiskFactor[]) ?? [],
+    drivers: (row.drivers as string[]) ?? [],
+    recommendations: (row.recommendations as string[]) ?? [],
+    assessedAt: row.assessedAt?.toISOString?.() ?? String(row.assessedAt),
+  }));
 }
 
 /** Portfolio-level risk summary across assessed parcels. */

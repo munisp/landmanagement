@@ -10,7 +10,7 @@
  */
 
 import { desc, eq } from 'drizzle-orm';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { mortgageDecisionExplanations } from '../drizzle/schema';
 import * as mortgageApplicationRepository from './mortgageApplicationRepository';
 import * as parcelRepository from './parcelRepository';
@@ -40,8 +40,6 @@ export interface MortgageDecisionExplanation {
 const POLICY_VERSION = 'underwriting-v1.0';
 const EXPECTED_DOCUMENTS = ['identity', 'income_proof', 'title_document', 'valuation_report', 'bank_statement'];
 
-const memoryExplanations: MortgageDecisionExplanation[] = [];
-let memoryId = 1;
 
 function clamp(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -201,57 +199,39 @@ export async function explainApplication(params: {
     generatedAt: new Date().toISOString(),
   };
 
-  const db = await getDb();
-  if (db) {
-    try {
-      const inserted = await db
-        .insert(mortgageDecisionExplanations)
-        .values({
-          applicationId,
-          overallRecommendation: explanation.recommendation,
-          overallScore,
-          factors,
-          policyVersion: POLICY_VERSION,
-          generatedBy: generatedBy ?? null,
-        })
-        .returning();
-      explanation.id = inserted[0]?.id;
-      return explanation;
-    } catch (error) {
-      console.warn('[MortgageExplain] Persist failed, using memory fallback:', (error as Error).message);
-    }
-  }
-  explanation.id = memoryId++;
-  memoryExplanations.unshift(explanation);
+  const db = await requireDb();
+  const inserted = await db
+    .insert(mortgageDecisionExplanations)
+    .values({
+      applicationId,
+      overallRecommendation: explanation.recommendation,
+      overallScore,
+      factors,
+      policyVersion: POLICY_VERSION,
+      generatedBy: generatedBy ?? null,
+    })
+    .returning();
+  explanation.id = inserted[0]?.id;
   return explanation;
 }
 
 /** List previously generated explanations. */
 export async function listExplanations(filter: { applicationId?: number; limit?: number } = {}) {
-  const db = await getDb();
-  if (db) {
-    try {
-      const conditions = filter.applicationId ? eq(mortgageDecisionExplanations.applicationId, filter.applicationId) : undefined;
-      const rows = await db
-        .select()
-        .from(mortgageDecisionExplanations)
-        .where(conditions)
-        .orderBy(desc(mortgageDecisionExplanations.createdAt))
-        .limit(filter.limit ?? 50);
-      return rows.map((row: any) => ({
-        id: row.id,
-        applicationId: row.applicationId,
-        overallScore: row.overallScore,
-        recommendation: row.overallRecommendation,
-        factors: (row.factors as DecisionFactor[]) ?? [],
-        policyVersion: row.policyVersion,
-        generatedAt: row.createdAt?.toISOString?.() ?? String(row.createdAt),
-      }));
-    } catch (error) {
-      console.warn('[MortgageExplain] List failed, using memory fallback:', (error as Error).message);
-    }
-  }
-  return memoryExplanations
-    .filter((e) => !filter.applicationId || e.applicationId === filter.applicationId)
-    .slice(0, filter.limit ?? 50);
+  const db = await requireDb();
+  const conditions = filter.applicationId ? eq(mortgageDecisionExplanations.applicationId, filter.applicationId) : undefined;
+  const rows = await db
+    .select()
+    .from(mortgageDecisionExplanations)
+    .where(conditions)
+    .orderBy(desc(mortgageDecisionExplanations.createdAt))
+    .limit(filter.limit ?? 50);
+  return rows.map((row: any) => ({
+    id: row.id,
+    applicationId: row.applicationId,
+    overallScore: row.overallScore,
+    recommendation: row.overallRecommendation,
+    factors: (row.factors as DecisionFactor[]) ?? [],
+    policyVersion: row.policyVersion,
+    generatedAt: row.createdAt?.toISOString?.() ?? String(row.createdAt),
+  }));
 }

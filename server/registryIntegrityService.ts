@@ -11,7 +11,7 @@
 
 import { createHash } from 'crypto';
 import { and, desc, eq } from 'drizzle-orm';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { registryIntegrityFindings } from '../drizzle/schema';
 import * as parcelRepository from './parcelRepository';
 import * as disputeRepository from './disputeRepository';
@@ -62,8 +62,6 @@ const TIMING_WINDOW_DAYS = 30;
 const TIMING_ALERT_COUNT = 3;
 const OVERLAP_DISTANCE_METERS = 25;
 
-const memoryFindings: IntegrityFinding[] = [];
-let memoryId = 1;
 
 function fingerprint(f: IntegrityFinding): string {
   return createHash('sha256')
@@ -92,7 +90,7 @@ function median(values: number[]): number {
 async function persistFindings(findings: IntegrityFinding[]): Promise<{ inserted: number; deduplicated: number }> {
   let inserted = 0;
   let deduplicated = 0;
-  const db = await getDb();
+  const db = await requireDb();
 
   for (const finding of findings) {
     // Deduplicate against identical open findings (same check, parcel, description)
@@ -103,27 +101,18 @@ async function persistFindings(findings: IntegrityFinding[]): Promise<{ inserted
       continue;
     }
 
-    if (db) {
-      try {
-        await db.insert(registryIntegrityFindings).values({
-          checkType: finding.checkType,
-          severity: finding.severity,
-          status: 'open',
-          parcelId: finding.parcelId ?? null,
-          relatedEntityType: finding.relatedEntityType ?? null,
-          relatedEntityId: finding.relatedEntityId ?? null,
-          description: finding.description,
-          evidence: finding.evidence ?? null,
-          detectedBy: finding.detectedBy,
-          scanRunId: finding.scanRunId ?? null,
-        });
-        inserted += 1;
-        continue;
-      } catch (error) {
-        console.warn('[RegistryIntegrity] Persist failed, using memory fallback:', (error as Error).message);
-      }
-    }
-    memoryFindings.unshift({ ...finding, id: memoryId++ });
+    await db.insert(registryIntegrityFindings).values({
+      checkType: finding.checkType,
+      severity: finding.severity,
+      status: 'open',
+      parcelId: finding.parcelId ?? null,
+      relatedEntityType: finding.relatedEntityType ?? null,
+      relatedEntityId: finding.relatedEntityId ?? null,
+      description: finding.description,
+      evidence: finding.evidence ?? null,
+      detectedBy: finding.detectedBy,
+      scanRunId: finding.scanRunId ?? null,
+    });
     inserted += 1;
   }
   return { inserted, deduplicated };
@@ -302,50 +291,36 @@ export async function listFindings(filter: {
   limit?: number;
 }): Promise<IntegrityFinding[]> {
   const limit = filter.limit ?? 100;
-  const db = await getDb();
-  if (db) {
-    try {
-      const conditions = [] as any[];
-      if (filter.status) conditions.push(eq(registryIntegrityFindings.status, filter.status));
-      if (filter.severity) conditions.push(eq(registryIntegrityFindings.severity, filter.severity));
-      if (filter.checkType) conditions.push(eq(registryIntegrityFindings.checkType, filter.checkType));
-      if (filter.parcelId) conditions.push(eq(registryIntegrityFindings.parcelId, filter.parcelId));
-      const rows = await db
-        .select()
-        .from(registryIntegrityFindings)
-        .where(conditions.length ? and(...conditions) : undefined)
-        .orderBy(desc(registryIntegrityFindings.detectedAt))
-        .limit(limit);
-      return rows.map((row: any) => ({
-        id: row.id,
-        checkType: row.checkType,
-        severity: row.severity,
-        status: row.status,
-        parcelId: row.parcelId ?? undefined,
-        relatedEntityType: row.relatedEntityType ?? undefined,
-        relatedEntityId: row.relatedEntityId ?? undefined,
-        description: row.description,
-        evidence: row.evidence ?? undefined,
-        detectedBy: row.detectedBy,
-        scanRunId: row.scanRunId ?? undefined,
-        detectedAt: row.detectedAt?.toISOString?.() ?? String(row.detectedAt),
-      }));
-    } catch (error) {
-      console.warn('[RegistryIntegrity] List failed, using memory fallback:', (error as Error).message);
-    }
-  }
-  return memoryFindings
-    .filter((f) =>
-      (!filter.status || f.status === filter.status) &&
-      (!filter.severity || f.severity === filter.severity) &&
-      (!filter.checkType || f.checkType === filter.checkType) &&
-      (!filter.parcelId || f.parcelId === filter.parcelId)
-    )
-    .slice(0, limit);
+  const db = await requireDb();
+  const conditions = [] as any[];
+  if (filter.status) conditions.push(eq(registryIntegrityFindings.status, filter.status));
+  if (filter.severity) conditions.push(eq(registryIntegrityFindings.severity, filter.severity));
+  if (filter.checkType) conditions.push(eq(registryIntegrityFindings.checkType, filter.checkType));
+  if (filter.parcelId) conditions.push(eq(registryIntegrityFindings.parcelId, filter.parcelId));
+  const rows = await db
+    .select()
+    .from(registryIntegrityFindings)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(registryIntegrityFindings.detectedAt))
+    .limit(limit);
+  return rows.map((row: any) => ({
+    id: row.id,
+    checkType: row.checkType,
+    severity: row.severity,
+    status: row.status,
+    parcelId: row.parcelId ?? undefined,
+    relatedEntityType: row.relatedEntityType ?? undefined,
+    relatedEntityId: row.relatedEntityId ?? undefined,
+    description: row.description,
+    evidence: row.evidence ?? undefined,
+    detectedBy: row.detectedBy,
+    scanRunId: row.scanRunId ?? undefined,
+    detectedAt: row.detectedAt?.toISOString?.() ?? String(row.detectedAt),
+  }));
 }
 
 async function updateFindingStatus(id: number, status: FindingStatus, userId: number, notes?: string) {
-  const db = await getDb();
+  const db = await requireDb();
   const patch: Record<string, any> = { status };
   if (status === 'acknowledged') {
     patch.acknowledgedBy = userId;
@@ -356,17 +331,7 @@ async function updateFindingStatus(id: number, status: FindingStatus, userId: nu
     patch.resolvedAt = new Date();
     if (notes) patch.resolutionNotes = notes;
   }
-  if (db) {
-    try {
-      await db.update(registryIntegrityFindings).set(patch).where(eq(registryIntegrityFindings.id, id));
-      return { success: true };
-    } catch (error) {
-      console.warn('[RegistryIntegrity] Update failed, using memory fallback:', (error as Error).message);
-    }
-  }
-  const finding = memoryFindings.find((f) => f.id === id);
-  if (!finding) throw new Error(`Finding ${id} not found`);
-  finding.status = status;
+  await db.update(registryIntegrityFindings).set(patch).where(eq(registryIntegrityFindings.id, id));
   return { success: true };
 }
 
