@@ -8,6 +8,7 @@ import {
 } from '../drizzle/schema';
 import { eq, and, lte, gte, desc } from 'drizzle-orm';
 import axios from 'axios';
+import { assertMockFallbackAllowed } from './_core/mockGuard';
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || 'sk_test_xxx';
 const FLUTTERWAVE_SECRET_KEY = process.env.FLUTTERWAVE_SECRET_KEY || 'FLWSECK_TEST-xxx';
@@ -494,7 +495,8 @@ async function createPaystackMandate(params: {
     };
   } catch (error: any) {
     console.error('[Paystack] Mandate creation failed:', error.message);
-    // Return mock data for development
+    // Mock data is only ever returned outside production (see mockGuard).
+    assertMockFallbackAllowed('paystack-mandate-creation');
     return {
       authorization_code: `AUTH_${Date.now()}`,
       authorization_url: 'https://checkout.paystack.com/mock',
