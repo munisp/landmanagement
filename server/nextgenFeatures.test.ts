@@ -175,9 +175,22 @@ describe('Privacy-Aware Data Exchange Gateway', () => {
   });
 });
 
+
+async function createTestRegistryTransaction(): Promise<number> {
+  const { createTransaction } = await import('./transactionRepository');
+  const tx = await createTransaction({
+    type: 'transfer',
+    parcelId: 1,
+    initiatorId: 101,
+    initiatorName: 'Clearance Test Initiator',
+    considerationAmount: 1000000,
+  });
+  return tx.id;
+}
+
 describe('Federated Inter-Agency Clearance Exchange', () => {
   it('initiates the full agency catalog idempotently', async () => {
-    const txId = 424242;
+    const txId = await createTestRegistryTransaction();
     const first = await clearanceExchangeService.initiateClearances({ transactionId: txId });
     expect(first.length).toBe(clearanceExchangeService.AGENCY_CATALOG.length);
     const second = await clearanceExchangeService.initiateClearances({ transactionId: txId });
@@ -185,7 +198,7 @@ describe('Federated Inter-Agency Clearance Exchange', () => {
   });
 
   it('tracks unified state from in_progress to cleared', async () => {
-    const txId = 434343;
+    const txId = await createTestRegistryTransaction();
     await clearanceExchangeService.initiateClearances({ transactionId: txId });
     let state = await clearanceExchangeService.getClearanceState(txId);
     expect(state.overall).toBe('in_progress');
@@ -200,7 +213,7 @@ describe('Federated Inter-Agency Clearance Exchange', () => {
   });
 
   it('marks rejected required agencies as blocking', async () => {
-    const txId = 444444;
+    const txId = await createTestRegistryTransaction();
     await clearanceExchangeService.initiateClearances({ transactionId: txId });
     await clearanceExchangeService.decideClearance({
       transactionId: txId,

@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type DisputeType =
   | 'boundary_dispute'
@@ -83,14 +82,6 @@ export interface ListDisputesInput {
   limit?: number;
 }
 
-const dataDir = path.join(process.cwd(), 'server', 'data');
-const storePath = path.join(dataDir, 'dispute-store.json');
-
-function ensureDataDir() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-}
 
 function buildSeedStore(): DisputeStore {
   const disputes: DisputeRecord[] = [
@@ -274,28 +265,12 @@ function buildSeedStore(): DisputeStore {
   };
 }
 
-function loadStore(): DisputeStore {
-  ensureDataDir();
-
-  if (!fs.existsSync(storePath)) {
-    const initial = buildSeedStore();
-    fs.writeFileSync(storePath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  const parsed = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as DisputeStore;
-  if (!Array.isArray(parsed.disputes) || !Array.isArray(parsed.timeline)) {
-    const initial = buildSeedStore();
-    fs.writeFileSync(storePath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  return parsed;
+async function loadStore(): Promise<DisputeStore> {
+  return readJsonStore<DisputeStore>('dispute-store', buildSeedStore);
 }
 
-function saveStore(store: DisputeStore) {
-  ensureDataDir();
-  fs.writeFileSync(storePath, JSON.stringify(store, null, 2));
+async function saveStore(store: DisputeStore) {
+  await writeJsonStore('dispute-store', store);
 }
 
 function buildCaseNumber(id: number) {
@@ -322,8 +297,8 @@ function appendTimelineEvent(
   });
 }
 
-export function listDisputes(input: ListDisputesInput = {}) {
-  const store = loadStore();
+export async function listDisputes(input: ListDisputesInput = {}) {
+  const store = await loadStore();
   const page = input.page ?? 1;
   const limit = input.limit ?? 20;
   const search = input.search?.trim().toLowerCase();
@@ -361,8 +336,8 @@ export function listDisputes(input: ListDisputesInput = {}) {
   };
 }
 
-export function getDisputeById(id: number) {
-  const store = loadStore();
+export async function getDisputeById(id: number) {
+  const store = await loadStore();
   const dispute = store.disputes.find((item) => item.id === id) ?? null;
   if (!dispute) return null;
 
@@ -376,8 +351,8 @@ export function getDisputeById(id: number) {
   };
 }
 
-export function getDisputeStats() {
-  const store = loadStore();
+export async function getDisputeStats() {
+  const store = await loadStore();
   const total = store.disputes.length;
   const statusCounts = store.disputes.reduce<Record<DisputeStatus, number>>(
     (acc, dispute) => {
@@ -405,7 +380,7 @@ export function getDisputeStats() {
   };
 }
 
-export function createDispute(input: {
+export async function createDispute(input: {
   parcelNumber: string;
   parcelId?: number;
   titleId?: number;
@@ -425,7 +400,7 @@ export function createDispute(input: {
     note?: string;
   }>;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const id = store.nextId;
   const now = new Date().toISOString();
   const caseNumber = buildCaseNumber(id);
@@ -467,18 +442,18 @@ export function createDispute(input: {
   store.disputes.unshift(dispute);
   store.nextId += 1;
   appendTimelineEvent(store, id, 'pending', 'Dispute lodged', 'Dispute intake completed and queued for registry review.', dispute.assignedOfficer || 'Registry Intake Desk', now);
-  saveStore(store);
+  await saveStore(store);
   return dispute;
 }
 
-export function addDisputeEvidence(input: {
+export async function addDisputeEvidence(input: {
   disputeId: number;
   fileName: string;
   fileType?: string;
   uploadedBy: string;
   note?: string;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const dispute = store.disputes.find((item) => item.id === input.disputeId);
   if (!dispute) {
     throw new Error('Dispute not found');
@@ -496,17 +471,17 @@ export function addDisputeEvidence(input: {
   dispute.evidence.push(evidence);
   dispute.updatedAt = evidence.uploadedAt;
   appendTimelineEvent(store, dispute.id, dispute.status, 'Additional evidence uploaded', `Evidence file ${input.fileName} was attached to the dispute record.`, input.uploadedBy, evidence.uploadedAt);
-  saveStore(store);
+  await saveStore(store);
   return dispute;
 }
 
-export function assignMediator(input: {
+export async function assignMediator(input: {
   disputeId: number;
   mediator: string;
   actor: string;
   hearingDate?: string;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const dispute = store.disputes.find((item) => item.id === input.disputeId);
   if (!dispute) {
     throw new Error('Dispute not found');
@@ -525,16 +500,16 @@ export function assignMediator(input: {
     input.actor,
     dispute.updatedAt,
   );
-  saveStore(store);
+  await saveStore(store);
   return dispute;
 }
 
-export function scheduleDisputeHearing(input: {
+export async function scheduleDisputeHearing(input: {
   disputeId: number;
   hearingDate: string;
   actor: string;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const dispute = store.disputes.find((item) => item.id === input.disputeId);
   if (!dispute) {
     throw new Error('Dispute not found');
@@ -556,7 +531,7 @@ export function scheduleDisputeHearing(input: {
     input.actor,
     dispute.updatedAt,
   );
-  saveStore(store);
+  await saveStore(store);
   return dispute;
 }
 
@@ -569,7 +544,7 @@ const allowedTransitions: Record<DisputeStatus, DisputeStatus[]> = {
   dismissed: [],
 };
 
-export function transitionDispute(input: {
+export async function transitionDispute(input: {
   disputeId: number;
   nextStatus: DisputeStatus;
   actor: string;
@@ -577,7 +552,7 @@ export function transitionDispute(input: {
   mediator?: string;
   hearingDate?: string;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const dispute = store.disputes.find((item) => item.id === input.disputeId);
   if (!dispute) {
     throw new Error('Dispute not found');
@@ -629,6 +604,6 @@ export function transitionDispute(input: {
     dispute.updatedAt,
   );
 
-  saveStore(store);
+  await saveStore(store);
   return dispute;
 }

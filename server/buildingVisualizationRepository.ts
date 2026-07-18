@@ -48,8 +48,8 @@ function scoreLandUse(landUseType: string) {
   }
 }
 
-export function getBuildingVisualizationState() {
-  const searchResult = searchParcels({ limit: 1 });
+export async function getBuildingVisualizationState() {
+  const searchResult = await searchParcels({ limit: 1 });
   const subject = searchResult.parcels[0];
   const areaSqm = subject?.areaSquareMeters ?? 900;
   const buildingArea = 400;

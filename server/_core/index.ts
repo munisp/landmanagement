@@ -40,6 +40,24 @@ async function startServer() {
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
 
+  // Local-storage file serving (self-hosted deployments): serves files written
+  // by the filesystem storage backend in server/storage.ts. Keys are resolved
+  // against the storage root with path-traversal protection.
+  app.get("/api/files/*", async (req, res) => {
+    try {
+      const { resolveLocalStoragePath } = await import("../storage");
+      const relKey = (req.params as Record<string, string>)[0] ?? "";
+      const filePath = resolveLocalStoragePath(relKey);
+      res.sendFile(filePath, (err) => {
+        if (err && !res.headersSent) {
+          res.status(404).json({ error: "File not found" });
+        }
+      });
+    } catch {
+      res.status(400).json({ error: "Invalid file key" });
+    }
+  });
+
   // Health, readiness, and startup probes for load balancers, nginx, and smoke tests
   app.get('/health', livenessProbe);
   app.get('/ready', readinessProbe);

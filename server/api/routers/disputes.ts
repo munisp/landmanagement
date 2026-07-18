@@ -77,7 +77,7 @@ export const disputesRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const parcel = getParcelByNumber(input.parcelNumber);
+      const parcel = await getParcelByNumber(input.parcelNumber);
       const inferred = inferJurisdiction(input.parcelNumber);
       const filedBy = ctx.user.name || ctx.user.email || `User ${ctx.user.id}`;
 

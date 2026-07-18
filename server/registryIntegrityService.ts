@@ -135,10 +135,10 @@ export async function runIntegrityScan(opts: { detectedBy?: string } = {}): Prom
   const scanRunId = `SCAN-${startedAt.getTime()}`;
   const detectedBy = opts.detectedBy ?? 'manual';
 
-  const parcels = parcelRepository.searchParcels({ limit: 10000 } as any).parcels as parcelRepository.ParcelRecord[];
-  const transactions = transactionRepository.listTransactions({ limit: 10000 }).transactions as any[];
-  const documents = (documentRepository.listAllDocuments?.() ?? []) as any[];
-  const disputes = disputeRepository.listDisputes({ limit: 10000 }).disputes as any[];
+  const parcels = (await parcelRepository.searchParcels({ limit: 10000 } as any)).parcels as parcelRepository.ParcelRecord[];
+  const transactions = (await transactionRepository.listTransactions({ limit: 10000 })).transactions as any[];
+  const documents = ((await documentRepository.listAllDocuments?.()) ?? []) as any[];
+  const disputes = (await disputeRepository.listDisputes({ limit: 10000 })).disputes as any[];
 
   const findings: IntegrityFinding[] = [];
   const base = { detectedBy, scanRunId, status: 'open' as FindingStatus, detectedAt: startedAt.toISOString() };

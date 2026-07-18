@@ -1,3 +1,4 @@
+CREATE TYPE "public"."payment_status" AS ENUM('pending', 'quote_received', 'reserved', 'committed', 'completed', 'failed', 'rejected');--> statement-breakpoint
 CREATE TYPE "public"."mandate_status" AS ENUM('pending', 'active', 'suspended', 'cancelled', 'expired');--> statement-breakpoint
 CREATE TABLE "auto_debit_mandates" (
 	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "auto_debit_mandates_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
@@ -71,9 +72,6 @@ CREATE TABLE "mortgage_payment_transactions" (
 	CONSTRAINT "mortgage_payment_transactions_transaction_id_unique" UNIQUE("transaction_id")
 );
 --> statement-breakpoint
-ALTER TABLE "auto_debit_mandates" ADD CONSTRAINT "auto_debit_mandates_application_id_mortgage_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."mortgage_applications"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "mortgage_payment_schedule" ADD CONSTRAINT "mortgage_payment_schedule_application_id_mortgage_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."mortgage_applications"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "mortgage_payment_transactions" ADD CONSTRAINT "mortgage_payment_transactions_application_id_mortgage_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."mortgage_applications"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "mortgage_payment_transactions" ADD CONSTRAINT "mortgage_payment_transactions_schedule_id_mortgage_payment_schedule_id_fk" FOREIGN KEY ("schedule_id") REFERENCES "public"."mortgage_payment_schedule"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "auto_debit_mandates_application_idx" ON "auto_debit_mandates" USING btree ("application_id");--> statement-breakpoint
 CREATE INDEX "auto_debit_mandates_status_idx" ON "auto_debit_mandates" USING btree ("status");--> statement-breakpoint

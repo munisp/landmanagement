@@ -40,7 +40,6 @@ CREATE TABLE "verification_audit_log" (
 	"createdAt" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "document_verifications" ADD CONSTRAINT "document_verifications_application_id_mortgage_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."mortgage_applications"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "document_verifications" ADD CONSTRAINT "document_verifications_verified_by_users_id_fk" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "verification_audit_log" ADD CONSTRAINT "verification_audit_log_verification_id_document_verifications_id_fk" FOREIGN KEY ("verification_id") REFERENCES "public"."document_verifications"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "verification_audit_log" ADD CONSTRAINT "verification_audit_log_performed_by_users_id_fk" FOREIGN KEY ("performed_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

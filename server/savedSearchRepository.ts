@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export interface SavedSearchRecord {
   id: number;
@@ -15,12 +14,6 @@ interface SavedSearchStore {
   searches: SavedSearchRecord[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'saved-search-store.json');
-
-function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function seededSearches(): SavedSearchRecord[] {
   return [
@@ -61,42 +54,22 @@ function defaultStore(): SavedSearchStore {
   };
 }
 
-function loadStore(): SavedSearchStore {
-  ensureDataDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as SavedSearchStore;
-    if (!Array.isArray(parsed.searches) || typeof parsed.nextId !== 'number') {
-      const store = defaultStore();
-      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-      return store;
-    }
-    return parsed;
-  } catch {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
+async function loadStore(): Promise<SavedSearchStore> {
+  return readJsonStore<SavedSearchStore>('saved-search-store', defaultStore);
 }
 
-function saveStore(store: SavedSearchStore) {
-  ensureDataDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function saveStore(store: SavedSearchStore) {
+  await writeJsonStore('saved-search-store', store);
 }
 
-export function listSavedSearches(userId: number) {
-  return loadStore().searches
+export async function listSavedSearches(userId: number) {
+  return (await loadStore()).searches
     .filter((search) => search.userId === userId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function createSavedSearch(input: { userId: number; name: string; query: Record<string, any> }) {
-  const store = loadStore();
+export async function createSavedSearch(input: { userId: number; name: string; query: Record<string, any> }) {
+  const store = await loadStore();
   const record: SavedSearchRecord = {
     id: store.nextId,
     userId: input.userId,
@@ -108,28 +81,28 @@ export function createSavedSearch(input: { userId: number; name: string; query: 
 
   store.searches.unshift(record);
   store.nextId += 1;
-  saveStore(store);
+  await saveStore(store);
   return record;
 }
 
-export function deleteSavedSearch(input: { id: number; userId: number }) {
-  const store = loadStore();
+export async function deleteSavedSearch(input: { id: number; userId: number }) {
+  const store = await loadStore();
   const originalLength = store.searches.length;
   store.searches = store.searches.filter((search) => !(search.id === input.id && search.userId === input.userId));
   if (store.searches.length === originalLength) {
     throw new Error('Saved search not found');
   }
-  saveStore(store);
+  await saveStore(store);
   return { success: true };
 }
 
-export function toggleSavedSearchFavorite(input: { id: number; userId: number }) {
-  const store = loadStore();
+export async function toggleSavedSearchFavorite(input: { id: number; userId: number }) {
+  const store = await loadStore();
   const record = store.searches.find((search) => search.id === input.id && search.userId === input.userId);
   if (!record) {
     throw new Error('Saved search not found');
   }
   record.isFavorite = !record.isFavorite;
-  saveStore(store);
+  await saveStore(store);
   return record;
 }

@@ -243,7 +243,7 @@ describe('Unified Dashboard Router', () => {
       expect(result).toBeDefined();
       expect(result.url).toBeDefined();
       expect(result.filename).toBeDefined();
-      expect(result.filename).toContain('.excel');
+      expect(result.filename).toContain('.xlsx');
       expect(result.filename).toContain(testTransactionId);
     });
   });

@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type Phase4MortgageStatus = 'pending' | 'under_review' | 'approved' | 'rejected' | 'disbursed' | 'cancelled';
 export type Phase4TaxStatus = 'pending' | 'in_progress' | 'verified' | 'issued' | 'rejected' | 'expired';
@@ -150,14 +149,6 @@ interface Phase4AdminStore {
   landUse: AdminLandUsePlanRecord[];
 }
 
-const dataDir = path.join(process.cwd(), 'server', 'data');
-const storePath = path.join(dataDir, 'phase4-admin-store.json');
-
-function ensureDataDir() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-}
 
 function seedStore(): Phase4AdminStore {
   return {
@@ -422,19 +413,12 @@ function seedStore(): Phase4AdminStore {
   };
 }
 
-function readStore(): Phase4AdminStore {
-  ensureDataDir();
-  if (!fs.existsSync(storePath)) {
-    const initial = seedStore();
-    fs.writeFileSync(storePath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-  return JSON.parse(fs.readFileSync(storePath, 'utf-8')) as Phase4AdminStore;
+async function readStore(): Promise<Phase4AdminStore> {
+  return readJsonStore<Phase4AdminStore>('phase4-admin-store', seedStore);
 }
 
-function writeStore(store: Phase4AdminStore) {
-  ensureDataDir();
-  fs.writeFileSync(storePath, JSON.stringify(store, null, 2));
+async function writeStore(store: Phase4AdminStore) {
+  await writeJsonStore('phase4-admin-store', store);
 }
 
 function stamp<T extends { updatedAt: string }>(record: T): T {
@@ -442,21 +426,21 @@ function stamp<T extends { updatedAt: string }>(record: T): T {
   return record;
 }
 
-export function listAdminMortgageApplications() {
-  return readStore().mortgages;
+export async function listAdminMortgageApplications() {
+  return (await readStore()).mortgages;
 }
-export function createAdminMortgageApplication(record: Omit<AdminMortgageApplicationRecord, 'id' | 'createdAt' | 'updatedAt'>) {
-  const store = readStore();
+export async function createAdminMortgageApplication(record: Omit<AdminMortgageApplicationRecord, 'id' | 'createdAt' | 'updatedAt'>) {
+  const store = await readStore();
   const nextId = (store.mortgages[0]?.id ?? 0) + 1;
   const now = new Date().toISOString();
   const created: AdminMortgageApplicationRecord = { id: nextId, createdAt: now, updatedAt: now, ...record };
   store.mortgages.unshift(created);
-  writeStore(store);
+  await writeStore(store);
   return stamp(created);
 }
 
-export function updateAdminMortgageApplicationStatus(applicationId: string, status: Phase4MortgageStatus, rejectionReason?: string | null) {
-  const store = readStore();
+export async function updateAdminMortgageApplicationStatus(applicationId: string, status: Phase4MortgageStatus, rejectionReason?: string | null) {
+  const store = await readStore();
   const record = store.mortgages.find((item) => item.applicationId === applicationId);
   if (!record) throw new Error('Mortgage application not found');
   record.status = status;
@@ -467,25 +451,25 @@ export function updateAdminMortgageApplicationStatus(applicationId: string, stat
     record.rejectionReason = rejectionReason ?? 'Rejected during administrative review';
   }
   if (status === 'disbursed') record.disbursedAt = new Date().toISOString();
-  writeStore(store);
+  await writeStore(store);
   return stamp(record);
 }
 
-export function listAdminTaxClearances() {
-  return readStore().taxes;
+export async function listAdminTaxClearances() {
+  return (await readStore()).taxes;
 }
-export function createAdminTaxClearance(record: Omit<AdminTaxClearanceRecord, 'id' | 'createdAt' | 'updatedAt'>) {
-  const store = readStore();
+export async function createAdminTaxClearance(record: Omit<AdminTaxClearanceRecord, 'id' | 'createdAt' | 'updatedAt'>) {
+  const store = await readStore();
   const nextId = (store.taxes[0]?.id ?? 0) + 1;
   const now = new Date().toISOString();
   const created: AdminTaxClearanceRecord = { id: nextId, createdAt: now, updatedAt: now, ...record };
   store.taxes.unshift(created);
-  writeStore(store);
+  await writeStore(store);
   return stamp(created);
 }
 
-export function updateAdminTaxClearanceStatus(clearanceId: string, status: Phase4TaxStatus, options?: { certificateUrl?: string; firsReferenceNumber?: string }) {
-  const store = readStore();
+export async function updateAdminTaxClearanceStatus(clearanceId: string, status: Phase4TaxStatus, options?: { certificateUrl?: string; firsReferenceNumber?: string }) {
+  const store = await readStore();
   const record = store.taxes.find((item) => item.clearanceId === clearanceId);
   if (!record) throw new Error('Tax clearance not found');
   record.status = status;
@@ -496,38 +480,38 @@ export function updateAdminTaxClearanceStatus(clearanceId: string, status: Phase
     record.certificateNumber = record.certificateNumber ?? `${record.clearanceId}-CERT`;
   }
   if (options?.firsReferenceNumber) record.firsReferenceNumber = options.firsReferenceNumber;
-  writeStore(store);
+  await writeStore(store);
   return stamp(record);
 }
 
-export function listAdminInsurancePolicies() {
-  return readStore().insurance;
+export async function listAdminInsurancePolicies() {
+  return (await readStore()).insurance;
 }
-export function createAdminInsurancePolicy(record: Omit<AdminInsurancePolicyRecord, 'id' | 'createdAt' | 'updatedAt'>) {
-  const store = readStore();
+export async function createAdminInsurancePolicy(record: Omit<AdminInsurancePolicyRecord, 'id' | 'createdAt' | 'updatedAt'>) {
+  const store = await readStore();
   const nextId = (store.insurance[0]?.id ?? 0) + 1;
   const now = new Date().toISOString();
   const created: AdminInsurancePolicyRecord = { id: nextId, createdAt: now, updatedAt: now, ...record };
   store.insurance.unshift(created);
-  writeStore(store);
+  await writeStore(store);
   return stamp(created);
 }
 
-export function updateAdminInsurancePolicyStatus(policyId: string, status: Phase4InsuranceStatus) {
-  const store = readStore();
+export async function updateAdminInsurancePolicyStatus(policyId: string, status: Phase4InsuranceStatus) {
+  const store = await readStore();
   const record = store.insurance.find((item) => item.policyId === policyId);
   if (!record) throw new Error('Insurance policy not found');
   record.status = status;
-  writeStore(store);
+  await writeStore(store);
   return stamp(record);
 }
 
-export function listAdminLegalDocuments() {
-  return readStore().legal;
+export async function listAdminLegalDocuments() {
+  return (await readStore()).legal;
 }
 
-export function updateAdminLegalDocumentStatus(documentId: string, status: Phase4LegalStatus, registrationNumber?: string) {
-  const store = readStore();
+export async function updateAdminLegalDocumentStatus(documentId: string, status: Phase4LegalStatus, registrationNumber?: string) {
+  const store = await readStore();
   const record = store.legal.find((item) => item.documentId === documentId);
   if (!record) throw new Error('Legal document not found');
   record.status = status;
@@ -536,30 +520,30 @@ export function updateAdminLegalDocumentStatus(documentId: string, status: Phase
   }
   if (registrationNumber) record.registrationNumber = registrationNumber;
   if (status !== 'pending_review' && !record.reviewedBy) record.reviewedBy = 'Admin Legal Desk';
-  writeStore(store);
+  await writeStore(store);
   return stamp(record);
 }
 
-export function listAdminCadastralSurveys() {
-  return readStore().surveys;
+export async function listAdminCadastralSurveys() {
+  return (await readStore()).surveys;
 }
 
-export function updateAdminCadastralSurveyStatus(surveyId: string, status: Phase4SurveyStatus) {
-  const store = readStore();
+export async function updateAdminCadastralSurveyStatus(surveyId: string, status: Phase4SurveyStatus) {
+  const store = await readStore();
   const record = store.surveys.find((item) => item.surveyId === surveyId);
   if (!record) throw new Error('Cadastral survey not found');
   record.status = status;
   if (status === 'completed' || status === 'approved') record.completedAt = record.completedAt ?? new Date().toISOString();
-  writeStore(store);
+  await writeStore(store);
   return stamp(record);
 }
 
-export function listAdminEnvironmentalAssessments() {
-  return readStore().environmental;
+export async function listAdminEnvironmentalAssessments() {
+  return (await readStore()).environmental;
 }
 
-export function updateAdminEnvironmentalAssessmentStatus(assessmentId: string, status: Phase4EnvironmentalStatus, options?: { conditions?: string; rejectionReason?: string; certificateUrl?: string }) {
-  const store = readStore();
+export async function updateAdminEnvironmentalAssessmentStatus(assessmentId: string, status: Phase4EnvironmentalStatus, options?: { conditions?: string; rejectionReason?: string; certificateUrl?: string }) {
+  const store = await readStore();
   const record = store.environmental.find((item) => item.assessmentId === assessmentId);
   if (!record) throw new Error('Environmental assessment not found');
   record.status = status;
@@ -571,16 +555,16 @@ export function updateAdminEnvironmentalAssessmentStatus(assessmentId: string, s
   if (status === 'rejected') {
     record.rejectionReason = options?.rejectionReason ?? 'Rejected after environmental compliance review';
   }
-  writeStore(store);
+  await writeStore(store);
   return stamp(record);
 }
 
-export function listAdminPublicNotices() {
-  return readStore().notices;
+export async function listAdminPublicNotices() {
+  return (await readStore()).notices;
 }
 
-export function updateAdminPublicNoticeStatus(noticeId: string, status: Phase4NoticeStatus) {
-  const store = readStore();
+export async function updateAdminPublicNoticeStatus(noticeId: string, status: Phase4NoticeStatus) {
+  const store = await readStore();
   const record = store.notices.find((item) => item.noticeId === noticeId);
   if (!record) throw new Error('Public notice not found');
   record.status = status;
@@ -588,16 +572,16 @@ export function updateAdminPublicNoticeStatus(noticeId: string, status: Phase4No
     record.publishedAt = record.publishedAt ?? new Date().toISOString();
     record.publicationReference = record.publicationReference ?? `${record.noticeId}-PUB`;
   }
-  writeStore(store);
+  await writeStore(store);
   return stamp(record);
 }
 
-export function listAdminLandUsePlans() {
-  return readStore().landUse;
+export async function listAdminLandUsePlans() {
+  return (await readStore()).landUse;
 }
 
-export function updateAdminLandUsePlanStatus(planId: string, status: Phase4LandUseStatus, options?: { conditions?: string; rejectionReason?: string; isCompliant?: boolean }) {
-  const store = readStore();
+export async function updateAdminLandUsePlanStatus(planId: string, status: Phase4LandUseStatus, options?: { conditions?: string; rejectionReason?: string; isCompliant?: boolean }) {
+  const store = await readStore();
   const record = store.landUse.find((item) => item.planId === planId);
   if (!record) throw new Error('Land use plan not found');
   record.status = status;
@@ -609,6 +593,6 @@ export function updateAdminLandUsePlanStatus(planId: string, status: Phase4LandU
   if (status === 'rejected') {
     record.rejectionReason = options?.rejectionReason ?? 'Rejected during planning compliance review';
   }
-  writeStore(store);
+  await writeStore(store);
   return stamp(record);
 }

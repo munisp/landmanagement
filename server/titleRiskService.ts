@@ -84,13 +84,13 @@ export async function assessTitleRisk(params: {
   assessedBy?: number;
 }): Promise<TitleRiskAssessmentResult> {
   const { parcelId, transactionId, assessedBy } = params;
-  const parcel = parcelRepository.getParcelById(parcelId);
+  const parcel = await parcelRepository.getParcelById(parcelId);
   if (!parcel) {
     throw new Error(`Parcel ${parcelId} not found`);
   }
 
   // --- Factor 1: dispute history -------------------------------------------
-  const allDisputes = disputeRepository.listDisputes({ limit: 1000 }).disputes;
+  const allDisputes = (await disputeRepository.listDisputes({ limit: 1000 })).disputes;
   const parcelDisputes = allDisputes.filter((d: any) => d.parcelId === parcelId);
   const openDisputes = parcelDisputes.filter((d: any) => OPEN_DISPUTE_STATUSES.has(String(d.status)));
   const disputeScore = clampScore(openDisputes.length * 35 + Math.max(0, parcelDisputes.length - openDisputes.length) * 10);
@@ -108,7 +108,7 @@ export async function assessTitleRisk(params: {
         : `Parcel status is ${parcel.status}`;
 
   // --- Factor 3: document integrity ----------------------------------------
-  const documents = documentRepository.getDocumentsByParcel(parcelId) as any[];
+  const documents = (await documentRepository.getDocumentsByParcel(parcelId)) as any[];
   const unverifiedDocs = documents.filter((doc) => doc && doc.verified === false);
   const documentScore =
     documents.length === 0 ? 70 : clampScore((unverifiedDocs.length / documents.length) * 100);
@@ -120,14 +120,14 @@ export async function assessTitleRisk(params: {
         : `All ${documents.length} parcel documents verified`;
 
   // --- Factor 4: encumbrance exposure (active mortgage-type transactions) ---
-  const mortgageTx = transactionRepository
-    .listTransactions({ type: 'mortgage', limit: 1000 })
+  const mortgageTx = (await transactionRepository
+    .listTransactions({ type: 'mortgage', limit: 1000 }))
     .transactions.filter((tx: any) => tx.parcelId === parcelId && ACTIVE_MORTGAGE_TX_STATUSES.has(String(tx.status)));
   const encumbranceScore = clampScore(mortgageTx.length * 40);
 
   // --- Factor 5: transaction cadence ----------------------------------------
-  const parcelTransactions = transactionRepository
-    .listTransactions({ limit: 1000 })
+  const parcelTransactions = (await transactionRepository
+    .listTransactions({ limit: 1000 }))
     .transactions.filter((tx: any) => tx.parcelId === parcelId);
   const now = new Date();
   const recentCount = parcelTransactions.filter((tx: any) => {

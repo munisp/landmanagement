@@ -63,7 +63,7 @@ async function fetchParcelData(filters: Record<string, any>): Promise<any[]> {
     return response.parcels || [];
   } catch (error) {
     console.error('Error fetching parcel data:', error);
-    const offline = searchParcels({
+    const offline = await searchParcels({
       query: filters.query,
       state: filters.state,
       lga: filters.lga,
@@ -88,7 +88,7 @@ async function fetchTransactionData(filters: Record<string, any>): Promise<any[]
     return response.transactions || [];
   } catch (error) {
     console.error('Error fetching transaction data:', error);
-    const offline = listTransactions({
+    const offline = await listTransactions({
       status: filters.status,
       type: filters.type,
       page: 1,

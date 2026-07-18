@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export interface DocumentRecord {
   id: number;
@@ -26,11 +25,6 @@ interface DocumentStore {
   documents: DocumentRecord[];
 }
 
-const STORE_PATH = path.join(process.cwd(), 'data', 'document-store.json');
-
-function ensureStoreDir() {
-  fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true });
-}
 
 function seededDocuments(): DocumentRecord[] {
   return [
@@ -96,54 +90,34 @@ function defaultStore(): DocumentStore {
   };
 }
 
-function loadStore(): DocumentStore {
-  ensureStoreDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as DocumentStore;
-    if (!Array.isArray(parsed.documents) || typeof parsed.nextId !== 'number') {
-      const store = defaultStore();
-      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-      return store;
-    }
-    return parsed;
-  } catch {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
+async function loadStore(): Promise<DocumentStore> {
+  return readJsonStore<DocumentStore>('document-store', defaultStore);
 }
 
-function saveStore(store: DocumentStore) {
-  ensureStoreDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function saveStore(store: DocumentStore) {
+  await writeJsonStore('document-store', store);
 }
 
-export function listAllDocuments() {
-  return loadStore().documents
+export async function listAllDocuments() {
+  return (await loadStore()).documents
     .slice()
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
 }
 
-export function getDocumentsByParcel(parcelId: number) {
-  return loadStore().documents
+export async function getDocumentsByParcel(parcelId: number) {
+  return (await loadStore()).documents
     .filter((item) => item.parcelId === parcelId)
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
 }
 
-export function getDocumentsByTransaction(transactionId: number) {
-  return loadStore().documents
+export async function getDocumentsByTransaction(transactionId: number) {
+  return (await loadStore()).documents
     .filter((item) => item.transactionId === transactionId)
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
 }
 
-export function uploadDocumentRecord(input: Omit<DocumentRecord, 'id' | 'uploadedAt' | 'verified' | 'verifiedAt' | 'verifiedBy'>) {
-  const store = loadStore();
+export async function uploadDocumentRecord(input: Omit<DocumentRecord, 'id' | 'uploadedAt' | 'verified' | 'verifiedAt' | 'verifiedBy'>) {
+  const store = await loadStore();
   const uploadedAt = new Date().toISOString();
   const record: DocumentRecord = {
     id: store.nextId,
@@ -154,12 +128,12 @@ export function uploadDocumentRecord(input: Omit<DocumentRecord, 'id' | 'uploade
 
   store.documents.unshift(record);
   store.nextId += 1;
-  saveStore(store);
+  await saveStore(store);
   return record;
 }
 
-export function verifyDocumentRecord(input: { id: number; verifierId: number }) {
-  const store = loadStore();
+export async function verifyDocumentRecord(input: { id: number; verifierId: number }) {
+  const store = await loadStore();
   const record = store.documents.find((item) => item.id === input.id);
   if (!record) {
     throw new Error('Document not found');
@@ -168,6 +142,6 @@ export function verifyDocumentRecord(input: { id: number; verifierId: number }) 
   record.verified = true;
   record.verifiedBy = input.verifierId;
   record.verifiedAt = new Date().toISOString();
-  saveStore(store);
+  await saveStore(store);
   return record;
 }

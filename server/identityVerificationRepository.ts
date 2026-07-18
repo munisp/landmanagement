@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type VerificationState = 'pending' | 'verified' | 'failed';
 export type KycDocumentStatus = 'pending' | 'verified' | 'rejected';
@@ -34,12 +33,6 @@ interface IdentityStore {
   profiles: IdentityProfile[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'identity-verification-store.json');
-
-function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function createSeedProfile(): IdentityProfile {
   return {
@@ -91,36 +84,16 @@ function defaultStore(): IdentityStore {
   };
 }
 
-function loadStore(): IdentityStore {
-  ensureDataDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as IdentityStore;
-    if (!Array.isArray(parsed.profiles) || typeof parsed.nextDocumentId !== 'number') {
-      const store = defaultStore();
-      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-      return store;
-    }
-    return parsed;
-  } catch {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
+async function loadStore(): Promise<IdentityStore> {
+  return readJsonStore<IdentityStore>('identity-verification-store', defaultStore);
 }
 
-function saveStore(store: IdentityStore) {
-  ensureDataDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function saveStore(store: IdentityStore) {
+  await writeJsonStore('identity-verification-store', store);
 }
 
-function getOrCreateProfile(userId: number) {
-  const store = loadStore();
+async function getOrCreateProfile(userId: number) {
+  const store = await loadStore();
   let profile = store.profiles.find((item) => item.userId === userId);
   if (!profile) {
     profile = {
@@ -131,39 +104,39 @@ function getOrCreateProfile(userId: number) {
       documents: [],
     };
     store.profiles.push(profile);
-    saveStore(store);
+    await saveStore(store);
   }
   return { store, profile };
 }
 
-export function getIdentityProfile(userId: number) {
-  return getOrCreateProfile(userId).profile;
+export async function getIdentityProfile(userId: number) {
+  return (await getOrCreateProfile(userId)).profile;
 }
 
-export function verifyNin(userId: number, nin: string) {
-  const { store, profile } = getOrCreateProfile(userId);
+export async function verifyNin(userId: number, nin: string) {
+  const { store, profile } = await getOrCreateProfile(userId);
   profile.nin = {
     number: nin,
     status: nin.length === 11 ? 'verified' : 'failed',
     verifiedAt: nin.length === 11 ? new Date().toISOString() : null,
   };
-  saveStore(store);
+  await saveStore(store);
   return profile;
 }
 
-export function verifyBvn(userId: number, bvn: string) {
-  const { store, profile } = getOrCreateProfile(userId);
+export async function verifyBvn(userId: number, bvn: string) {
+  const { store, profile } = await getOrCreateProfile(userId);
   profile.bvn = {
     number: bvn,
     status: bvn.length === 11 ? 'verified' : 'failed',
     verifiedAt: bvn.length === 11 ? new Date().toISOString() : null,
   };
-  saveStore(store);
+  await saveStore(store);
   return profile;
 }
 
-export function uploadKycDocument(userId: number, input: { type: string; fileName: string }) {
-  const { store, profile } = getOrCreateProfile(userId);
+export async function uploadKycDocument(userId: number, input: { type: string; fileName: string }) {
+  const { store, profile } = await getOrCreateProfile(userId);
   const document = {
     id: store.nextDocumentId,
     type: input.type,
@@ -173,6 +146,6 @@ export function uploadKycDocument(userId: number, input: { type: string; fileNam
   };
   store.nextDocumentId += 1;
   profile.documents.unshift(document);
-  saveStore(store);
+  await saveStore(store);
   return document;
 }

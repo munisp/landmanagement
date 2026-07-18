@@ -1,5 +1,15 @@
-import fs from 'fs';
-import path from 'path';
+/**
+ * Registry transaction repository — PostgreSQL-backed.
+ *
+ * Persists to the `registry_transactions` table (migration 0012). The workflow
+ * state machine (submit → request_payment → approve → complete / reject) is
+ * unchanged from the previous implementation; only the storage engine changed.
+ * There is no in-memory or file-store fallback.
+ */
+
+import { and, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { registryTransactions, type RegistryTransaction } from '../drizzle/schema';
+import { requireDb } from './db';
 
 export type TransactionStatus =
   | 'draft'
@@ -28,129 +38,69 @@ export interface TransactionRecord {
   updatedAt: string;
 }
 
-interface TransactionStore {
-  transactions: TransactionRecord[];
-  nextId: number;
+function toIso(value: Date | string | null | undefined): string {
+  if (!value) return new Date(0).toISOString();
+  return value instanceof Date ? value.toISOString() : value;
 }
 
-const dataDir = path.join(process.cwd(), 'server', 'data');
-const storePath = path.join(dataDir, 'transaction-store.json');
-
-function ensureDataDir() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-}
-
-function seededTransactions(): TransactionRecord[] {
-  return [
-    {
-      id: 1,
-      type: 'transfer',
-      parcelId: 1,
-      initiatorId: 1,
-      initiatorName: 'Amina Bello',
-      counterpartyName: 'Femi Adeyemi',
-      titleId: 1,
-      status: 'pending_approval',
-      considerationAmount: 175000000,
-      workflowStage: 'registry_review',
-      paymentStatus: 'pending',
-      documentStatus: 'verified',
-      notes: 'Awaiting registrar approval before payment release.',
-      createdAt: '2024-03-10T09:00:00.000Z',
-      updatedAt: '2024-03-12T14:00:00.000Z',
-    },
-    {
-      id: 2,
-      type: 'mortgage_registration',
-      parcelId: 4,
-      initiatorId: 4,
-      initiatorName: 'Industrial Assets Limited',
-      counterpartyName: 'Unity Commercial Bank',
-      titleId: 4,
-      status: 'registered',
-      considerationAmount: 120000000,
-      workflowStage: 'registry_completed',
-      paymentStatus: 'paid',
-      documentStatus: 'verified',
-      notes: 'Mortgage interest fully noted on title.',
-      createdAt: '2024-02-15T09:00:00.000Z',
-      updatedAt: '2024-02-20T15:00:00.000Z',
-    },
-    {
-      id: 3,
-      type: 'title_perfection',
-      parcelId: 3,
-      initiatorId: 3,
-      initiatorName: 'Musa Garba Farms',
-      titleId: 3,
-      status: 'in_review',
-      considerationAmount: 3500000,
-      workflowStage: 'governor_consent',
-      paymentStatus: 'paid',
-      documentStatus: 'submitted',
-      notes: 'Consent package submitted to state land bureau.',
-      createdAt: '2024-03-05T10:00:00.000Z',
-      updatedAt: '2024-03-09T12:00:00.000Z',
-    },
-  ];
-}
-
-function initialStore(): TransactionStore {
-  const transactions = seededTransactions();
+function toRecord(row: RegistryTransaction): TransactionRecord {
   return {
-    transactions,
-    nextId: transactions.length + 1,
+    id: row.id,
+    type: row.type,
+    parcelId: row.parcelId,
+    initiatorId: row.initiatorId,
+    initiatorName: row.initiatorName,
+    counterpartyName: row.counterpartyName ?? undefined,
+    titleId: row.titleId ?? undefined,
+    status: row.status as TransactionStatus,
+    considerationAmount: row.considerationAmount,
+    workflowStage: row.workflowStage,
+    paymentStatus: row.paymentStatus as TransactionRecord['paymentStatus'],
+    documentStatus: row.documentStatus as TransactionRecord['documentStatus'],
+    notes: row.notes ?? undefined,
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt),
   };
 }
 
-function loadStore(): TransactionStore {
-  ensureDataDir();
-  if (!fs.existsSync(storePath)) {
-    const initial = initialStore();
-    fs.writeFileSync(storePath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  const parsed = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as TransactionStore;
-  if (!parsed.transactions?.length) {
-    const initial = initialStore();
-    fs.writeFileSync(storePath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  return parsed;
-}
-
-function saveStore(store: TransactionStore) {
-  ensureDataDir();
-  fs.writeFileSync(storePath, JSON.stringify(store, null, 2));
-}
-
-export function listTransactions(input: { status?: string; type?: string; page?: number; limit?: number }) {
-  const store = loadStore();
+export async function listTransactions(input: { status?: string; type?: string; page?: number; limit?: number }) {
+  const db = await requireDb();
   const page = input.page ?? 1;
   const limit = input.limit ?? 20;
-  const filtered = store.transactions.filter((transaction) => {
-    if (input.status && transaction.status !== input.status) return false;
-    if (input.type && transaction.type !== input.type) return false;
-    return true;
-  });
-  const start = (page - 1) * limit;
+
+  const conditions: SQL[] = [];
+  if (input.status) conditions.push(eq(registryTransactions.status, input.status));
+  if (input.type) conditions.push(eq(registryTransactions.type, input.type));
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(registryTransactions)
+    .where(where);
+
+  const rows = await db
+    .select()
+    .from(registryTransactions)
+    .where(where)
+    .orderBy(desc(registryTransactions.createdAt))
+    .limit(limit)
+    .offset((page - 1) * limit);
+
   return {
-    transactions: filtered.slice(start, start + limit),
-    total: filtered.length,
+    transactions: rows.map(toRecord),
+    total: count,
     page,
     limit,
   };
 }
 
-export function getTransactionById(id: number) {
-  return loadStore().transactions.find((transaction) => transaction.id === id) ?? null;
+export async function getTransactionById(id: number): Promise<TransactionRecord | null> {
+  const db = await requireDb();
+  const rows = await db.select().from(registryTransactions).where(eq(registryTransactions.id, id)).limit(1);
+  return rows[0] ? toRecord(rows[0]) : null;
 }
 
-export function createTransaction(input: {
+export async function createTransaction(input: {
   type: string;
   parcelId: number;
   initiatorId: number;
@@ -159,34 +109,29 @@ export function createTransaction(input: {
   titleId?: number;
   considerationAmount: number;
   notes?: string;
-}) {
-  const store = loadStore();
-  const id = store.nextId;
-  const now = new Date().toISOString();
-  const record: TransactionRecord = {
-    id,
-    type: input.type,
-    parcelId: input.parcelId,
-    initiatorId: input.initiatorId,
-    initiatorName: input.initiatorName,
-    counterpartyName: input.counterpartyName,
-    titleId: input.titleId,
-    status: 'pending_approval',
-    considerationAmount: input.considerationAmount,
-    workflowStage: 'submission',
-    paymentStatus: 'unpaid',
-    documentStatus: 'pending',
-    notes: input.notes,
-    createdAt: now,
-    updatedAt: now,
-  };
-  store.transactions.unshift(record);
-  store.nextId += 1;
-  saveStore(store);
-  return record;
+}): Promise<TransactionRecord> {
+  const db = await requireDb();
+  const inserted = await db
+    .insert(registryTransactions)
+    .values({
+      type: input.type,
+      parcelId: input.parcelId,
+      initiatorId: input.initiatorId,
+      initiatorName: input.initiatorName,
+      counterpartyName: input.counterpartyName,
+      titleId: input.titleId,
+      status: 'pending_approval',
+      considerationAmount: input.considerationAmount,
+      workflowStage: 'submission',
+      paymentStatus: 'unpaid',
+      documentStatus: 'pending',
+      notes: input.notes,
+    })
+    .returning();
+  return toRecord(inserted[0]);
 }
 
-export function createImportedTransaction(input: {
+export async function createImportedTransaction(input: {
   externalReference: string;
   type: string;
   parcelId: number;
@@ -200,68 +145,67 @@ export function createImportedTransaction(input: {
   documentStatus: TransactionRecord['documentStatus'];
   notes?: string;
   createdAt?: string;
-}) {
-  const store = loadStore();
-  const id = store.nextId;
-  const now = input.createdAt ?? new Date().toISOString();
-  const record: TransactionRecord = {
-    id,
-    type: input.type,
-    parcelId: input.parcelId,
-    initiatorId: input.initiatorId,
-    initiatorName: input.initiatorName,
-    counterpartyName: input.counterpartyName,
-    status: input.status,
-    workflowStage: input.workflowStage,
-    paymentStatus: input.paymentStatus,
-    documentStatus: input.documentStatus,
-    considerationAmount: input.considerationAmount,
-    notes: input.notes ?? `Imported transaction ${input.externalReference}`,
-    createdAt: now,
-    updatedAt: now,
-  };
-  store.transactions.unshift(record);
-  store.nextId += 1;
-  saveStore(store);
-  return record;
+}): Promise<TransactionRecord> {
+  const db = await requireDb();
+  const createdAt = input.createdAt ? new Date(input.createdAt) : new Date();
+  const inserted = await db
+    .insert(registryTransactions)
+    .values({
+      externalReference: input.externalReference,
+      type: input.type,
+      parcelId: input.parcelId,
+      initiatorId: input.initiatorId,
+      initiatorName: input.initiatorName,
+      counterpartyName: input.counterpartyName,
+      status: input.status,
+      workflowStage: input.workflowStage,
+      paymentStatus: input.paymentStatus,
+      documentStatus: input.documentStatus,
+      considerationAmount: input.considerationAmount,
+      notes: input.notes ?? `Imported transaction ${input.externalReference}`,
+      createdAt,
+      updatedAt: createdAt,
+    })
+    .returning();
+  return toRecord(inserted[0]);
 }
 
-export function advanceTransaction(id: number, action: 'submit' | 'request_payment' | 'approve' | 'complete' | 'reject') {
-  const store = loadStore();
-  const transaction = store.transactions.find((item) => item.id === id);
-  if (!transaction) {
+const ADVANCE_ACTIONS: Record<
+  'submit' | 'request_payment' | 'approve' | 'complete' | 'reject',
+  Partial<typeof registryTransactions.$inferInsert>
+> = {
+  submit: { status: 'pending_approval', workflowStage: 'registry_review' },
+  request_payment: { status: 'pending_payment', workflowStage: 'fee_collection', paymentStatus: 'pending' },
+  approve: { status: 'registered', workflowStage: 'registry_completed', documentStatus: 'verified' },
+  complete: { status: 'completed', workflowStage: 'closed', paymentStatus: 'paid', documentStatus: 'verified' },
+  reject: { status: 'rejected', workflowStage: 'exception' },
+};
+
+export async function advanceTransaction(
+  id: number,
+  action: 'submit' | 'request_payment' | 'approve' | 'complete' | 'reject',
+): Promise<TransactionRecord> {
+  const db = await requireDb();
+
+  const existing = await db.select().from(registryTransactions).where(eq(registryTransactions.id, id)).limit(1);
+  if (!existing[0]) {
     throw new Error('Transaction not found');
   }
 
-  switch (action) {
-    case 'submit':
-      transaction.status = 'pending_approval';
-      transaction.workflowStage = 'registry_review';
-      transaction.documentStatus = transaction.documentStatus === 'pending' ? 'submitted' : transaction.documentStatus;
-      break;
-    case 'request_payment':
-      transaction.status = 'pending_payment';
-      transaction.workflowStage = 'fee_collection';
-      transaction.paymentStatus = 'pending';
-      break;
-    case 'approve':
-      transaction.status = 'registered';
-      transaction.workflowStage = 'registry_completed';
-      transaction.documentStatus = 'verified';
-      break;
-    case 'complete':
-      transaction.status = 'completed';
-      transaction.workflowStage = 'closed';
-      transaction.paymentStatus = 'paid';
-      transaction.documentStatus = 'verified';
-      break;
-    case 'reject':
-      transaction.status = 'rejected';
-      transaction.workflowStage = 'exception';
-      break;
+  const patch: Partial<typeof registryTransactions.$inferInsert> = {
+    ...ADVANCE_ACTIONS[action],
+    updatedAt: new Date(),
+  };
+
+  // 'submit' promotes document status pending → submitted but never demotes.
+  if (action === 'submit' && existing[0].documentStatus === 'pending') {
+    patch.documentStatus = 'submitted';
   }
 
-  transaction.updatedAt = new Date().toISOString();
-  saveStore(store);
-  return transaction;
+  const updated = await db
+    .update(registryTransactions)
+    .set(patch)
+    .where(eq(registryTransactions.id, id))
+    .returning();
+  return toRecord(updated[0]);
 }

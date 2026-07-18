@@ -1,7 +1,14 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { randomBytes } from "crypto";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
+import {
+  createSignedState,
+  extractKeycloakRoles,
+  mapKeycloakRolesToAppRole,
+  verifySignedState,
+} from "./keycloakAuth";
 import { sdk } from "./sdk";
 
 function getQueryParam(req: Request, key: string): string | undefined {
@@ -110,7 +117,11 @@ export function registerOAuthRoutes(app: Express) {
     }
 
     const redirectTo = normalizeRedirectTarget(getQueryParam(req, 'redirectTo'));
-    const state = Buffer.from(JSON.stringify({ redirectTo, nonce: Date.now() })).toString('base64url');
+    const state = createSignedState({
+      redirectTo,
+      nonce: randomBytes(16).toString('base64url'),
+      issuedAt: Date.now(),
+    });
     const authUrl = new URL(`${config.baseUrl}/realms/${config.realm}/protocol/openid-connect/auth`);
     authUrl.searchParams.set('client_id', config.clientId);
     authUrl.searchParams.set('response_type', 'code');
@@ -125,8 +136,14 @@ export function registerOAuthRoutes(app: Express) {
     const code = getQueryParam(req, 'code');
     const encodedState = getQueryParam(req, 'state');
 
-    if (!code) {
-      res.status(400).json({ error: 'code is required' });
+    if (!code || !encodedState) {
+      res.status(400).json({ error: 'code and state are required' });
+      return;
+    }
+
+    const statePayload = verifySignedState(encodedState);
+    if (!statePayload) {
+      res.status(400).json({ error: 'Invalid or expired OAuth state' });
       return;
     }
 
@@ -141,11 +158,14 @@ export function registerOAuthRoutes(app: Express) {
         return;
       }
 
+      const appRole = mapKeycloakRolesToAppRole(extractKeycloakRoles(userInfo));
+
       await db.upsertUser({
         openId: `keycloak:${subject}`,
         name: typeof userInfo.name === 'string' ? userInfo.name : preferredUsername ?? null,
         email: typeof userInfo.email === 'string' ? userInfo.email : null,
         loginMethod: 'keycloak',
+        role: appRole,
         lastSignedIn: new Date(),
       });
 
@@ -157,17 +177,7 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      let redirectTo = '/dashboard';
-      if (encodedState) {
-        try {
-          const decoded = JSON.parse(Buffer.from(encodedState, 'base64url').toString('utf8')) as { redirectTo?: string };
-          redirectTo = normalizeRedirectTarget(decoded.redirectTo);
-        } catch {
-          redirectTo = '/dashboard';
-        }
-      }
-
-      res.redirect(302, redirectTo);
+      res.redirect(302, normalizeRedirectTarget(statePayload.redirectTo));
     } catch (error) {
       console.error('[KeycloakAuth] Callback failed', error);
       res.status(500).json({ error: 'Keycloak callback failed' });
@@ -216,6 +226,20 @@ export function registerOAuthRoutes(app: Express) {
   });
 
   app.get("/api/auth/preview-login", async (req: Request, res: Response) => {
+    // SECURITY: preview-login issues sessions for arbitrary roles (including
+    // admin) without any identity check. It exists only for local development
+    // and CI preview environments. It is HARD-DISABLED in production and
+    // requires an explicit opt-in flag everywhere else.
+    if (process.env.NODE_ENV === "production" || process.env.ENABLE_PREVIEW_LOGIN !== "true") {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    console.warn(
+      "[PreviewAuth] Preview login used — this endpoint must never be enabled in production",
+      { ip: req.ip, role: getQueryParam(req, "role") }
+    );
+
     const role = normalizePreviewRole(getQueryParam(req, "role"));
     const redirectTo = normalizeRedirectTarget(getQueryParam(req, "redirectTo"));
     const identity = buildPreviewIdentity(role);

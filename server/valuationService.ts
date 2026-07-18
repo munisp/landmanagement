@@ -1,7 +1,6 @@
-import fs from 'fs';
-import path from 'path';
 import { getParcelByNumber, searchParcels } from './parcelRepository';
 import { listTransactions } from './transactionRepository';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type ValuationMethod = 'comparative' | 'income' | 'cost' | 'avm';
 export type ValuationPurpose = 'sale' | 'mortgage' | 'tax' | 'insurance' | 'legal';
@@ -33,14 +32,6 @@ interface ValuationStore {
   nextId: number;
 }
 
-const dataDir = path.join(process.cwd(), 'server', 'data');
-const storePath = path.join(dataDir, 'valuation-store.json');
-
-function ensureDataDir() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-}
 
 function seedStore(): ValuationStore {
   return {
@@ -74,27 +65,12 @@ function seedStore(): ValuationStore {
   };
 }
 
-function loadStore(): ValuationStore {
-  ensureDataDir();
-  if (!fs.existsSync(storePath)) {
-    const initial = seedStore();
-    fs.writeFileSync(storePath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  const parsed = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as ValuationStore;
-  if (!Array.isArray(parsed.history)) {
-    const initial = seedStore();
-    fs.writeFileSync(storePath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  return parsed;
+async function loadStore(): Promise<ValuationStore> {
+  return readJsonStore<ValuationStore>('valuation-store', seedStore);
 }
 
-function saveStore(store: ValuationStore) {
-  ensureDataDir();
-  fs.writeFileSync(storePath, JSON.stringify(store, null, 2));
+async function saveStore(store: ValuationStore) {
+  await writeJsonStore('valuation-store', store);
 }
 
 function formatMethod(method: ValuationMethod) {
@@ -136,14 +112,14 @@ function getPurposeAdjustment(purpose: ValuationPurpose) {
   }
 }
 
-function getComparableSales(parcelNumber: string): ValuationComparableSale[] {
-  const subject = getParcelByNumber(parcelNumber);
+async function getComparableSales(parcelNumber: string): Promise<ValuationComparableSale[]> {
+  const subject = await getParcelByNumber(parcelNumber);
   if (!subject) {
     throw new Error('Parcel not found');
   }
 
-  const parcels = searchParcels({ page: 1, limit: 1000 }).parcels.filter((parcel) => parcel.parcelNumber !== subject.parcelNumber);
-  const transactions = listTransactions({ page: 1, limit: 1000 }).transactions;
+  const parcels = (await searchParcels({ page: 1, limit: 1000 })).parcels.filter((parcel) => parcel.parcelNumber !== subject!.parcelNumber);
+  const transactions = (await listTransactions({ page: 1, limit: 1000 })).transactions;
 
   const ranked = parcels
     .map((parcel) => {
@@ -169,19 +145,19 @@ function getComparableSales(parcelNumber: string): ValuationComparableSale[] {
   return ranked.slice(0, 4).map(({ score, ...sale }) => sale);
 }
 
-export function calculatePropertyValuation(input: {
+export async function calculatePropertyValuation(input: {
   parcelNumber: string;
   method: ValuationMethod;
   purpose: ValuationPurpose;
   requestedByUserId?: number;
   requestedByName?: string;
 }) {
-  const subject = getParcelByNumber(input.parcelNumber);
+  const subject = await getParcelByNumber(input.parcelNumber);
   if (!subject) {
     throw new Error('Parcel not found');
   }
 
-  const comparableSales = getComparableSales(input.parcelNumber);
+  const comparableSales = await getComparableSales(input.parcelNumber);
   const averageComparablePricePerSqm = comparableSales.length > 0
     ? comparableSales.reduce((sum, sale) => sum + sale.pricePerSqm, 0) / comparableSales.length
     : subject.estimatedValue / Math.max(subject.areaSquareMeters, 1);
@@ -202,7 +178,7 @@ export function calculatePropertyValuation(input: {
   const pricePerSqm = Math.round(estimatedValue / Math.max(subject.areaSquareMeters, 1));
   const confidence = Math.max(68, Math.min(94, 72 + comparableSales.length * 4 + (subject.status === 'registered' ? 6 : subject.status === 'verified' ? 4 : 0)));
 
-  const store = loadStore();
+  const store = await loadStore();
   const record: ValuationHistoryRecord = {
     id: store.nextId,
     date: new Date().toISOString(),
@@ -218,7 +194,7 @@ export function calculatePropertyValuation(input: {
 
   store.history.unshift(record);
   store.nextId += 1;
-  saveStore(store);
+  await saveStore(store);
 
   return {
     parcel: subject,
@@ -244,17 +220,17 @@ export function calculatePropertyValuation(input: {
   };
 }
 
-export function listValuationHistory(parcelNumber?: string) {
-  const history = loadStore().history;
+export async function listValuationHistory(parcelNumber?: string) {
+  const history = (await loadStore()).history;
   return history
     .filter((record) => (parcelNumber ? record.parcelNumber === parcelNumber : true))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
-export function getMarketInsights(parcelNumber?: string) {
-  const parcels = searchParcels({ page: 1, limit: 1000 }).parcels;
-  const history = loadStore().history;
-  const subject = parcelNumber ? getParcelByNumber(parcelNumber) : null;
+export async function getMarketInsights(parcelNumber?: string) {
+  const parcels = (await searchParcels({ page: 1, limit: 1000 })).parcels;
+  const history = (await loadStore()).history;
+  const subject = parcelNumber ? await getParcelByNumber(parcelNumber) : null;
   const locationParcels = subject ? parcels.filter((parcel) => parcel.state === subject.state && parcel.lga === subject.lga) : parcels;
 
   const averagePricePerSqm = locationParcels.length > 0

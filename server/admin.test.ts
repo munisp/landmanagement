@@ -162,6 +162,13 @@ describe('Admin User Management', () => {
   });
 
   describe('getUserActivityLogs', () => {
+    beforeAll(async () => {
+      // Record a real login attempt for the test user through the actual
+      // security-monitoring write path, so the read path has data to serve.
+      const { recordLoginAttempt } = await import('./securityMonitoringService');
+      await recordLoginAttempt('user@test.com', '127.0.0.1', true, { userId: testUserId });
+    });
+
     it('should return activity logs for a user', async () => {
       const logs = await adminService.getUserActivityLogs(testUserId, 50);
 

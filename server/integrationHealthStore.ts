@@ -1,7 +1,6 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import type { IntegrationsHealth, IntegrationStatus } from './_core/integrations';
 import { defaultAlertConfig, type AlertConfig } from './_core/alertNotifications';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type IntegrationServiceName = 'fabric' | 'mojaloop' | 'tigerbeetle' | 'kafka' | 'temporal' | 'elasticsearch';
 
@@ -18,7 +17,6 @@ interface IntegrationHealthStoreData {
   snapshots: IntegrationHealthSnapshot[];
 }
 
-const STORE_FILE = process.env.INTEGRATION_HEALTH_STORE_PATH || path.resolve(process.cwd(), 'data', 'integration-health-store.json');
 const MAX_SNAPSHOTS = 10000;
 
 function defaultStoreData(): IntegrationHealthStoreData {
@@ -42,39 +40,12 @@ function defaultStoreData(): IntegrationHealthStoreData {
   };
 }
 
-async function ensureStoreDirectory(): Promise<void> {
-  await fs.mkdir(path.dirname(STORE_FILE), { recursive: true });
-}
-
 async function readStore(): Promise<IntegrationHealthStoreData> {
-  await ensureStoreDirectory();
-
-  try {
-    const raw = await fs.readFile(STORE_FILE, 'utf8');
-    const parsed = JSON.parse(raw) as Partial<IntegrationHealthStoreData>;
-    return {
-      alertConfig: {
-        ...defaultStoreData().alertConfig,
-        ...parsed.alertConfig,
-        thresholds: {
-          ...defaultStoreData().alertConfig.thresholds,
-          ...(parsed.alertConfig?.thresholds ?? {}),
-        },
-        recipients: {
-          ...defaultStoreData().alertConfig.recipients,
-          ...(parsed.alertConfig?.recipients ?? {}),
-        },
-      },
-      snapshots: Array.isArray(parsed.snapshots) ? parsed.snapshots : [],
-    };
-  } catch (error) {
-    return defaultStoreData();
-  }
+  return readJsonStore<IntegrationHealthStoreData>('integration-health-store', defaultStoreData);
 }
 
-async function writeStore(data: IntegrationHealthStoreData): Promise<void> {
-  await ensureStoreDirectory();
-  await fs.writeFile(STORE_FILE, JSON.stringify(data, null, 2) + '\n', 'utf8');
+async function writeStore(store: IntegrationHealthStoreData) {
+  await writeJsonStore('integration-health-store', store);
 }
 
 function mapServiceName(name: string): IntegrationServiceName | null {

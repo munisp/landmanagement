@@ -154,7 +154,7 @@ export const marketplaceRouter = router({
       }
 
       try {
-        const escrow = createMarketplaceEscrow({
+        const escrow = await createMarketplaceEscrow({
           listingId: input.listingId,
           sellerId: Number(ctx.user.id),
           buyerId: input.buyerId,
@@ -188,7 +188,7 @@ export const marketplaceRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        const escrow = fundMarketplaceEscrow({
+        const escrow = await fundMarketplaceEscrow({
           escrowId: input.escrowId,
           buyerId: Number(ctx.user.id),
           paymentMethod: input.paymentMethod,
@@ -222,7 +222,7 @@ export const marketplaceRouter = router({
     )
     .mutation(async ({ input }) => {
       try {
-        const escrow = releaseMarketplaceEscrow({
+        const escrow = await releaseMarketplaceEscrow({
           escrowId: input.escrowId,
           releaseToSeller: input.releaseToSeller,
         });

@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type WorkflowStatus = 'running' | 'paused' | 'completed';
 export type WorkflowStepType = 'user_task' | 'automated' | 'approval';
@@ -38,12 +37,6 @@ interface WorkflowDesignerStore {
   workflowSteps: WorkflowStepRecord[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'workflow-designer-store.json');
-
-function ensureDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function defaultStore(): WorkflowDesignerStore {
   return {
@@ -68,29 +61,16 @@ function defaultStore(): WorkflowDesignerStore {
   };
 }
 
-function readStore(): WorkflowDesignerStore {
-  ensureDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const seeded = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
-  try {
-    return JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as WorkflowDesignerStore;
-  } catch {
-    const seeded = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
+async function readStore(): Promise<WorkflowDesignerStore> {
+  return readJsonStore<WorkflowDesignerStore>('workflow-designer-store', defaultStore);
 }
 
-function writeStore(store: WorkflowDesignerStore) {
-  ensureDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function writeStore(store: WorkflowDesignerStore) {
+  await writeJsonStore('workflow-designer-store', store);
 }
 
-export function getWorkflowDesignerState() {
-  const store = readStore();
+export async function getWorkflowDesignerState() {
+  const store = await readStore();
   const total = store.activeWorkflows.length;
   const active = store.activeWorkflows.filter((workflow) => workflow.status === 'running').length;
   const completed = store.activeWorkflows.filter((workflow) => workflow.status === 'completed').length;
@@ -111,8 +91,8 @@ export function getWorkflowDesignerState() {
   };
 }
 
-export function createWorkflowInstance(input: { workflowName: string; templateId: string }) {
-  const store = readStore();
+export async function createWorkflowInstance(input: { workflowName: string; templateId: string }) {
+  const store = await readStore();
   const template = store.templates.find((item) => item.id === input.templateId);
   if (!template) {
     throw new Error('Workflow template not found');
@@ -130,6 +110,6 @@ export function createWorkflowInstance(input: { workflowName: string; templateId
   };
 
   store.activeWorkflows.unshift(workflow);
-  writeStore(store);
+  await writeStore(store);
   return workflow;
 }

@@ -7,6 +7,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
+import { verifyKeycloakBearerToken } from "./keycloakAuth";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
@@ -265,6 +266,35 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
+    // Bearer-token flow: API clients authenticate with a Keycloak-issued
+    // RS256 access token, verified against the realm JWKS. Only active when
+    // Keycloak is configured (KEYCLOAK_URL set).
+    const authHeader = req.headers.authorization;
+    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.slice("Bearer ".length).trim();
+      const verified = await verifyKeycloakBearerToken(token);
+      if (!verified) {
+        throw ForbiddenError("Invalid bearer token");
+      }
+      const openId = `keycloak:${verified.subject}`;
+      let bearerUser = await db.getUserByOpenId(openId);
+      if (!bearerUser) {
+        await db.upsertUser({
+          openId,
+          name: verified.name ?? verified.preferredUsername ?? null,
+          email: verified.email ?? null,
+          loginMethod: "keycloak",
+          role: verified.appRole,
+          lastSignedIn: new Date(),
+        });
+        bearerUser = await db.getUserByOpenId(openId);
+      }
+      if (!bearerUser) {
+        throw ForbiddenError("Failed to resolve bearer-token user");
+      }
+      return bearerUser;
+    }
+
     // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
@@ -286,8 +316,10 @@ class SDKServer {
       user = undefined;
     }
 
-    // If user not in DB, allow preview users to authenticate without a backing database.
-    if (!user && previewRoleMatch) {
+    // If user not in DB, allow preview users to authenticate without a backing
+    // database — but NEVER in production, where a preview identity must not
+    // exist at all.
+    if (!user && previewRoleMatch && process.env.NODE_ENV !== "production") {
       const previewRole = previewRoleMatch[1] as User["role"];
       return {
         id: 0,

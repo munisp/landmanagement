@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type BackupStatus = 'completed' | 'in_progress' | 'failed';
 export type RecoveryPointType = 'manual' | 'automated';
@@ -45,12 +44,6 @@ interface BackupRecoveryStore {
   storageMetrics: StorageMetricsRecord;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'backup-recovery-store.json');
-
-function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function defaultStore(): BackupRecoveryStore {
   return {
@@ -83,40 +76,20 @@ function defaultStore(): BackupRecoveryStore {
   };
 }
 
-function loadStore(): BackupRecoveryStore {
-  ensureDataDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as BackupRecoveryStore;
-    if (!parsed || !Array.isArray(parsed.recentBackups) || !Array.isArray(parsed.recoveryPoints)) {
-      const store = defaultStore();
-      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-      return store;
-    }
-    return parsed;
-  } catch {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
+async function loadStore(): Promise<BackupRecoveryStore> {
+  return readJsonStore<BackupRecoveryStore>('backup-recovery-store', defaultStore);
 }
 
-function saveStore(store: BackupRecoveryStore) {
-  ensureDataDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function saveStore(store: BackupRecoveryStore) {
+  await writeJsonStore('backup-recovery-store', store);
 }
 
-export function getBackupRecoveryState() {
-  return loadStore();
+export async function getBackupRecoveryState() {
+  return await loadStore();
 }
 
-export function initiateBackupRun() {
-  const store = loadStore();
+export async function initiateBackupRun() {
+  const store = await loadStore();
   const now = new Date();
   const id = store.nextBackupId++;
   const backup: BackupRecord = {
@@ -145,12 +118,12 @@ export function initiateBackupRun() {
   store.recentBackups = store.recentBackups.slice(0, 10);
   store.recoveryPoints.unshift(recoveryPoint);
   store.recoveryPoints = store.recoveryPoints.slice(0, 10);
-  saveStore(store);
+  await saveStore(store);
   return backup;
 }
 
-export function restoreFromRecoveryPoint(recoveryPointId: number) {
-  const store = loadStore();
+export async function restoreFromRecoveryPoint(recoveryPointId: number) {
+  const store = await loadStore();
   const point = store.recoveryPoints.find((item) => item.id === recoveryPointId);
   if (!point) {
     throw new Error('Recovery point not found');

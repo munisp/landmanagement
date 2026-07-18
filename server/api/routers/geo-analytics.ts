@@ -17,8 +17,8 @@ export const geoAnalyticsRouter = router({
     )
     .query(async ({ input }) => {
       const stateFilter = input?.state && input.state !== 'all' ? input.state : undefined;
-      const parcels = searchParcels({ page: 1, limit: 1000 }).parcels;
-      const transactions = listTransactions({ page: 1, limit: 1000 }).transactions;
+      const parcels = (await searchParcels({ page: 1, limit: 1000 })).parcels;
+      const transactions = (await listTransactions({ page: 1, limit: 1000 })).transactions;
       const filteredParcels = stateFilter ? parcels.filter((parcel) => parcel.state === stateFilter) : parcels;
       const parcelIds = new Set(filteredParcels.map((parcel) => parcel.id));
       const filteredTransactions = transactions.filter((transaction) => parcelIds.has(transaction.parcelId));

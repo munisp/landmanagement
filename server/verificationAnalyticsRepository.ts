@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type VerificationLifecycleStatus = 'submitted' | 'under_review' | 'approved' | 'rejected';
 
@@ -22,12 +21,6 @@ interface VerificationAnalyticsStore {
   requests: VerificationAnalyticsRecord[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'verification-analytics-store.json');
-
-function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function hoursAfter(dateIso: string, hours: number) {
   return new Date(new Date(dateIso).getTime() + hours * 60 * 60 * 1000).toISOString();
@@ -92,29 +85,10 @@ function defaultStore(): VerificationAnalyticsStore {
   };
 }
 
-function loadStore(): VerificationAnalyticsStore {
-  ensureDataDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as VerificationAnalyticsStore;
-    if (!Array.isArray(parsed.requests) || typeof parsed.nextId !== 'number') {
-      const store = defaultStore();
-      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-      return store;
-    }
-    return parsed;
-  } catch {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
+async function loadStore(): Promise<VerificationAnalyticsStore> {
+  return readJsonStore<VerificationAnalyticsStore>('verification-analytics-store', defaultStore);
 }
 
-export function listVerificationAnalyticsRequests() {
-  return loadStore().requests;
+export async function listVerificationAnalyticsRequests() {
+  return (await loadStore()).requests;
 }

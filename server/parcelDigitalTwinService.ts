@@ -101,13 +101,13 @@ function normalizeUse(landUse?: string): string {
 
 /** Assemble the digital-twin profile for a parcel. */
 export async function buildDigitalTwin(parcelId: number) {
-  const parcel = parcelRepository.getParcelById(parcelId);
+  const parcel = await parcelRepository.getParcelById(parcelId);
   if (!parcel) throw new Error(`Parcel ${parcelId} not found`);
 
-  const disputes = disputeRepository.listDisputes({ limit: 1000 }).disputes
+  const disputes = (await disputeRepository.listDisputes({ limit: 1000 })).disputes
     .filter((d: any) => d.parcelId === parcelId);
   const openDisputes = disputes.filter((d: any) => OPEN_DISPUTE_STATUSES.has(String(d.status)));
-  const transactions = transactionRepository.listTransactions({ limit: 1000 }).transactions
+  const transactions = (await transactionRepository.listTransactions({ limit: 1000 })).transactions
     .filter((tx: any) => tx.parcelId === parcelId);
 
   return {

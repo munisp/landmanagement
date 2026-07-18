@@ -180,7 +180,7 @@ export async function importParcels(data: ParcelImportRow[]): Promise<ImportResu
 
     try {
       if (!db) {
-        const createdParcel = createParcel({
+        const createdParcel = await createParcel({
           surveyPlanNumber: row.coordinates.includes('SP/') ? row.coordinates : `IMP-${row.parcel_id}`,
           state: row.parcel_id.split('-')[0] === 'LG' ? 'Lagos' : row.parcel_id.split('-')[0] === 'AB' ? 'Abuja' : 'Imported State',
           lga: 'Imported LGA',
@@ -194,7 +194,7 @@ export async function importParcels(data: ParcelImportRow[]): Promise<ImportResu
         });
 
         if (row.status === 'Active') {
-          verifyParcel(createdParcel.id, 'bulk-import');
+          await verifyParcel(createdParcel.id, 'bulk-import');
         }
 
         result.success++;
@@ -247,7 +247,7 @@ export async function importDocuments(data: DocumentImportRow[]): Promise<Import
 
     try {
       if (!db) {
-        const parcel = getParcelByNumber(row.parcel_id);
+        const parcel = await getParcelByNumber(row.parcel_id);
         if (!parcel) {
           throw new Error(`Parcel ${row.parcel_id} not found`);
         }
@@ -320,7 +320,7 @@ export async function importTransactions(data: TransactionImportRow[]): Promise<
 
     try {
       if (!db) {
-        const parcel = getParcelByNumber(row.parcel_id);
+        const parcel = await getParcelByNumber(row.parcel_id);
         if (!parcel) {
           throw new Error(`Parcel ${row.parcel_id} not found`);
         }
@@ -336,7 +336,7 @@ export async function importTransactions(data: TransactionImportRow[]): Promise<
             ? { status: 'pending_approval', workflowStage: 'registry_review', paymentStatus: 'pending', documentStatus: 'submitted' }
             : { status: 'rejected', workflowStage: 'closed', paymentStatus: 'unpaid', documentStatus: 'pending' };
 
-        createImportedTransaction({
+        await createImportedTransaction({
           externalReference: row.transaction_id,
           type: row.type.toLowerCase(),
           parcelId: parcel.id,
@@ -387,7 +387,7 @@ export async function importTransactions(data: TransactionImportRow[]): Promise<
 
 export async function exportBulkData(type: keyof BulkExportRowMap): Promise<Array<Record<string, string | number | boolean | null>>> {
   if (type === 'parcels') {
-    return searchParcels({ page: 1, limit: 5000 }).parcels.map((parcel) => ({
+    return (await searchParcels({ page: 1, limit: 5000 })).parcels.map((parcel) => ({
       parcel_id: parcel.parcelNumber,
       survey_plan_number: parcel.surveyPlanNumber,
       state: parcel.state,
@@ -402,7 +402,7 @@ export async function exportBulkData(type: keyof BulkExportRowMap): Promise<Arra
   }
 
   if (type === 'documents') {
-    return listAllDocuments().map((document) => ({
+    return (await listAllDocuments()).map((document) => ({
       document_id: document.id,
       parcel_id: document.parcelId ?? null,
       transaction_id: document.transactionId ?? null,
@@ -416,7 +416,7 @@ export async function exportBulkData(type: keyof BulkExportRowMap): Promise<Arra
   }
 
   if (type === 'transactions') {
-    return listTransactions({ page: 1, limit: 5000 }).transactions.map((transaction) => ({
+    return (await listTransactions({ page: 1, limit: 5000 })).transactions.map((transaction) => ({
       transaction_id: transaction.id,
       parcel_id: transaction.parcelId,
       type: transaction.type,
@@ -432,9 +432,9 @@ export async function exportBulkData(type: keyof BulkExportRowMap): Promise<Arra
 
   const dedupedUsers = new Map<number, Record<string, string | number | boolean | null>>();
   const userRows = [
-    ...listAdminMortgageApplications().map((item) => ({ id: item.applicantId, name: `Borrower ${item.applicantId}`, role: 'borrower', source: 'mortgage' })),
-    ...listAdminTaxClearances().map((item) => ({ id: item.ownerId, name: `Owner ${item.ownerId}`, role: 'owner', source: 'tax' })),
-    ...listAdminInsurancePolicies().map((item) => ({ id: item.policyHolderId, name: `Policy Holder ${item.policyHolderId}`, role: 'user', source: 'insurance' })),
+    ...(await listAdminMortgageApplications()).map((item) => ({ id: item.applicantId, name: `Borrower ${item.applicantId}`, role: 'borrower', source: 'mortgage' })),
+    ...(await listAdminTaxClearances()).map((item) => ({ id: item.ownerId, name: `Owner ${item.ownerId}`, role: 'owner', source: 'tax' })),
+    ...(await listAdminInsurancePolicies()).map((item) => ({ id: item.policyHolderId, name: `Policy Holder ${item.policyHolderId}`, role: 'user', source: 'insurance' })),
     { id: 1, name: 'System Administrator', role: 'admin', source: 'system' },
   ];
 

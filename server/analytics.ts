@@ -437,7 +437,7 @@ export async function exportAnalyticsData(
 
     return toCsv(
       ['Parcel ID', 'Owner ID', 'Address', 'City', 'State', 'Status'],
-      rows.map((row) => [row.parcelId, String(row.ownerId), row.address, row.city ?? '', row.state ?? '', row.status])
+      rows.map((row) => [row.parcelId, String(row.ownerId), row.address ?? '', row.city ?? '', row.state ?? '', row.status])
     );
   }
 

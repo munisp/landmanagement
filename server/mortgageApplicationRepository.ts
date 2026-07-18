@@ -1,6 +1,4 @@
-import { promises as fs } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type MortgageLifecycleStatus = 'pending' | 'under_review' | 'approved' | 'rejected' | 'disbursed' | 'cancelled';
 
@@ -77,11 +75,6 @@ interface UpdateMortgageApplicationInput {
   bankName?: string;
   bankBranch?: string | null;
 }
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DATA_DIR = path.join(__dirname, 'data');
-const STORE_PATH = path.join(DATA_DIR, 'mortgage-application-store.json');
 
 const seedTemplates: Array<Omit<MortgageApplicationRecord, 'id' | 'applicationId' | 'applicantId' | 'transactionId' | 'createdAt' | 'updatedAt' | 'submittedAt'>> = [
   {
@@ -241,10 +234,6 @@ function assessBusinessRules(params: {
   };
 }
 
-async function ensureDataDir() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-}
-
 async function createSeededStore(): Promise<MortgageStore> {
   const now = new Date();
   const applications: MortgageApplicationRecord[] = [];
@@ -321,21 +310,42 @@ async function createSeededStore(): Promise<MortgageStore> {
 }
 
 async function readStore(): Promise<MortgageStore> {
-  await ensureDataDir();
-
-  try {
-    const raw = await fs.readFile(STORE_PATH, 'utf8');
-    return JSON.parse(raw) as MortgageStore;
-  } catch {
-    const seeded = await createSeededStore();
-    await writeStore(seeded);
-    return seeded;
-  }
+  return readJsonStore<MortgageStore>('mortgage-application-store', createSeededStore);
 }
 
 async function writeStore(store: MortgageStore) {
-  await ensureDataDir();
-  await fs.writeFile(STORE_PATH, JSON.stringify(store, null, 2));
+  await writeJsonStore('mortgage-application-store', store);
+}
+
+
+/**
+ * Internal cross-repository access (used by mortgagePaymentRepository):
+ * list every application record across all applicants.
+ */
+export async function listAllMortgageApplicationRecords(): Promise<MortgageApplicationRecord[]> {
+  const store = await readStore();
+  return store.applications;
+}
+
+/**
+ * Internal cross-repository access (used by mortgagePaymentRepository):
+ * atomically update one application record by its numeric id.
+ */
+export async function updateMortgageApplicationRecord(
+  numericId: number,
+  update: (current: MortgageApplicationRecord) => Partial<MortgageApplicationRecord>,
+): Promise<MortgageApplicationRecord | null> {
+  const store = await readStore();
+  const index = store.applications.findIndex((item) => item.id === numericId);
+  if (index === -1) return null;
+  const current = store.applications[index];
+  store.applications[index] = {
+    ...current,
+    ...update(current),
+    updatedAt: new Date().toISOString(),
+  };
+  await writeStore(store);
+  return store.applications[index];
 }
 
 function assertValidTransition(currentStatus: MortgageLifecycleStatus, nextStatus: MortgageLifecycleStatus) {

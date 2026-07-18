@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export interface SurveyDeviceRecord {
   id: number;
@@ -35,12 +34,6 @@ interface SurveyEquipmentStore {
   calibrationRecords: CalibrationRecord[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'survey-equipment-store.json');
-
-function ensureDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function defaultStore(): SurveyEquipmentStore {
   return {
@@ -62,22 +55,10 @@ function defaultStore(): SurveyEquipmentStore {
   };
 }
 
-function loadStore(): SurveyEquipmentStore {
-  ensureDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const seeded = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
-  try {
-    return JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as SurveyEquipmentStore;
-  } catch {
-    const seeded = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
+async function loadStore(): Promise<SurveyEquipmentStore> {
+  return readJsonStore<SurveyEquipmentStore>('survey-equipment-store', defaultStore);
 }
 
-export function getSurveyEquipmentState() {
-  return loadStore();
+export async function getSurveyEquipmentState() {
+  return await loadStore();
 }

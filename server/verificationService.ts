@@ -346,7 +346,7 @@ export async function addVerificationDocument(
 ): Promise<{ success: boolean; documentId?: number }> {
   const db = await getDb();
   if (!db) {
-    return addVerificationDocumentOffline(requestId, documentType, fileName, fileUrl, fileSize, mimeType, uploadedBy) as {
+    return (await addVerificationDocumentOffline(requestId, documentType, fileName, fileUrl, fileSize, mimeType, uploadedBy)) as {
       success: boolean;
       documentId?: number;
     };
@@ -389,7 +389,7 @@ export async function getVerificationRequestDetails(
 ): Promise<VerificationRequestDetails | null> {
   const db = await getDb();
   if (!db) {
-    return getVerificationRequestDetailsOffline(requestId) as VerificationRequestDetails | null;
+    return (await getVerificationRequestDetailsOffline(requestId)) as VerificationRequestDetails | null;
   }
 
   const [request] = await db
@@ -478,7 +478,7 @@ export async function listVerificationRequests(
 }> {
   const db = await getDb();
   if (!db) {
-    return listVerificationRequestsOffline(filters, page, limit) as {
+    return (await listVerificationRequestsOffline(filters, page, limit)) as {
       requests: VerificationRequestDetails[];
       total: number;
       page: number;

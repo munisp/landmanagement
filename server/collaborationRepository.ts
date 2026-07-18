@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export interface CollaborationParticipant {
   id: number;
@@ -39,12 +38,6 @@ interface CollaborationStore {
   nextMessageId: number;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'collaboration-store.json');
-
-function ensureDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function defaultStore(): CollaborationStore {
   return {
@@ -70,33 +63,20 @@ function defaultStore(): CollaborationStore {
   };
 }
 
-function loadStore(): CollaborationStore {
-  ensureDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const seeded = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
-  try {
-    return JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as CollaborationStore;
-  } catch {
-    const seeded = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
+async function loadStore(): Promise<CollaborationStore> {
+  return readJsonStore<CollaborationStore>('collaboration-store', defaultStore);
 }
 
-function saveStore(store: CollaborationStore) {
-  ensureDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function saveStore(store: CollaborationStore) {
+  await writeJsonStore('collaboration-store', store);
 }
 
-export function getCollaborationState() {
-  return loadStore();
+export async function getCollaborationState() {
+  return await loadStore();
 }
 
-export function addCollaborationMessage(sender: string, message: string) {
-  const store = loadStore();
+export async function addCollaborationMessage(sender: string, message: string) {
+  const store = await loadStore();
   const record: CollaborationMessage = {
     id: store.nextMessageId++,
     sender,
@@ -105,6 +85,6 @@ export function addCollaborationMessage(sender: string, message: string) {
   };
   store.messages.push(record);
   store.messages = store.messages.slice(-50);
-  saveStore(store);
+  await saveStore(store);
   return record;
 }

@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export interface IoTDeviceRecord {
   id: number;
@@ -60,12 +59,6 @@ interface IoTStore {
   maintenanceAlerts: MaintenanceAlertRecord[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'iot-store.json');
-
-function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function defaultStore(): IoTStore {
   return {
@@ -105,35 +98,16 @@ function defaultStore(): IoTStore {
   };
 }
 
-function loadStore(): IoTStore {
-  ensureDataDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
-  try {
-    const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as IoTStore;
-    if (!parsed || !Array.isArray(parsed.devices) || !Array.isArray(parsed.environmentalReadings) || !Array.isArray(parsed.accessControlEvents) || !Array.isArray(parsed.utilityMeterReadings) || !Array.isArray(parsed.maintenanceAlerts)) {
-      const store = defaultStore();
-      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-      return store;
-    }
-    return parsed;
-  } catch {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
+async function loadStore(): Promise<IoTStore> {
+  return readJsonStore<IoTStore>('iot-store', defaultStore);
 }
 
-function saveStore(store: IoTStore) {
-  ensureDataDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function saveStore(store: IoTStore) {
+  await writeJsonStore('iot-store', store);
 }
 
-export function getIoTOverview() {
-  const store = loadStore();
+export async function getIoTOverview() {
+  const store = await loadStore();
   return {
     devices: store.devices,
     environmentalReadings: store.environmentalReadings.slice().sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()),
@@ -149,20 +123,20 @@ export function getIoTOverview() {
   };
 }
 
-export function registerIoTDevice(input: Omit<IoTDeviceRecord, 'id' | 'lastSeenAt'>) {
-  const store = loadStore();
+export async function registerIoTDevice(input: Omit<IoTDeviceRecord, 'id' | 'lastSeenAt'>) {
+  const store = await loadStore();
   const device: IoTDeviceRecord = {
     id: store.nextDeviceId++,
     ...input,
     lastSeenAt: new Date().toISOString(),
   };
   store.devices.unshift(device);
-  saveStore(store);
+  await saveStore(store);
   return device;
 }
 
-export function addEnvironmentalReading(input: Omit<EnvironmentalReadingRecord, 'id' | 'recordedAt'>) {
-  const store = loadStore();
+export async function addEnvironmentalReading(input: Omit<EnvironmentalReadingRecord, 'id' | 'recordedAt'>) {
+  const store = await loadStore();
   const reading: EnvironmentalReadingRecord = {
     id: store.nextEnvironmentalReadingId++,
     ...input,
@@ -171,12 +145,12 @@ export function addEnvironmentalReading(input: Omit<EnvironmentalReadingRecord, 
   store.environmentalReadings.unshift(reading);
   const device = store.devices.find((item) => item.id === input.deviceId);
   if (device) device.lastSeenAt = reading.recordedAt;
-  saveStore(store);
+  await saveStore(store);
   return reading;
 }
 
-export function addAccessControlEvent(input: Omit<AccessControlEventRecord, 'id' | 'recordedAt'>) {
-  const store = loadStore();
+export async function addAccessControlEvent(input: Omit<AccessControlEventRecord, 'id' | 'recordedAt'>) {
+  const store = await loadStore();
   const event: AccessControlEventRecord = {
     id: store.nextAccessEventId++,
     ...input,
@@ -185,12 +159,12 @@ export function addAccessControlEvent(input: Omit<AccessControlEventRecord, 'id'
   store.accessControlEvents.unshift(event);
   const device = store.devices.find((item) => item.id === input.deviceId);
   if (device) device.lastSeenAt = event.recordedAt;
-  saveStore(store);
+  await saveStore(store);
   return event;
 }
 
-export function addUtilityMeterReading(input: Omit<UtilityMeterReadingRecord, 'id' | 'recordedAt'>) {
-  const store = loadStore();
+export async function addUtilityMeterReading(input: Omit<UtilityMeterReadingRecord, 'id' | 'recordedAt'>) {
+  const store = await loadStore();
   const reading: UtilityMeterReadingRecord = {
     id: store.nextUtilityReadingId++,
     ...input,
@@ -199,12 +173,12 @@ export function addUtilityMeterReading(input: Omit<UtilityMeterReadingRecord, 'i
   store.utilityMeterReadings.unshift(reading);
   const device = store.devices.find((item) => item.id === input.deviceId);
   if (device) device.lastSeenAt = reading.recordedAt;
-  saveStore(store);
+  await saveStore(store);
   return reading;
 }
 
-export function createMaintenanceAlert(input: Omit<MaintenanceAlertRecord, 'id' | 'createdAt'>) {
-  const store = loadStore();
+export async function createMaintenanceAlert(input: Omit<MaintenanceAlertRecord, 'id' | 'createdAt'>) {
+  const store = await loadStore();
   const alert: MaintenanceAlertRecord = {
     id: store.nextMaintenanceAlertId++,
     ...input,
@@ -213,6 +187,6 @@ export function createMaintenanceAlert(input: Omit<MaintenanceAlertRecord, 'id' 
   store.maintenanceAlerts.unshift(alert);
   const device = store.devices.find((item) => item.id === input.deviceId);
   if (device) device.status = 'maintenance';
-  saveStore(store);
+  await saveStore(store);
   return alert;
 }

@@ -1,6 +1,5 @@
-import fs from 'fs';
-import path from 'path';
-import { seedMortgageApplications } from './mortgageApplicationRepository';
+import { listAllMortgageApplicationRecords, updateMortgageApplicationRecord } from './mortgageApplicationRepository';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 type MandateStatus = 'pending' | 'active' | 'suspended' | 'cancelled' | 'expired';
 type GatewayProvider = 'paystack' | 'flutterwave';
@@ -23,10 +22,6 @@ type MortgageApplicationRecord = {
   createdAt: string;
   updatedAt: string;
   metadata?: Record<string, any>;
-};
-
-type MortgageApplicationStore = {
-  applications: MortgageApplicationRecord[];
 };
 
 export interface MortgagePaymentScheduleRecord {
@@ -104,12 +99,6 @@ interface MortgagePaymentStore {
   mandates: AutoDebitMandateRecord[];
 }
 
-const PAYMENT_STORE_PATH = path.join(process.cwd(), 'server', 'data', 'mortgage-payment-store.json');
-const APPLICATION_STORE_PATH = path.join(process.cwd(), 'server', 'data', 'mortgage-application-store.json');
-
-function ensureDir(filePath: string) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-}
 
 function roundCurrency(value: number) {
   return Math.round(Number.isFinite(value) ? value : 0);
@@ -117,37 +106,6 @@ function roundCurrency(value: number) {
 
 function calculateMonthlyRate(interestRate: number) {
   return interestRate / 100 / 12;
-}
-
-function readJsonFile<T>(filePath: string): T | null {
-  try {
-    if (!fs.existsSync(filePath)) return null;
-    return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
-  } catch {
-    return null;
-  }
-}
-
-async function ensureApplicationsStore() {
-  if (!fs.existsSync(APPLICATION_STORE_PATH)) {
-    await seedMortgageApplications();
-  }
-}
-
-async function loadApplications(): Promise<MortgageApplicationRecord[]> {
-  await ensureApplicationsStore();
-  const store = readJsonFile<MortgageApplicationStore>(APPLICATION_STORE_PATH);
-  return Array.isArray(store?.applications) ? store!.applications : [];
-}
-
-function saveApplications(applications: MortgageApplicationRecord[]) {
-  const existing = readJsonFile<MortgageApplicationStore>(APPLICATION_STORE_PATH) ?? { applications: [] };
-  const payload: MortgageApplicationStore = {
-    ...existing,
-    applications,
-  };
-  ensureDir(APPLICATION_STORE_PATH);
-  fs.writeFileSync(APPLICATION_STORE_PATH, JSON.stringify(payload, null, 2));
 }
 
 function defaultStore(): MortgagePaymentStore {
@@ -161,32 +119,16 @@ function defaultStore(): MortgagePaymentStore {
   };
 }
 
-function loadStore(): MortgagePaymentStore {
-  ensureDir(PAYMENT_STORE_PATH);
-  const store = readJsonFile<MortgagePaymentStore>(PAYMENT_STORE_PATH);
-  if (!store) {
-    const seed = defaultStore();
-    fs.writeFileSync(PAYMENT_STORE_PATH, JSON.stringify(seed, null, 2));
-    return seed;
-  }
-
-  return {
-    nextScheduleId: typeof store.nextScheduleId === 'number' ? store.nextScheduleId : 1,
-    nextTransactionId: typeof store.nextTransactionId === 'number' ? store.nextTransactionId : 1,
-    nextMandateId: typeof store.nextMandateId === 'number' ? store.nextMandateId : 1,
-    schedules: Array.isArray(store.schedules) ? store.schedules : [],
-    transactions: Array.isArray(store.transactions) ? store.transactions : [],
-    mandates: Array.isArray(store.mandates) ? store.mandates : [],
-  };
+async function loadStore(): Promise<MortgagePaymentStore> {
+  return readJsonStore<MortgagePaymentStore>('mortgage-payment-store', defaultStore);
 }
 
-function saveStore(store: MortgagePaymentStore) {
-  ensureDir(PAYMENT_STORE_PATH);
-  fs.writeFileSync(PAYMENT_STORE_PATH, JSON.stringify(store, null, 2));
+async function saveStore(store: MortgagePaymentStore) {
+  await writeJsonStore('mortgage-payment-store', store);
 }
 
 async function getApplicationByNumericId(applicationNumericId: number) {
-  const applications = await loadApplications();
+  const applications = await listAllMortgageApplicationRecords();
   const application = applications.find((item) => item.id === applicationNumericId);
   if (!application) {
     throw new Error('Mortgage application not found');
@@ -341,7 +283,7 @@ function maybeSeedMandate(store: MortgagePaymentStore, application: MortgageAppl
 
 async function ensureApplicationArtifacts(applicationNumericId: number) {
   const application = await getApplicationByNumericId(applicationNumericId);
-  const store = loadStore();
+  const store = await loadStore();
 
   const existingSchedule = store.schedules.filter((item) => item.applicationNumericId === applicationNumericId);
   if (existingSchedule.length === 0) {
@@ -351,38 +293,27 @@ async function ensureApplicationArtifacts(applicationNumericId: number) {
     markSeededPayments(store, application, generated, paidInstallments);
     maybeSeedMandate(store, application);
     store.schedules.push(...generated);
-    saveStore(store);
+    await saveStore(store);
   }
 
   return {
     application,
-    store: loadStore(),
+    store: await loadStore(),
   };
 }
 
-function syncApplicationOutstandingBalance(applicationNumericId: number, remainingBalance: number, markDisbursed = false) {
-  const store = readJsonFile<MortgageApplicationStore>(APPLICATION_STORE_PATH);
-  if (!store?.applications) return;
-  const applications = [...store.applications];
-  const index = applications.findIndex((item) => item.id === applicationNumericId);
-  if (index === -1) return;
-
-  const current = applications[index];
+async function syncApplicationOutstandingBalance(applicationNumericId: number, remainingBalance: number, markDisbursed = false) {
   const now = new Date().toISOString();
-  applications[index] = {
-    ...current,
+  await updateMortgageApplicationRecord(applicationNumericId, (current) => ({
     outstandingBalance: remainingBalance,
     status: remainingBalance === 0 ? 'disbursed' : markDisbursed && current.status === 'approved' ? 'disbursed' : current.status,
     disbursedAt: markDisbursed && !current.disbursedAt ? now : current.disbursedAt,
-    updatedAt: now,
     metadata: {
       ...(current.metadata ?? {}),
       lastPaymentSyncAt: now,
       repaymentStatus: remainingBalance === 0 ? 'paid_off' : 'active',
     },
-  };
-
-  saveApplications(applications);
+  }));
 }
 
 function getScheduleForApp(store: MortgagePaymentStore, applicationNumericId: number) {
@@ -466,7 +397,7 @@ export async function createMandateForApplication(input: {
   };
 
   store.mandates.unshift(record);
-  saveStore(store);
+  await saveStore(store);
 
   return {
     mandateId: record.mandateId,
@@ -475,7 +406,7 @@ export async function createMandateForApplication(input: {
 }
 
 export async function suspendMandateRecord(mandateId: string, reason: string) {
-  const store = loadStore();
+  const store = await loadStore();
   const mandate = store.mandates.find((item) => item.mandateId === mandateId);
   if (!mandate) throw new Error('Mandate not found');
 
@@ -483,13 +414,13 @@ export async function suspendMandateRecord(mandateId: string, reason: string) {
   mandate.suspendedAt = new Date().toISOString();
   mandate.cancellationReason = reason;
   mandate.updatedAt = mandate.suspendedAt;
-  saveStore(store);
+  await saveStore(store);
 
   return { success: true, message: 'Mandate suspended successfully' };
 }
 
 export async function reactivateMandateRecord(mandateId: string) {
-  const store = loadStore();
+  const store = await loadStore();
   const mandate = store.mandates.find((item) => item.mandateId === mandateId);
   if (!mandate) throw new Error('Mandate not found');
 
@@ -498,7 +429,7 @@ export async function reactivateMandateRecord(mandateId: string) {
   mandate.suspendedAt = null;
   mandate.failedDebitsCount = 0;
   mandate.updatedAt = updatedAt;
-  saveStore(store);
+  await saveStore(store);
 
   return { success: true, message: 'Mandate reactivated successfully' };
 }
@@ -563,11 +494,11 @@ export async function makeManualPaymentRecord(input: {
   };
 
   store.transactions.unshift(transaction);
-  saveStore(store);
+  await saveStore(store);
 
-  const refreshed = getScheduleForApp(loadStore(), input.applicationId);
+  const refreshed = getScheduleForApp(await loadStore(), input.applicationId);
   const remainingBalance = findNextUnpaidSchedule(refreshed)?.remainingBalance ?? 0;
-  syncApplicationOutstandingBalance(input.applicationId, remainingBalance, true);
+  await syncApplicationOutstandingBalance(input.applicationId, remainingBalance, true);
 
   return {
     success: true,
@@ -609,7 +540,7 @@ export async function getUpcomingPaymentsForApplication(applicationNumericId: nu
 }
 
 export async function listAllMandatesOffline(params: { status?: MandateStatus; limit: number }) {
-  const store = loadStore();
+  const store = await loadStore();
   const mandates = store.mandates
     .filter((item) => !params.status || item.status === params.status)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -618,7 +549,7 @@ export async function listAllMandatesOffline(params: { status?: MandateStatus; l
 }
 
 export async function processAutomaticDebitsOffline() {
-  const store = loadStore();
+  const store = await loadStore();
   let processed = 0;
   let successful = 0;
   let failed = 0;
@@ -668,7 +599,7 @@ export async function processAutomaticDebitsOffline() {
 
       const refreshed = getScheduleForApp(store, mandate.applicationNumericId);
       const remainingBalance = findNextUnpaidSchedule(refreshed)?.remainingBalance ?? 0;
-      syncApplicationOutstandingBalance(mandate.applicationNumericId, remainingBalance, true);
+      await syncApplicationOutstandingBalance(mandate.applicationNumericId, remainingBalance, true);
 
       processed += 1;
       successful += 1;
@@ -684,7 +615,7 @@ export async function processAutomaticDebitsOffline() {
     }
   }
 
-  saveStore(store);
+  await saveStore(store);
   return { processed, successful, failed };
 }
 
@@ -750,8 +681,8 @@ export async function processEarlyPayoffOffline(input: {
     createdAt: now,
   });
 
-  saveStore(store);
-  syncApplicationOutstandingBalance(input.applicationId, 0, true);
+  await saveStore(store);
+  await syncApplicationOutstandingBalance(input.applicationId, 0, true);
 
   return {
     success: true,
@@ -805,8 +736,8 @@ export async function makeExtraPrincipalPaymentOffline(input: {
     createdAt: now,
   });
 
-  saveStore(store);
-  syncApplicationOutstandingBalance(input.applicationId, updatedBalance, true);
+  await saveStore(store);
+  await syncApplicationOutstandingBalance(input.applicationId, updatedBalance, true);
 
   return {
     success: true,

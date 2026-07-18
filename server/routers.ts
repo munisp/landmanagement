@@ -413,10 +413,10 @@ export const appRouter = router({
     overview: protectedProcedure.query(async () => {
       const repo = await import('./supportRepository');
       return {
-        tickets: repo.listSupportTickets(),
-        analytics: repo.getSupportAnalytics(),
-        knowledgeBase: repo.listKnowledgeBaseArticles(),
-        faqs: repo.listFaqs(),
+        tickets: await repo.listSupportTickets(),
+        analytics: await repo.getSupportAnalytics(),
+        knowledgeBase: await repo.listKnowledgeBaseArticles(),
+        faqs: await repo.listFaqs(),
       };
     }),
 
@@ -432,7 +432,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./supportRepository');
-        return repo.createSupportTicket(input);
+        return await repo.createSupportTicket(input);
       }),
 
     addMessage: protectedProcedure
@@ -444,7 +444,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./supportRepository');
-        return repo.addSupportMessage(input);
+        return await repo.addSupportMessage(input);
       }),
 
     updateStatus: protectedProcedure
@@ -454,7 +454,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./supportRepository');
-        return repo.updateSupportTicketStatus(input);
+        return await repo.updateSupportTicketStatus(input);
       }),
 
     createKnowledgeBaseArticle: protectedProcedure
@@ -469,7 +469,7 @@ export const appRouter = router({
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Only privileged users can publish knowledge-base content' });
         }
         const repo = await import('./supportRepository');
-        return repo.createKnowledgeBaseArticle(input);
+        return await repo.createKnowledgeBaseArticle(input);
       }),
 
     createFaq: protectedProcedure
@@ -483,14 +483,14 @@ export const appRouter = router({
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Only privileged users can manage FAQ content' });
         }
         const repo = await import('./supportRepository');
-        return repo.createFaq(input);
+        return await repo.createFaq(input);
       }),
   }),
 
   marketing: router({
     overview: protectedProcedure.query(async () => {
       const repo = await import('./marketingRepository');
-      return repo.getMarketingOverview();
+      return await repo.getMarketingOverview();
     }),
 
     createCampaign: protectedProcedure
@@ -503,7 +503,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./marketingRepository');
-        return repo.createCampaign(input);
+        return await repo.createCampaign(input);
       }),
 
     updateCampaignStatus: protectedProcedure
@@ -513,7 +513,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./marketingRepository');
-        return repo.updateCampaignStatus(input);
+        return await repo.updateCampaignStatus(input);
       }),
 
     createLandingPage: protectedProcedure
@@ -527,7 +527,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./marketingRepository');
-        return repo.createLandingPage(input);
+        return await repo.createLandingPage(input);
       }),
 
     createExperiment: protectedProcedure
@@ -539,14 +539,14 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./marketingRepository');
-        return repo.createExperiment(input);
+        return await repo.createExperiment(input);
       }),
   }),
 
   iot: router({
     overview: protectedProcedure.query(async () => {
       const repo = await import('./iotRepository');
-      return repo.getIoTOverview();
+      return await repo.getIoTOverview();
     }),
 
     registerDevice: protectedProcedure
@@ -559,7 +559,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./iotRepository');
-        return repo.registerIoTDevice(input);
+        return await repo.registerIoTDevice(input);
       }),
 
     addEnvironmentalReading: protectedProcedure
@@ -570,7 +570,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./iotRepository');
-        return repo.addEnvironmentalReading(input);
+        return await repo.addEnvironmentalReading(input);
       }),
 
     addAccessControlEvent: protectedProcedure
@@ -582,7 +582,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./iotRepository');
-        return repo.addAccessControlEvent(input);
+        return await repo.addAccessControlEvent(input);
       }),
 
     addUtilityMeterReading: protectedProcedure
@@ -594,7 +594,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./iotRepository');
-        return repo.addUtilityMeterReading(input);
+        return await repo.addUtilityMeterReading(input);
       }),
 
     createMaintenanceAlert: protectedProcedure
@@ -607,7 +607,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./iotRepository');
-        return repo.createMaintenanceAlert(input);
+        return await repo.createMaintenanceAlert(input);
       }),
   }),
 
@@ -682,7 +682,7 @@ export const appRouter = router({
             surveyorId: ctx.user.id,
           });
         } catch (error) {
-          return createParcel({
+          return await createParcel({
             ...input,
             surveyorId: String(ctx.user.id),
           });
@@ -757,7 +757,7 @@ export const appRouter = router({
         try {
           return await titleService.get('/api/v1/titles', input);
         } catch (error) {
-          return searchTitles(input);
+          return await searchTitles(input);
         }
       }),
 
@@ -767,7 +767,7 @@ export const appRouter = router({
         try {
           return await titleService.get(`/api/v1/titles/${input.id}`);
         } catch (error) {
-          const title = getTitleById(input.id);
+          const title = await getTitleById(input.id);
           if (!title) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Title not found' });
           }
@@ -781,7 +781,7 @@ export const appRouter = router({
         try {
           return await titleService.get(`/api/v1/titles/number/${input.titleNumber}`);
         } catch (error) {
-          const title = getTitleByNumber(input.titleNumber);
+          const title = await getTitleByNumber(input.titleNumber);
           if (!title) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Title not found' });
           }
@@ -794,7 +794,7 @@ export const appRouter = router({
         try {
           return await titleService.get('/api/v1/titles', { ownerId: ctx.user.id });
         } catch (error) {
-          return getTitlesByOwner(Number(ctx.user.id));
+          return await getTitlesByOwner(Number(ctx.user.id));
         }
       }),
 
@@ -810,7 +810,7 @@ export const appRouter = router({
         try {
           return await titleService.post('/api/v1/titles', input);
         } catch (error) {
-          return createTitle(input);
+          return await createTitle(input);
         }
       }),
 
@@ -822,7 +822,7 @@ export const appRouter = router({
             titleId: input.id,
           });
         } catch (error) {
-          return verifyTitle(input.id);
+          return await verifyTitle(input.id);
         }
       }),
   }),
@@ -840,7 +840,7 @@ export const appRouter = router({
         try {
           return await transactionService.get('/api/v1/transactions', input);
         } catch (error) {
-          return listTransactions(input);
+          return await listTransactions(input);
         }
       }),
 
@@ -850,7 +850,7 @@ export const appRouter = router({
         try {
           return await transactionService.get(`/api/v1/transactions/${input.id}`);
         } catch (error) {
-          const transaction = getTransactionById(input.id);
+          const transaction = await getTransactionById(input.id);
           if (!transaction) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Transaction not found' });
           }
@@ -865,7 +865,7 @@ export const appRouter = router({
             initiatorId: ctx.user.id,
           });
         } catch (error) {
-          const fallback = listTransactions({ page: 1, limit: 100 });
+          const fallback = await listTransactions({ page: 1, limit: 100 });
           return fallback.transactions.filter((transaction) => transaction.initiatorId === Number(ctx.user.id));
         }
       }),
@@ -885,7 +885,7 @@ export const appRouter = router({
             initiatorId: ctx.user.id,
           });
         } catch (error) {
-          const created = createTransaction({
+          const created = await createTransaction({
             type: input.type,
             parcelId: input.parcelId,
             initiatorId: Number(ctx.user.id),
@@ -913,7 +913,7 @@ export const appRouter = router({
             approverId: ctx.user.id,
           });
         } catch (error) {
-          result = advanceTransaction(input.id, 'approve');
+          result = await advanceTransaction(input.id, 'approve');
         }
 
         if (result.initiatorId) {
@@ -941,7 +941,7 @@ export const appRouter = router({
             reason: input.reason,
           });
         } catch (error) {
-          result = advanceTransaction(input.id, 'reject');
+          result = await advanceTransaction(input.id, 'reject');
         }
 
         if (result.initiatorId) {
@@ -963,7 +963,7 @@ export const appRouter = router({
         try {
           return await transactionService.post(`/api/v1/transactions/${input.id}/complete`, {});
         } catch (error) {
-          return advanceTransaction(input.id, 'complete');
+          return await advanceTransaction(input.id, 'complete');
         }
       }),
   }),
@@ -979,7 +979,7 @@ export const appRouter = router({
           });
         } catch (error) {
           return {
-            payments: listPaymentsByTransaction(input.transactionId),
+            payments: await listPaymentsByTransaction(input.transactionId),
           };
         }
       }),
@@ -998,7 +998,7 @@ export const appRouter = router({
             payerId: ctx.user.id,
           });
         } catch (error) {
-          return processPaymentRecord({
+          return await processPaymentRecord({
             transactionId: input.transactionId,
             payerId: Number(ctx.user.id),
             amount: input.amount,
@@ -1014,7 +1014,7 @@ export const appRouter = router({
         try {
           return await paymentService.post(`/api/v1/payments/${input.id}/confirm`, {});
         } catch (error) {
-          return confirmPaymentRecord(input.id);
+          return await confirmPaymentRecord(input.id);
         }
       }),
 
@@ -1022,7 +1022,7 @@ export const appRouter = router({
       .input(z.object({ transactionId: z.number() }))
       .mutation(async ({ input }) => {
         const buffer = await generatePaymentReceiptPdf(input.transactionId);
-        const { payment } = buildPaymentReceipt(input.transactionId);
+        const { payment } = await buildPaymentReceipt(input.transactionId);
         return {
           data: buffer.toString('base64'),
           filename: `${payment.receiptNumber || payment.reference}.pdf`,
@@ -1036,7 +1036,7 @@ export const appRouter = router({
   documents: router({
     list: publicProcedure
       .query(async () => {
-        return listAllDocuments();
+        return await listAllDocuments();
       }),
 
     getByParcel: publicProcedure
@@ -1047,7 +1047,7 @@ export const appRouter = router({
             parcelId: input.parcelId,
           });
         } catch (error) {
-          return getDocumentsByParcel(input.parcelId);
+          return await getDocumentsByParcel(input.parcelId);
         }
       }),
 
@@ -1059,7 +1059,7 @@ export const appRouter = router({
             transactionId: input.transactionId,
           });
         } catch (error) {
-          return getDocumentsByTransaction(input.transactionId);
+          return await getDocumentsByTransaction(input.transactionId);
         }
       }),
 
@@ -1084,7 +1084,7 @@ export const appRouter = router({
             uploadedBy: ctx.user.id,
           });
         } catch (error) {
-          return uploadDocumentRecord({
+          return await uploadDocumentRecord({
             ...input,
             uploadedBy: ctx.user.id,
           });
@@ -1099,7 +1099,7 @@ export const appRouter = router({
             verifierId: ctx.user.id,
           });
         } catch (error) {
-          return verifyDocumentRecord({
+          return await verifyDocumentRecord({
             id: input.id,
             verifierId: ctx.user.id,
           });
@@ -1113,7 +1113,7 @@ export const appRouter = router({
       .input(z.object({ hash: z.string() }))
       .query(async ({ input }) => {
         const { verifyBlockchainTransaction } = await import('./blockchainExplorerRepository');
-        const repositoryResult = verifyBlockchainTransaction(input.hash);
+        const repositoryResult = await verifyBlockchainTransaction(input.hash);
         if (repositoryResult.verified) {
           return repositoryResult;
         }
@@ -1264,7 +1264,7 @@ export const appRouter = router({
         try {
           return await odmService.submitDroneImagery(input);
         } catch (error) {
-          return createDroneProcessingTask(input);
+          return await createDroneProcessingTask(input);
         }
       }),
 
@@ -1274,7 +1274,7 @@ export const appRouter = router({
         try {
           return await odmService.getTaskStatus(input.taskId);
         } catch (error) {
-          const task = getDroneProcessingTask(input.taskId);
+          const task = await getDroneProcessingTask(input.taskId);
           if (!task) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Drone processing task not found' });
           }
@@ -1287,7 +1287,7 @@ export const appRouter = router({
         try {
           return await odmService.listTasks();
         } catch (error) {
-          return listDroneProcessingTasks();
+          return await listDroneProcessingTasks();
         }
       }),
 
@@ -1298,7 +1298,7 @@ export const appRouter = router({
           await odmService.cancelTask(input.taskId);
           return { success: true };
         } catch (error) {
-          const success = cancelDroneProcessingTask(input.taskId);
+          const success = await cancelDroneProcessingTask(input.taskId);
           if (!success) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Drone processing task not found' });
           }
@@ -1336,7 +1336,7 @@ export const appRouter = router({
         try {
           return await firsService.calculatePropertyTax(input);
         } catch (error) {
-          return calculateTaxAssessment(input);
+          return await calculateTaxAssessment(input);
         }
       }),
 
@@ -1360,7 +1360,7 @@ export const appRouter = router({
         try {
           return await firsService.getTaxHistory(input.parcelId);
         } catch (error) {
-          return getTaxHistoryByParcel(input.parcelId);
+          return await getTaxHistoryByParcel(input.parcelId);
         }
       }),
 
@@ -1378,7 +1378,7 @@ export const appRouter = router({
             input.paymentMethod
           );
         } catch (error) {
-          return submitTaxPaymentRecord(
+          return await submitTaxPaymentRecord(
             input.assessmentId,
             input.amount,
             input.paymentMethod
@@ -1390,7 +1390,7 @@ export const appRouter = router({
       .input(z.object({ tin: z.string() }))
       .query(async ({ input }) => {
         const remote = await firsService.verifyTIN(input.tin);
-        return remote.valid ? remote : verifyTinRecord(input.tin);
+        return remote.valid ? remote : await verifyTinRecord(input.tin);
       }),
 
     generateClearance: protectedProcedure
@@ -1407,7 +1407,7 @@ export const appRouter = router({
             input.ownerTin
           );
         } catch (error) {
-          return generateTaxClearanceRecord(
+          return await generateTaxClearanceRecord(
             input.parcelId,
             input.ownerName,
             input.ownerTin
@@ -1421,7 +1421,7 @@ export const appRouter = router({
         try {
           return await firsService.verifyTaxClearance(input.certificateId);
         } catch (error) {
-          const clearance = verifyTaxClearanceRecord(input.certificateId);
+          const clearance = await verifyTaxClearanceRecord(input.certificateId);
           if (!clearance) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Tax clearance certificate not found' });
           }
@@ -1708,7 +1708,7 @@ export const appRouter = router({
 
         if (!db) {
           const { listActivityLogs } = await import('./activityLogRepository');
-          return listActivityLogs({ limit: input.limit }).map((r) => ({
+          return (await listActivityLogs({ limit: input.limit })).map((r) => ({
             id: String(r.id),
             userId: r.userId,
             userName: r.userName,
@@ -1760,7 +1760,7 @@ export const appRouter = router({
 
         if (!db) {
           const { listSavedSearches } = await import('./savedSearchRepository');
-          return listSavedSearches(ctx.user.id).map((r) => ({
+          return (await listSavedSearches(ctx.user.id)).map((r) => ({
             id: String(r.id),
             name: r.name,
             query: r.query,
@@ -1798,7 +1798,7 @@ export const appRouter = router({
 
         if (!db) {
           const { createSavedSearch } = await import('./savedSearchRepository');
-          const result = createSavedSearch({
+          const result = await createSavedSearch({
             userId: ctx.user.id,
             name: input.name,
             query: input.query,
@@ -1828,7 +1828,7 @@ export const appRouter = router({
 
         if (!db) {
           const { deleteSavedSearch } = await import('./savedSearchRepository');
-          return deleteSavedSearch({ id: parseInt(input.id), userId: ctx.user.id });
+          return await deleteSavedSearch({ id: parseInt(input.id), userId: ctx.user.id });
         }
 
         const { savedSearches } = await import('../drizzle/schema');
@@ -1856,7 +1856,7 @@ export const appRouter = router({
 
         if (!db) {
           const { toggleSavedSearchFavorite } = await import('./savedSearchRepository');
-          toggleSavedSearchFavorite({ id: parseInt(input.id), userId: ctx.user.id });
+          await toggleSavedSearchFavorite({ id: parseInt(input.id), userId: ctx.user.id });
           return { success: true };
         }
 
@@ -2237,9 +2237,9 @@ export const appRouter = router({
   stats: router({
     dashboard: protectedProcedure
       .query(async () => {
-        const parcelFallback = searchParcelRepository({ page: 1, limit: 1000 });
-        const titleFallback = searchTitles({ page: 1, limit: 1000 });
-        const transactionFallback = listTransactions({ page: 1, limit: 1000 });
+        const parcelFallback = await searchParcelRepository({ page: 1, limit: 1000 });
+        const titleFallback = await searchTitles({ page: 1, limit: 1000 });
+        const transactionFallback = await listTransactions({ page: 1, limit: 1000 });
 
         const fallbackStats = {
           parcels: {
@@ -2395,13 +2395,13 @@ export const appRouter = router({
     state: publicProcedure
       .query(async () => {
         const { getBlockchainExplorerState } = await import('./blockchainExplorerRepository');
-        return getBlockchainExplorerState();
+        return await getBlockchainExplorerState();
       }),
     search: publicProcedure
       .input(z.object({ query: z.string().min(1) }))
       .query(async ({ input }) => {
         const { findBlockchainTransaction } = await import('./blockchainExplorerRepository');
-        const result = findBlockchainTransaction(input.query);
+        const result = await findBlockchainTransaction(input.query);
         if (!result) {
           throw new Error('Transaction not found');
         }
@@ -2414,7 +2414,7 @@ export const appRouter = router({
     state: protectedProcedure
       .query(async () => {
         const { getBuildingVisualizationState } = await import('./buildingVisualizationRepository');
-        return getBuildingVisualizationState();
+        return await getBuildingVisualizationState();
       }),
   }),
 
@@ -2423,14 +2423,14 @@ export const appRouter = router({
     state: protectedProcedure
       .query(async () => {
         const { getCollaborationState } = await import('./collaborationRepository');
-        return getCollaborationState();
+        return await getCollaborationState();
       }),
     sendMessage: protectedProcedure
       .input(z.object({ message: z.string().min(1) }))
       .mutation(async ({ input, ctx }) => {
         const { addCollaborationMessage } = await import('./collaborationRepository');
         const sender = ctx.user.fullName || ctx.user.email || `User ${ctx.user.id}`;
-        return addCollaborationMessage(sender, input.message);
+        return await addCollaborationMessage(sender, input.message);
       }),
   }),
 
@@ -2439,7 +2439,7 @@ export const appRouter = router({
     state: protectedProcedure
       .query(async () => {
         const { getGovernmentIntegrationState } = await import('./governmentIntegrationRepository');
-        const state = getGovernmentIntegrationState();
+        const state = await getGovernmentIntegrationState();
         return {
           integrations: state.integrations.map((item) => ({ ...item, lastSync: new Date(item.lastSync) })),
           recentVerifications: state.recentVerifications.map((item) => ({ ...item, timestamp: new Date(item.timestamp) })),
@@ -2450,8 +2450,8 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const { verifyNin } = await import('./identityVerificationRepository');
         const { recordGovernmentVerification } = await import('./governmentIntegrationRepository');
-        const profile = verifyNin(ctx.user.id, input.nin);
-        const verification = recordGovernmentVerification({
+        const profile = await verifyNin(ctx.user.id, input.nin);
+        const verification = await recordGovernmentVerification({
           type: 'NIN Verification',
           identifier: input.nin,
           name: profile.fullName,
@@ -2464,8 +2464,8 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const { verifyBvn } = await import('./identityVerificationRepository');
         const { recordGovernmentVerification } = await import('./governmentIntegrationRepository');
-        const profile = verifyBvn(ctx.user.id, input.bvn);
-        const verification = recordGovernmentVerification({
+        const profile = await verifyBvn(ctx.user.id, input.bvn);
+        const verification = await recordGovernmentVerification({
           type: 'BVN Verification',
           identifier: input.bvn,
           name: profile.fullName,
@@ -2477,16 +2477,16 @@ export const appRouter = router({
       .input(z.object({ cac: z.string().min(2) }))
       .mutation(async ({ input }) => {
         const { verifyCacRegistration } = await import('./governmentIntegrationRepository');
-        return verifyCacRegistration(input.cac);
+        return await verifyCacRegistration(input.cac);
       }),
     verifyTin: protectedProcedure
       .input(z.object({ tin: z.string().min(5) }))
       .mutation(async ({ input }) => {
         const { recordGovernmentVerification } = await import('./governmentIntegrationRepository');
         const remote = await firsService.verifyTIN(input.tin);
-        const fallback = verifyTinRecord(input.tin);
+        const fallback = await verifyTinRecord(input.tin);
         const result = remote.valid ? remote : fallback;
-        const verification = recordGovernmentVerification({
+        const verification = await recordGovernmentVerification({
           type: 'Tax Verification',
           identifier: input.tin,
           name: result.taxpayerName || 'Unknown Taxpayer',
@@ -2501,7 +2501,7 @@ export const appRouter = router({
     state: protectedProcedure
       .query(async () => {
         const { getSurveyEquipmentState } = await import('./surveyEquipmentRepository');
-        const state = getSurveyEquipmentState();
+        const state = await getSurveyEquipmentState();
         return {
           connectedDevices: state.connectedDevices.map((item) => ({ ...item, lastSync: new Date(item.lastSync) })),
           recentImports: state.recentImports.map((item) => ({ ...item, timestamp: new Date(item.timestamp) })),
@@ -2515,7 +2515,7 @@ export const appRouter = router({
     state: protectedProcedure
       .query(async () => {
         const { getWorkflowDesignerState } = await import('./workflowDesignerRepository');
-        const state = getWorkflowDesignerState();
+        const state = await getWorkflowDesignerState();
         return {
           ...state,
           activeWorkflows: state.activeWorkflows.map((item) => ({
@@ -2531,7 +2531,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const { createWorkflowInstance } = await import('./workflowDesignerRepository');
-        const created = createWorkflowInstance(input);
+        const created = await createWorkflowInstance(input);
         return {
           ...created,
           startedAt: new Date(created.startedAt),
@@ -2544,7 +2544,7 @@ export const appRouter = router({
     state: protectedProcedure
       .query(async () => {
         const { getComplianceDashboardState } = await import('./complianceDashboardRepository');
-        const state = getComplianceDashboardState();
+        const state = await getComplianceDashboardState();
         return {
           ...state,
           regulations: state.regulations.map((item) => ({
@@ -2569,7 +2569,7 @@ export const appRouter = router({
     state: protectedProcedure
       .query(async () => {
         const { getBackupRecoveryState } = await import('./backupRecoveryRepository');
-        const state = getBackupRecoveryState();
+        const state = await getBackupRecoveryState();
         return {
           ...state,
           schedule: {
@@ -2591,7 +2591,7 @@ export const appRouter = router({
     initiateBackup: protectedProcedure
       .mutation(async () => {
         const { initiateBackupRun } = await import('./backupRecoveryRepository');
-        const backup = initiateBackupRun();
+        const backup = await initiateBackupRun();
         return {
           ...backup,
           timestamp: new Date(backup.timestamp),
@@ -2602,7 +2602,7 @@ export const appRouter = router({
       .input(z.object({ recoveryPointId: z.number() }))
       .mutation(async ({ input }) => {
         const { restoreFromRecoveryPoint } = await import('./backupRecoveryRepository');
-        const result = restoreFromRecoveryPoint(input.recoveryPointId);
+        const result = await restoreFromRecoveryPoint(input.recoveryPointId);
         return {
           ...result,
           restoredAt: new Date(result.restoredAt),
@@ -2615,7 +2615,7 @@ export const appRouter = router({
     profile: protectedProcedure
       .query(async ({ ctx }) => {
         const { getIdentityProfile } = await import('./identityVerificationRepository');
-        const profile = getIdentityProfile(ctx.user.id);
+        const profile = await getIdentityProfile(ctx.user.id);
         return {
           ...profile,
           nin: {
@@ -2637,7 +2637,7 @@ export const appRouter = router({
       .input(z.object({ nin: z.string().length(11) }))
       .mutation(async ({ input, ctx }) => {
         const { verifyNin } = await import('./identityVerificationRepository');
-        const profile = verifyNin(ctx.user.id, input.nin);
+        const profile = await verifyNin(ctx.user.id, input.nin);
         return {
           status: profile.nin.status,
           fullName: profile.fullName,
@@ -2651,7 +2651,7 @@ export const appRouter = router({
       .input(z.object({ bvn: z.string().length(11) }))
       .mutation(async ({ input, ctx }) => {
         const { verifyBvn } = await import('./identityVerificationRepository');
-        const profile = verifyBvn(ctx.user.id, input.bvn);
+        const profile = await verifyBvn(ctx.user.id, input.bvn);
         return {
           status: profile.bvn.status,
           fullName: profile.fullName,
@@ -2667,7 +2667,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const { uploadKycDocument } = await import('./identityVerificationRepository');
-        const document = uploadKycDocument(ctx.user.id, input);
+        const document = await uploadKycDocument(ctx.user.id, input);
         return {
           ...document,
           uploadedAt: new Date(document.uploadedAt),
@@ -2784,7 +2784,7 @@ export const appRouter = router({
     responseOverview: protectedProcedure
       .query(async () => {
         const repo = await import('./securityResponseRepository');
-        return repo.getSecurityResponseOverview();
+        return await repo.getSecurityResponseOverview();
       }),
 
     createBehavioralSignal: protectedProcedure
@@ -2798,7 +2798,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./securityResponseRepository');
-        return repo.createBehavioralSignal(input);
+        return await repo.createBehavioralSignal(input);
       }),
 
     registerHoneypotEvent: protectedProcedure
@@ -2810,14 +2810,14 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./securityResponseRepository');
-        return repo.registerHoneypotEvent(input);
+        return await repo.registerHoneypotEvent(input);
       }),
 
     createIncidentFromHoneypot: protectedProcedure
       .input(z.object({ eventId: z.number() }))
       .mutation(async ({ input }) => {
         const repo = await import('./securityResponseRepository');
-        return repo.createIncidentFromHoneypot(input.eventId);
+        return await repo.createIncidentFromHoneypot(input.eventId);
       }),
 
     updateIncidentStatus: protectedProcedure
@@ -2827,7 +2827,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const repo = await import('./securityResponseRepository');
-        return repo.updateIncidentStatus(input);
+        return await repo.updateIncidentStatus(input);
       }),
 
     blockIP: protectedProcedure
@@ -3027,7 +3027,7 @@ export const appRouter = router({
           );
         } catch (error) {
           const { createOfflinePropertyTransfer } = await import('./blockchainTransactionsRepository');
-          return createOfflinePropertyTransfer(input);
+          return await createOfflinePropertyTransfer(input);
         }
       }),
 
@@ -3066,7 +3066,7 @@ export const appRouter = router({
           );
         } catch (error) {
           const { createOfflineEscrow } = await import('./blockchainTransactionsRepository');
-          return createOfflineEscrow(input);
+          return await createOfflineEscrow(input);
         }
       }),
 
@@ -3118,7 +3118,7 @@ export const appRouter = router({
           return await service.getTransactionHistory(input.parcelId, input.limit);
         } catch (error) {
           const { listBlockchainTransactions } = await import('./blockchainTransactionsRepository');
-          return listBlockchainTransactions(input);
+          return await listBlockchainTransactions(input);
         }
       }),
   }),

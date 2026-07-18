@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export interface OfflineMojaloopTransaction {
   transactionId: string;
@@ -40,12 +39,6 @@ interface OfflineMojaloopStore {
   transactions: OfflineMojaloopTransaction[];
 }
 
-const dataDir = path.join(process.cwd(), 'server', 'data');
-const storePath = path.join(dataDir, 'mojaloop-transactions.json');
-
-function ensureDataDir() {
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-}
 
 function seededStore(): OfflineMojaloopStore {
   return {
@@ -92,45 +85,36 @@ function revive(tx: OfflineMojaloopTransaction): OfflineMojaloopTransaction {
   };
 }
 
-function loadStore(): OfflineMojaloopStore {
-  ensureDataDir();
-  if (!fs.existsSync(storePath)) {
-    const seeded = seededStore();
-    fs.writeFileSync(storePath, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
-  const parsed = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as OfflineMojaloopStore;
-  parsed.transactions = parsed.transactions.map(revive);
-  return parsed;
+async function loadStore(): Promise<OfflineMojaloopStore> {
+  return readJsonStore<OfflineMojaloopStore>('mojaloop-transactions', seededStore);
 }
 
-function saveStore(store: OfflineMojaloopStore) {
-  ensureDataDir();
-  fs.writeFileSync(storePath, JSON.stringify(store, null, 2));
+async function saveStore(store: OfflineMojaloopStore) {
+  await writeJsonStore('mojaloop-transactions', store);
 }
 
-export function createOfflineMojaloopTransaction(tx: OfflineMojaloopTransaction) {
-  const store = loadStore();
+export async function createOfflineMojaloopTransaction(tx: OfflineMojaloopTransaction) {
+  const store = await loadStore();
   store.transactions.unshift(tx);
-  saveStore(store);
+  await saveStore(store);
   return tx;
 }
 
-export function getOfflineMojaloopTransaction(transactionId: string) {
-  const store = loadStore();
+export async function getOfflineMojaloopTransaction(transactionId: string) {
+  const store = await loadStore();
   return store.transactions.find((tx) => tx.transactionId === transactionId) ?? null;
 }
 
-export function listOfflineMojaloopTransactions(userId: number, limit = 10) {
-  const store = loadStore();
+export async function listOfflineMojaloopTransactions(userId: number, limit = 10) {
+  const store = await loadStore();
   return store.transactions.filter((tx) => tx.userId === userId).slice(0, limit);
 }
 
-export function updateOfflineMojaloopTransaction(transactionId: string, patch: Partial<OfflineMojaloopTransaction>) {
-  const store = loadStore();
+export async function updateOfflineMojaloopTransaction(transactionId: string, patch: Partial<OfflineMojaloopTransaction>) {
+  const store = await loadStore();
   const tx = store.transactions.find((item) => item.transactionId === transactionId);
   if (!tx) return null;
   Object.assign(tx, patch, { updatedAt: new Date() });
-  saveStore(store);
+  await saveStore(store);
   return tx;
 }

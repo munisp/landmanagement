@@ -38,19 +38,19 @@ function titleCase(value: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function getAllParcels() {
-  const result = searchParcels({ page: 1, limit: 1000 });
+async function getAllParcels() {
+  const result = await searchParcels({ page: 1, limit: 1000 });
   return result.parcels;
 }
 
-function getAllTransactions() {
-  const result = listTransactions({ page: 1, limit: 1000 });
+async function getAllTransactions() {
+  const result = await listTransactions({ page: 1, limit: 1000 });
   return result.transactions;
 }
 
 export class AnalyticsService {
   async getParcelDistributionByState(): Promise<ParcelDistribution[]> {
-    const parcels = getAllParcels();
+    const parcels = await getAllParcels();
     const grouped = parcels.reduce<Record<string, number>>((acc, parcel) => {
       acc[parcel.state] = (acc[parcel.state] || 0) + 1;
       return acc;
@@ -62,7 +62,7 @@ export class AnalyticsService {
   }
 
   async getParcelDistributionByLandUse(): Promise<LandUseDistribution[]> {
-    const parcels = getAllParcels();
+    const parcels = await getAllParcels();
     const grouped = parcels.reduce<Record<string, number>>((acc, parcel) => {
       const landUse = titleCase(parcel.landUseType || 'unknown');
       acc[landUse] = (acc[landUse] || 0) + 1;
@@ -75,7 +75,7 @@ export class AnalyticsService {
   }
 
   async getTransactionTrends(): Promise<TransactionTrend[]> {
-    const transactions = getAllTransactions();
+    const transactions = await getAllTransactions();
     const now = new Date();
     const buckets: { key: string; label: string; count: number; revenue: number }[] = [];
 
@@ -103,7 +103,7 @@ export class AnalyticsService {
   }
 
   async getRevenueBreakdown(): Promise<RevenueBreakdown[]> {
-    const transactions = getAllTransactions();
+    const transactions = await getAllTransactions();
     const grouped = transactions.reduce<Record<string, number>>((acc, transaction) => {
       const category = titleCase(transaction.type);
       acc[category] = (acc[category] || 0) + transaction.considerationAmount;
@@ -122,8 +122,8 @@ export class AnalyticsService {
   }
 
   async getAnalyticsMetrics(): Promise<AnalyticsMetrics> {
-    const parcels = getAllParcels();
-    const transactions = getAllTransactions();
+    const parcels = await getAllParcels();
+    const transactions = await getAllTransactions();
     const totalRevenue = transactions.reduce((sum, transaction) => sum + transaction.considerationAmount, 0);
     const approvedTransactions = transactions.filter((transaction) => ['registered', 'completed'].includes(transaction.status)).length;
     const pendingTransactions = transactions.filter((transaction) => ['draft', 'pending_approval', 'pending_payment', 'in_review'].includes(transaction.status)).length;
@@ -139,7 +139,7 @@ export class AnalyticsService {
   }
 
   async getParcelStatusDistribution(): Promise<{ status: string; count: number }[]> {
-    const parcels = getAllParcels();
+    const parcels = await getAllParcels();
     const grouped = parcels.reduce<Record<string, number>>((acc, parcel) => {
       const status = titleCase(parcel.status);
       acc[status] = (acc[status] || 0) + 1;
@@ -152,7 +152,7 @@ export class AnalyticsService {
   }
 
   async getTransactionStatusDistribution(): Promise<{ status: string; count: number }[]> {
-    const transactions = getAllTransactions();
+    const transactions = await getAllTransactions();
     const grouped = transactions.reduce<Record<string, number>>((acc, transaction) => {
       const status = titleCase(transaction.status);
       acc[status] = (acc[status] || 0) + 1;

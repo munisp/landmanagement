@@ -1,6 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import { getParcelById } from './parcelRepository';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export interface MarketplaceListingRecord {
   id: number;
@@ -67,14 +66,6 @@ interface MarketplaceStore {
   nextFavoriteId: number;
 }
 
-const dataDir = path.join(process.cwd(), 'server', 'data');
-const storePath = path.join(dataDir, 'marketplace-store.json');
-
-function ensureDataDir() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-}
 
 function seedStore(): MarketplaceStore {
   return {
@@ -169,30 +160,15 @@ function seedStore(): MarketplaceStore {
   };
 }
 
-function loadStore(): MarketplaceStore {
-  ensureDataDir();
-  if (!fs.existsSync(storePath)) {
-    const initial = seedStore();
-    fs.writeFileSync(storePath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  const parsed = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as MarketplaceStore;
-  if (!Array.isArray(parsed.listings) || !Array.isArray(parsed.bids) || !Array.isArray(parsed.escrow) || !Array.isArray(parsed.favorites)) {
-    const initial = seedStore();
-    fs.writeFileSync(storePath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  return parsed;
+async function loadStore(): Promise<MarketplaceStore> {
+  return readJsonStore<MarketplaceStore>('marketplace-store', seedStore);
 }
 
-function saveStore(store: MarketplaceStore) {
-  ensureDataDir();
-  fs.writeFileSync(storePath, JSON.stringify(store, null, 2));
+async function saveStore(store: MarketplaceStore) {
+  await writeJsonStore('marketplace-store', store);
 }
 
-export function listMarketplaceListings(input: {
+export async function listMarketplaceListings(input: {
   listingType?: 'sale' | 'lease' | 'auction' | 'all';
   minPrice?: number;
   maxPrice?: number;
@@ -200,7 +176,7 @@ export function listMarketplaceListings(input: {
   page?: number;
   pageSize?: number;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const page = input.page ?? 1;
   const pageSize = input.pageSize ?? 20;
 
@@ -223,21 +199,21 @@ export function listMarketplaceListings(input: {
   };
 }
 
-export function getMarketplaceListing(listingId: number, incrementView = false) {
-  const store = loadStore();
+export async function getMarketplaceListing(listingId: number, incrementView = false) {
+  const store = await loadStore();
   const listing = store.listings.find((item) => item.id === listingId) ?? null;
   if (!listing) return null;
 
   if (incrementView) {
     listing.viewCount += 1;
     listing.updatedAt = new Date().toISOString();
-    saveStore(store);
+    await saveStore(store);
   }
 
   return listing;
 }
 
-export function createMarketplaceListing(input: {
+export async function createMarketplaceListing(input: {
   parcelId: number;
   sellerId: number;
   title: string;
@@ -251,12 +227,12 @@ export function createMarketplaceListing(input: {
   images?: string[];
   features?: string[];
 }) {
-  const parcel = getParcelById(input.parcelId);
+  const parcel = await getParcelById(input.parcelId);
   if (!parcel) {
     throw new Error('Parcel not found');
   }
 
-  const store = loadStore();
+  const store = await loadStore();
   const now = new Date().toISOString();
   const listing: MarketplaceListingRecord = {
     id: store.nextListingId,
@@ -281,11 +257,11 @@ export function createMarketplaceListing(input: {
 
   store.listings.unshift(listing);
   store.nextListingId += 1;
-  saveStore(store);
+  await saveStore(store);
   return listing;
 }
 
-export function updateMarketplaceListing(input: {
+export async function updateMarketplaceListing(input: {
   listingId: number;
   sellerId: number;
   title?: string;
@@ -293,7 +269,7 @@ export function updateMarketplaceListing(input: {
   price?: number;
   status?: 'active' | 'sold' | 'cancelled' | 'expired';
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const listing = store.listings.find((item) => item.id === input.listingId);
   if (!listing) throw new Error('Listing not found');
   if (listing.sellerId !== input.sellerId) throw new Error('You do not own this listing');
@@ -303,7 +279,7 @@ export function updateMarketplaceListing(input: {
   if (input.price !== undefined) listing.price = String(input.price);
   if (input.status) listing.status = input.status;
   listing.updatedAt = new Date().toISOString();
-  saveStore(store);
+  await saveStore(store);
   return listing;
 }
 
@@ -311,21 +287,21 @@ export function deleteMarketplaceListing(listingId: number, sellerId: number) {
   return updateMarketplaceListing({ listingId, sellerId, status: 'cancelled' });
 }
 
-export function getMyMarketplaceListings(sellerId: number, status?: 'active' | 'sold' | 'cancelled' | 'expired' | 'all') {
-  const listings = loadStore().listings.filter((listing) => listing.sellerId === sellerId && (!status || status === 'all' || listing.status === status));
+export async function getMyMarketplaceListings(sellerId: number, status?: 'active' | 'sold' | 'cancelled' | 'expired' | 'all') {
+  const listings = (await loadStore()).listings.filter((listing) => listing.sellerId === sellerId && (!status || status === 'all' || listing.status === status));
   return {
     listings,
     total: listings.length,
   };
 }
 
-export function placeMarketplaceBid(input: {
+export async function placeMarketplaceBid(input: {
   listingId: number;
   bidderId: number;
   bidAmount: number;
   message?: string;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const listing = store.listings.find((item) => item.id === input.listingId);
   if (!listing) throw new Error('Listing not found');
   if (listing.listingType !== 'auction') throw new Error('This listing is not an auction');
@@ -357,34 +333,34 @@ export function placeMarketplaceBid(input: {
   store.nextBidId += 1;
   listing.currentBid = String(input.bidAmount);
   listing.updatedAt = bid.createdAt;
-  saveStore(store);
+  await saveStore(store);
   return bid;
 }
 
-export function getMarketplaceBids(listingId: number) {
-  const bids = loadStore().bids.filter((bid) => bid.listingId === listingId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+export async function getMarketplaceBids(listingId: number) {
+  const bids = (await loadStore()).bids.filter((bid) => bid.listingId === listingId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return {
     bids,
     highestBid: bids.length > 0 ? parseFloat(bids[0].bidAmount) : 0,
   };
 }
 
-export function getMyMarketplaceBids(bidderId: number) {
-  const bids = loadStore().bids.filter((bid) => bid.bidderId === bidderId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+export async function getMyMarketplaceBids(bidderId: number) {
+  const bids = (await loadStore()).bids.filter((bid) => bid.bidderId === bidderId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return {
     bids,
     total: bids.length,
   };
 }
 
-export function createMarketplaceEscrow(input: {
+export async function createMarketplaceEscrow(input: {
   listingId: number;
   sellerId: number;
   buyerId: number;
   amount: number;
   terms: string;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const listing = store.listings.find((item) => item.id === input.listingId);
   if (!listing) throw new Error('Listing not found');
 
@@ -407,17 +383,17 @@ export function createMarketplaceEscrow(input: {
 
   store.escrow.unshift(escrow);
   store.nextEscrowId += 1;
-  saveStore(store);
+  await saveStore(store);
   return escrow;
 }
 
-export function fundMarketplaceEscrow(input: {
+export async function fundMarketplaceEscrow(input: {
   escrowId: number;
   buyerId: number;
   paymentMethod: 'card' | 'bank_transfer' | 'mojaloop';
   paymentReference: string;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const escrow = store.escrow.find((item) => item.id === input.escrowId);
   if (!escrow) throw new Error('Escrow not found');
   if (escrow.buyerId !== input.buyerId) throw new Error('Only the buyer can fund this escrow');
@@ -428,15 +404,15 @@ export function fundMarketplaceEscrow(input: {
   escrow.paymentReference = input.paymentReference;
   escrow.fundedAt = now;
   escrow.updatedAt = now;
-  saveStore(store);
+  await saveStore(store);
   return escrow;
 }
 
-export function releaseMarketplaceEscrow(input: {
+export async function releaseMarketplaceEscrow(input: {
   escrowId: number;
   releaseToSeller: boolean;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const escrow = store.escrow.find((item) => item.id === input.escrowId);
   if (!escrow) throw new Error('Escrow not found');
 
@@ -451,12 +427,12 @@ export function releaseMarketplaceEscrow(input: {
     listing.updatedAt = now;
   }
 
-  saveStore(store);
+  await saveStore(store);
   return escrow;
 }
 
-export function addMarketplaceFavorite(userId: number, listingId: number) {
-  const store = loadStore();
+export async function addMarketplaceFavorite(userId: number, listingId: number) {
+  const store = await loadStore();
   const exists = store.favorites.find((favorite) => favorite.userId === userId && favorite.listingId === listingId);
   if (exists) return exists;
 
@@ -469,19 +445,19 @@ export function addMarketplaceFavorite(userId: number, listingId: number) {
 
   store.favorites.unshift(favorite);
   store.nextFavoriteId += 1;
-  saveStore(store);
+  await saveStore(store);
   return favorite;
 }
 
-export function removeMarketplaceFavorite(userId: number, listingId: number) {
-  const store = loadStore();
+export async function removeMarketplaceFavorite(userId: number, listingId: number) {
+  const store = await loadStore();
   store.favorites = store.favorites.filter((favorite) => !(favorite.userId === userId && favorite.listingId === listingId));
-  saveStore(store);
+  await saveStore(store);
   return { success: true };
 }
 
-export function getMarketplaceFavorites(userId: number) {
-  const store = loadStore();
+export async function getMarketplaceFavorites(userId: number) {
+  const store = await loadStore();
   const listingIds = new Set(store.favorites.filter((favorite) => favorite.userId === userId).map((favorite) => favorite.listingId));
   const favorites = store.listings.filter((listing) => listingIds.has(listing.id));
   return {

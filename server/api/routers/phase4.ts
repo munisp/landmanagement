@@ -130,7 +130,7 @@ export const phase4Router = router({
       }
 
       const updated = !(await getDb())
-        ? updateAdminMortgageApplicationStatus(input.applicationId, input.status, input.rejectionReason)
+        ? await updateAdminMortgageApplicationStatus(input.applicationId, input.status, input.rejectionReason)
         : await phase4Service.updateMortgageApplicationStatus(
             input.applicationId,
             input.status,
@@ -223,7 +223,7 @@ export const phase4Router = router({
       }
 
       const updated = !(await getDb())
-        ? updateAdminTaxClearanceStatus(input.clearanceId, input.status, {
+        ? await updateAdminTaxClearanceStatus(input.clearanceId, input.status, {
             certificateUrl: input.certificateUrl,
             firsReferenceNumber: input.firsReferenceNumber,
           })
@@ -332,7 +332,7 @@ export const phase4Router = router({
       }
 
       const updated = !(await getDb())
-        ? updateAdminInsurancePolicyStatus(input.policyId, input.status)
+        ? await updateAdminInsurancePolicyStatus(input.policyId, input.status)
         : await phase4Service.updateInsurancePolicyStatus(input.policyId, input.status);
 
       // Emit WebSocket event
@@ -432,7 +432,7 @@ export const phase4Router = router({
       }
 
       const updated = !(await getDb())
-        ? updateAdminLegalDocumentStatus(input.documentId, input.status, input.registrationNumber)
+        ? await updateAdminLegalDocumentStatus(input.documentId, input.status, input.registrationNumber)
         : await phase4Service.updateLegalDocumentStatus(
             input.documentId,
             input.status,
@@ -532,7 +532,7 @@ export const phase4Router = router({
       }
 
       const updated = !(await getDb())
-        ? updateAdminCadastralSurveyStatus(input.surveyId, input.status)
+        ? await updateAdminCadastralSurveyStatus(input.surveyId, input.status)
         : await phase4Service.updateCadastralSurveyStatus(
             input.surveyId,
             input.status,
@@ -639,7 +639,7 @@ export const phase4Router = router({
       }
 
       const updated = !(await getDb())
-        ? updateAdminEnvironmentalAssessmentStatus(input.assessmentId, input.status, {
+        ? await updateAdminEnvironmentalAssessmentStatus(input.assessmentId, input.status, {
             conditions: input.conditions,
             rejectionReason: input.rejectionReason,
             certificateUrl: input.certificateUrl,
@@ -743,7 +743,7 @@ export const phase4Router = router({
       }
 
       const updated = !(await getDb())
-        ? updateAdminPublicNoticeStatus(input.noticeId, input.status)
+        ? await updateAdminPublicNoticeStatus(input.noticeId, input.status)
         : await phase4Service.updatePublicNoticeStatus(input.noticeId, input.status);
 
       // Emit WebSocket event
@@ -856,7 +856,7 @@ export const phase4Router = router({
       }
 
       const updated = !(await getDb())
-        ? updateAdminLandUsePlanStatus(input.planId, input.status, {
+        ? await updateAdminLandUsePlanStatus(input.planId, input.status, {
             conditions: input.conditions,
             rejectionReason: input.rejectionReason,
             isCompliant: input.isCompliant,
@@ -906,56 +906,56 @@ export const phase4Router = router({
   getAllMortgageApplications: adminProcedure
     .query(async () => {
       const db = await getDb();
-      if (!db) return listAdminMortgageApplications();
+      if (!db) return await listAdminMortgageApplications();
       return await db.select().from(mortgageApplications);
     }),
 
   getAllTaxClearances: adminProcedure
     .query(async () => {
       const db = await getDb();
-      if (!db) return listAdminTaxClearances();
+      if (!db) return await listAdminTaxClearances();
       return await db.select().from(taxClearances);
     }),
 
   getAllInsurancePolicies: adminProcedure
     .query(async () => {
       const db = await getDb();
-      if (!db) return listAdminInsurancePolicies();
+      if (!db) return await listAdminInsurancePolicies();
       return await db.select().from(insurancePolicies);
     }),
 
   getAllLegalDocuments: adminProcedure
     .query(async () => {
       const db = await getDb();
-      if (!db) return listAdminLegalDocuments();
+      if (!db) return await listAdminLegalDocuments();
       return await db.select().from(legalDocuments);
     }),
 
   getAllCadastralSurveys: adminProcedure
     .query(async () => {
       const db = await getDb();
-      if (!db) return listAdminCadastralSurveys();
+      if (!db) return await listAdminCadastralSurveys();
       return await db.select().from(cadastralSurveys);
     }),
 
   getAllEnvironmentalAssessments: adminProcedure
     .query(async () => {
       const db = await getDb();
-      if (!db) return listAdminEnvironmentalAssessments();
+      if (!db) return await listAdminEnvironmentalAssessments();
       return await db.select().from(environmentalAssessments);
     }),
 
   getAllPublicNotices: adminProcedure
     .query(async () => {
       const db = await getDb();
-      if (!db) return listAdminPublicNotices();
+      if (!db) return await listAdminPublicNotices();
       return await db.select().from(publicNotices);
     }),
 
   getAllLandUsePlans: adminProcedure
     .query(async () => {
       const db = await getDb();
-      if (!db) return listAdminLandUsePlans();
+      if (!db) return await listAdminLandUsePlans();
       return await db.select().from(landUsePlans);
     }),
 });

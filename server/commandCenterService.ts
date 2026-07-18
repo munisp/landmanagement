@@ -58,12 +58,12 @@ export async function getOperationalForecast(): Promise<OperationalForecast> {
   const signals: ForecastSignal[] = [];
 
   // ---- Load operational data (offline-capable repositories) ----------------
-  const allTransactions = transactionRepository.listTransactions({ limit: 10000 }).transactions as any[];
-  const disputeStats = disputeRepository.getDisputeStats() as any;
-  const allDisputes = disputeRepository.listDisputes({ limit: 10000 }).disputes as any[];
+  const allTransactions = (await transactionRepository.listTransactions({ limit: 10000 })).transactions as any[];
+  const disputeStats = (await disputeRepository.getDisputeStats()) as any;
+  const allDisputes = (await disputeRepository.listDisputes({ limit: 10000 })).disputes as any[];
   let verificationBacklog: any[] = [];
   try {
-    verificationBacklog = verificationRepository.listVerificationRequestsOffline({}, 1, 10000).requests as any[];
+    verificationBacklog = (await verificationRepository.listVerificationRequestsOffline({}, 1, 10000)).requests as any[];
   } catch {
     verificationBacklog = [];
   }

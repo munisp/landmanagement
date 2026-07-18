@@ -58,7 +58,7 @@ export const valuationsRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const parcel = getParcelByNumber(input.parcelNumber);
+      const parcel = await getParcelByNumber(input.parcelNumber);
       const actor = ctx.user.name || ctx.user.email || `User ${ctx.user.id}`;
       const dispute = createDispute({
         parcelNumber: input.parcelNumber,

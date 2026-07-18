@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type BehavioralRiskLevel = 'low' | 'medium' | 'high';
 export type HoneypotSeverity = 'medium' | 'high' | 'critical';
@@ -49,12 +48,6 @@ interface SecurityResponseStore {
   incidents: IncidentRecord[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'security-response-store.json');
-
-function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function defaultStore(): SecurityResponseStore {
   return {
@@ -176,36 +169,16 @@ function defaultStore(): SecurityResponseStore {
   };
 }
 
-function loadStore(): SecurityResponseStore {
-  ensureDataDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as SecurityResponseStore;
-    if (!parsed || !Array.isArray(parsed.behavioralSignals) || !Array.isArray(parsed.honeypotEvents) || !Array.isArray(parsed.incidents)) {
-      const store = defaultStore();
-      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-      return store;
-    }
-    return parsed;
-  } catch {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
+async function loadStore(): Promise<SecurityResponseStore> {
+  return readJsonStore<SecurityResponseStore>('security-response-store', defaultStore);
 }
 
-function saveStore(store: SecurityResponseStore) {
-  ensureDataDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function saveStore(store: SecurityResponseStore) {
+  await writeJsonStore('security-response-store', store);
 }
 
-export function getSecurityResponseOverview() {
-  const store = loadStore();
+export async function getSecurityResponseOverview() {
+  const store = await loadStore();
   return {
     behavioralSignals: store.behavioralSignals.slice().sort((a, b) => b.score - a.score),
     honeypotEvents: store.honeypotEvents.slice().sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime()),
@@ -219,8 +192,8 @@ export function getSecurityResponseOverview() {
   };
 }
 
-export function createIncidentFromHoneypot(eventId: number) {
-  const store = loadStore();
+export async function createIncidentFromHoneypot(eventId: number) {
+  const store = await loadStore();
   const event = store.honeypotEvents.find((item) => item.id === eventId);
   if (!event) {
     throw new Error('Honeypot event not found');
@@ -243,12 +216,12 @@ export function createIncidentFromHoneypot(eventId: number) {
 
   event.disposition = 'escalated';
   store.incidents.unshift(incident);
-  saveStore(store);
+  await saveStore(store);
   return incident;
 }
 
-export function updateIncidentStatus(input: { incidentId: number; status: IncidentStatus }) {
-  const store = loadStore();
+export async function updateIncidentStatus(input: { incidentId: number; status: IncidentStatus }) {
+  const store = await loadStore();
   const incident = store.incidents.find((item) => item.id === input.incidentId);
   if (!incident) {
     throw new Error('Incident not found');
@@ -261,11 +234,11 @@ export function updateIncidentStatus(input: { incidentId: number; status: Incide
   if (input.status === 'resolved') {
     incident.automationSteps.unshift('Incident resolution logged and queue closed');
   }
-  saveStore(store);
+  await saveStore(store);
   return incident;
 }
 
-export function createBehavioralSignal(input: {
+export async function createBehavioralSignal(input: {
   userId: number;
   userLabel: string;
   signalType: BehavioralSignalRecord['signalType'];
@@ -273,24 +246,24 @@ export function createBehavioralSignal(input: {
   score: number;
   description: string;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const signal: BehavioralSignalRecord = {
     id: store.nextBehavioralSignalId++,
     ...input,
     createdAt: new Date().toISOString(),
   };
   store.behavioralSignals.unshift(signal);
-  saveStore(store);
+  await saveStore(store);
   return signal;
 }
 
-export function registerHoneypotEvent(input: {
+export async function registerHoneypotEvent(input: {
   sourceIp: string;
   endpoint: string;
   payloadSnippet: string;
   severity: HoneypotSeverity;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const event: HoneypotEventRecord = {
     id: store.nextHoneypotEventId++,
     sourceIp: input.sourceIp,
@@ -301,6 +274,6 @@ export function registerHoneypotEvent(input: {
     disposition: 'observed',
   };
   store.honeypotEvents.unshift(event);
-  saveStore(store);
+  await saveStore(store);
   return event;
 }

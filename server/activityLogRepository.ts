@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export interface ActivityLogRecord {
   id: number;
@@ -16,12 +15,6 @@ interface ActivityLogStore {
   activities: ActivityLogRecord[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'activity-log-store.json');
-
-function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function seededActivities(): ActivityLogRecord[] {
   return [
@@ -63,44 +56,24 @@ function defaultStore(): ActivityLogStore {
   };
 }
 
-function loadStore(): ActivityLogStore {
-  ensureDataDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as ActivityLogStore;
-    if (!Array.isArray(parsed.activities) || typeof parsed.nextId !== 'number') {
-      const store = defaultStore();
-      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-      return store;
-    }
-    return parsed;
-  } catch {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
+async function loadStore(): Promise<ActivityLogStore> {
+  return readJsonStore<ActivityLogStore>('activity-log-store', defaultStore);
 }
 
-function saveStore(store: ActivityLogStore) {
-  ensureDataDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function saveStore(store: ActivityLogStore) {
+  await writeJsonStore('activity-log-store', store);
 }
 
-export function listActivityLogs(input: { limit?: number }) {
+export async function listActivityLogs(input: { limit?: number }) {
   const limit = input.limit ?? 10;
-  return loadStore().activities
+  return (await loadStore()).activities
     .slice()
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, limit);
 }
 
-export function appendActivityLog(input: Omit<ActivityLogRecord, 'id' | 'createdAt'> & { createdAt?: string }) {
-  const store = loadStore();
+export async function appendActivityLog(input: Omit<ActivityLogRecord, 'id' | 'createdAt'> & { createdAt?: string }) {
+  const store = await loadStore();
   const record: ActivityLogRecord = {
     id: store.nextId,
     ...input,
@@ -108,6 +81,6 @@ export function appendActivityLog(input: Omit<ActivityLogRecord, 'id' | 'created
   };
   store.activities.unshift(record);
   store.nextId += 1;
-  saveStore(store);
+  await saveStore(store);
   return record;
 }

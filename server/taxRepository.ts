@@ -1,6 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import { getParcelByNumber } from './parcelRepository';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type TaxStatus = 'pending' | 'paid' | 'overdue' | 'disputed';
 export type PaymentStatus = 'pending' | 'completed' | 'failed';
@@ -75,8 +74,6 @@ interface TaxStore {
   nextClearanceSequence: number;
 }
 
-const dataDir = path.join(process.cwd(), 'server', 'data');
-const storePath = path.join(dataDir, 'tax-store.json');
 
 const taxRates: Record<LandUseType, number> = {
   residential: 0.005,
@@ -85,12 +82,6 @@ const taxRates: Record<LandUseType, number> = {
   agricultural: 0.002,
   mixed: 0.0075,
 };
-
-function ensureDataDir() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-}
 
 function seedTinRegistry(): Record<string, TinVerificationRecord> {
   return {
@@ -250,31 +241,16 @@ function initialStore(): TaxStore {
   };
 }
 
-function loadStore(): TaxStore {
-  ensureDataDir();
-  if (!fs.existsSync(storePath)) {
-    const initial = initialStore();
-    fs.writeFileSync(storePath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  const parsed = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as TaxStore;
-  if (!parsed.assessments || !parsed.payments || !parsed.clearances || !parsed.tins) {
-    const initial = initialStore();
-    fs.writeFileSync(storePath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  return parsed;
+async function loadStore(): Promise<TaxStore> {
+  return readJsonStore<TaxStore>('tax-store', initialStore);
 }
 
-function saveStore(store: TaxStore) {
-  ensureDataDir();
-  fs.writeFileSync(storePath, JSON.stringify(store, null, 2));
+async function saveStore(store: TaxStore) {
+  await writeJsonStore('tax-store', store);
 }
 
-export function calculateTaxAssessment(input: PropertyTaxCalculationInput) {
-  const store = loadStore();
+export async function calculateTaxAssessment(input: PropertyTaxCalculationInput) {
+  const store = await loadStore();
   const existing = store.assessments.find(
     (assessment) => assessment.parcelId === input.parcelId && assessment.taxYear === new Date().getFullYear()
   );
@@ -286,22 +262,22 @@ export function calculateTaxAssessment(input: PropertyTaxCalculationInput) {
   const assessment = buildAssessment(input, store.nextAssessmentSequence, new Date());
   store.assessments.unshift(assessment);
   store.nextAssessmentSequence += 1;
-  saveStore(store);
+  await saveStore(store);
   return assessment;
 }
 
-export function getTaxAssessmentById(assessmentId: string) {
-  return loadStore().assessments.find((assessment) => assessment.assessmentId === assessmentId) ?? null;
+export async function getTaxAssessmentById(assessmentId: string) {
+  return (await loadStore()).assessments.find((assessment) => assessment.assessmentId === assessmentId) ?? null;
 }
 
-export function getTaxHistoryByParcel(parcelId: string) {
-  return loadStore().assessments
+export async function getTaxHistoryByParcel(parcelId: string) {
+  return (await loadStore()).assessments
     .filter((assessment) => assessment.parcelId === parcelId)
     .sort((a, b) => new Date(b.assessmentDate).getTime() - new Date(a.assessmentDate).getTime());
 }
 
-export function submitTaxPaymentRecord(assessmentId: string, amount: number, paymentMethod: TaxPaymentMethod) {
-  const store = loadStore();
+export async function submitTaxPaymentRecord(assessmentId: string, amount: number, paymentMethod: TaxPaymentMethod) {
+  const store = await loadStore();
   const assessment = store.assessments.find((item) => item.assessmentId === assessmentId);
   if (!assessment) {
     throw new Error('Tax assessment not found');
@@ -326,12 +302,12 @@ export function submitTaxPaymentRecord(assessmentId: string, amount: number, pay
   assessment.totalDue = amount;
   store.payments.unshift(payment);
   store.nextPaymentSequence += 1;
-  saveStore(store);
+  await saveStore(store);
   return payment;
 }
 
-export function generateTaxClearanceRecord(parcelId: string, ownerName: string, ownerTin: string) {
-  const store = loadStore();
+export async function generateTaxClearanceRecord(parcelId: string, ownerName: string, ownerTin: string) {
+  const store = await loadStore();
   const parcel = getParcelByNumber(parcelId);
   if (!parcel) {
     throw new Error('Parcel not found in registry continuity store');
@@ -371,17 +347,17 @@ export function generateTaxClearanceRecord(parcelId: string, ownerName: string, 
 
   store.clearances.unshift(record);
   store.nextClearanceSequence += 1;
-  saveStore(store);
+  await saveStore(store);
   return record;
 }
 
-export function verifyTaxClearanceRecord(certificateId: string) {
-  return loadStore().clearances.find((clearance) => clearance.certificateId === certificateId) ?? null;
+export async function verifyTaxClearanceRecord(certificateId: string) {
+  return (await loadStore()).clearances.find((clearance) => clearance.certificateId === certificateId) ?? null;
 }
 
-export function verifyTinRecord(tin: string): TinVerificationRecord {
+export async function verifyTinRecord(tin: string): Promise<TinVerificationRecord> {
   const normalized = tin.trim();
-  const existing = loadStore().tins[normalized];
+  const existing = (await loadStore()).tins[normalized];
   if (existing) {
     return existing;
   }

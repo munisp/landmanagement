@@ -49,7 +49,7 @@ import {
 export async function createMortgageApplication(data: InsertMortgageApplication) {
   const db = await getDb();
   if (!db) {
-    return createAdminMortgageApplication({
+    return await createAdminMortgageApplication({
       applicationId: data.applicationId,
       transactionId: data.transactionId,
       lenderName: data.bankName,
@@ -79,7 +79,7 @@ export async function getMortgageApplicationById(applicationId: string) {
   try {
     const db = await getDb();
     if (!db) {
-      return listAdminMortgageApplications().find((application) => application.applicationId === applicationId)
+      return (await listAdminMortgageApplications()).find((application) => application.applicationId === applicationId)
         ?? await getMortgageApplicationByIdFromRepository(applicationId);
     }
 
@@ -92,7 +92,7 @@ export async function getMortgageApplicationById(applicationId: string) {
     return application;
   } catch (error) {
     console.warn('[phase4Service.getMortgageApplicationById] Falling back to repository:', error);
-    return listAdminMortgageApplications().find((application) => application.applicationId === applicationId)
+    return (await listAdminMortgageApplications()).find((application) => application.applicationId === applicationId)
       ?? await getMortgageApplicationByIdFromRepository(applicationId);
   }
 }
@@ -114,7 +114,7 @@ export async function getMortgageApplicationsByApplicant(applicantId: number) {
   try {
     const db = await getDb();
     if (!db) {
-      const adminMatches = listAdminMortgageApplications().filter((application) => application.applicantId === applicantId);
+      const adminMatches = (await listAdminMortgageApplications()).filter((application) => application.applicantId === applicantId);
       return adminMatches.length > 0 ? adminMatches : await listMortgageApplicationsForUserFromRepository(applicantId);
     }
 
@@ -127,7 +127,7 @@ export async function getMortgageApplicationsByApplicant(applicantId: number) {
     return applications;
   } catch (error) {
     console.warn('[phase4Service.getMortgageApplicationsByApplicant] Falling back to repository:', error);
-    const adminMatches = listAdminMortgageApplications().filter((application) => application.applicantId === applicantId);
+    const adminMatches = (await listAdminMortgageApplications()).filter((application) => application.applicantId === applicantId);
     return adminMatches.length > 0 ? adminMatches : await listMortgageApplicationsForUserFromRepository(applicantId);
   }
 }
@@ -191,7 +191,7 @@ export async function updateMortgageApplicationStatus(
 export async function createTaxClearance(data: InsertTaxClearance) {
   const db = await getDb();
   if (!db) {
-    const created = createAdminTaxClearance({
+    const created = await createAdminTaxClearance({
       clearanceId: data.clearanceId,
       transactionId: data.transactionId,
       taxAuthority: 'Federal Inland Revenue Service',
@@ -224,7 +224,7 @@ export async function createTaxClearance(data: InsertTaxClearance) {
 export async function getTaxClearanceById(clearanceId: string) {
   const db = await getDb();
   if (!db) {
-    return listAdminTaxClearances().find((clearance) => clearance.clearanceId === clearanceId);
+    return (await listAdminTaxClearances()).find((clearance) => clearance.clearanceId === clearanceId);
   }
 
   const [clearance] = await db
@@ -252,7 +252,7 @@ export async function getTaxClearancesByTransaction(transactionId: string) {
 export async function getTaxClearancesByOwner(ownerId: number) {
   const db = await getDb();
   if (!db) {
-    return listAdminTaxClearances().filter((clearance) => clearance.ownerId === ownerId);
+    return (await listAdminTaxClearances()).filter((clearance) => clearance.ownerId === ownerId);
   }
 
   const clearances = await db
@@ -271,7 +271,7 @@ export async function updateTaxClearanceStatus(
 ) {
   const db = await getDb();
   if (!db) {
-    return updateAdminTaxClearanceStatus(clearanceId, status, additionalData);
+    return await updateAdminTaxClearanceStatus(clearanceId, status, additionalData);
   }
 
   const updateData: any = {
@@ -311,7 +311,7 @@ export async function updateTaxClearanceStatus(
 export async function createInsurancePolicy(data: InsertInsurancePolicy) {
   const db = await getDb();
   if (!db) {
-    const created = createAdminInsurancePolicy({
+    const created = await createAdminInsurancePolicy({
       policyId: data.policyId,
       transactionId: data.transactionId ?? data.policyId,
       providerName: data.providerName,
@@ -344,7 +344,7 @@ export async function createInsurancePolicy(data: InsertInsurancePolicy) {
 export async function getInsurancePolicyById(policyId: string) {
   const db = await getDb();
   if (!db) {
-    return listAdminInsurancePolicies().find((policy) => policy.policyId === policyId);
+    return (await listAdminInsurancePolicies()).find((policy) => policy.policyId === policyId);
   }
 
   const [policy] = await db
@@ -372,10 +372,10 @@ export async function getInsurancePoliciesByTransaction(transactionId: string) {
 export async function getInsurancePoliciesByParcel(parcelId: number) {
   const db = await getDb();
   if (!db) {
-    const matches = listAdminInsurancePolicies().filter((policy) => Number((policy as any).parcelId) === Number(parcelId) || Number(policy.id) === Number(parcelId) || policy.transactionId.includes(String(parcelId)));
+    const matches = (await listAdminInsurancePolicies()).filter((policy) => Number((policy as any).parcelId) === Number(parcelId) || Number(policy.id) === Number(parcelId) || policy.transactionId.includes(String(parcelId)));
     return matches.length > 0
       ? matches.map((policy) => ({ ...policy, parcelId: (policy as any).parcelId ?? parcelId }))
-      : listAdminInsurancePolicies().slice(0, 1).map((policy) => ({ ...policy, parcelId }));
+      : (await listAdminInsurancePolicies()).slice(0, 1).map((policy) => ({ ...policy, parcelId }));
   }
 
   const policies = await db
@@ -393,7 +393,7 @@ export async function updateInsurancePolicyStatus(
 ) {
   const db = await getDb();
   if (!db) {
-    return updateAdminInsurancePolicyStatus(policyId, status);
+    return await updateAdminInsurancePolicyStatus(policyId, status);
   }
 
   const [updated] = await db
@@ -850,9 +850,9 @@ export async function updateLandUsePlanStatus(
 export async function getTransactionPhase4Status(transactionId: string) {
   const db = await getDb();
   if (!db) {
-    const mortgage = listAdminMortgageApplications().find((item) => item.transactionId === transactionId) ?? null;
-    const tax = listAdminTaxClearances().find((item) => item.transactionId === transactionId) ?? null;
-    const insurance = listAdminInsurancePolicies().find((item) => item.transactionId === transactionId) ?? null;
+    const mortgage = (await listAdminMortgageApplications()).find((item) => item.transactionId === transactionId) ?? null;
+    const tax = (await listAdminTaxClearances()).find((item) => item.transactionId === transactionId) ?? null;
+    const insurance = (await listAdminInsurancePolicies()).find((item) => item.transactionId === transactionId) ?? null;
     return {
       mortgage,
       tax,

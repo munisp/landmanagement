@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type VerificationStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected';
 
@@ -59,14 +58,6 @@ interface VerificationStore {
   history: VerificationHistoryRecord[];
 }
 
-const dataDir = path.join(process.cwd(), 'server', 'data');
-const storePath = path.join(dataDir, 'verification-store.json');
-
-function ensureDataDir() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-}
 
 function seededStore(): VerificationStore {
   const requests: VerificationRequestRecord[] = [
@@ -217,23 +208,12 @@ function parseDate<T extends Record<string, any>>(record: T, keys: string[]): T 
   return record;
 }
 
-function loadStore(): VerificationStore {
-  ensureDataDir();
-  if (!fs.existsSync(storePath)) {
-    const seeded = seededStore();
-    fs.writeFileSync(storePath, serialize(seeded));
-    return seeded;
-  }
-  const parsed = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as VerificationStore;
-  parsed.requests = parsed.requests.map((request) => parseDate(request, ['submittedAt', 'reviewedAt', 'approvedAt', 'rejectedAt', 'createdAt', 'updatedAt']));
-  parsed.documents = parsed.documents.map((doc) => parseDate(doc, ['verifiedAt', 'createdAt']));
-  parsed.history = parsed.history.map((entry) => parseDate(entry, ['createdAt']));
-  return parsed;
+async function loadStore(): Promise<VerificationStore> {
+  return readJsonStore<VerificationStore>('verification-store', seededStore);
 }
 
-function saveStore(store: VerificationStore) {
-  ensureDataDir();
-  fs.writeFileSync(storePath, serialize(store));
+async function saveStore(store: VerificationStore) {
+  await writeJsonStore('verification-store', store);
 }
 
 function resolveUserName(userId: number) {
@@ -250,13 +230,13 @@ function withDocuments(request: VerificationRequestRecord, store: VerificationSt
   };
 }
 
-export function listVerificationRequestsOffline(filters: {
+export async function listVerificationRequestsOffline(filters: {
   status?: VerificationStatus;
   requesterId?: number;
   reviewerId?: number;
   parcelId?: string;
 }, page = 1, limit = 20) {
-  const store = loadStore();
+  const store = await loadStore();
   const filtered = store.requests.filter((request) => {
     if (filters.status && request.status !== filters.status) return false;
     if (filters.requesterId && request.requesterId !== filters.requesterId) return false;
@@ -273,19 +253,19 @@ export function listVerificationRequestsOffline(filters: {
   };
 }
 
-export function getVerificationRequestDetailsOffline(requestId: number) {
-  const store = loadStore();
+export async function getVerificationRequestDetailsOffline(requestId: number) {
+  const store = await loadStore();
   const request = store.requests.find((item) => item.id === requestId);
   return request ? withDocuments(request, store) : null;
 }
 
-export function getVerificationHistoryOffline(requestId: number) {
-  const store = loadStore();
+export async function getVerificationHistoryOffline(requestId: number) {
+  const store = await loadStore();
   return store.history.filter((entry) => entry.verificationRequestId === requestId);
 }
 
-export function createVerificationRequestOffline(parcelId: string, requesterId: number, requesterName: string | null, notes?: string) {
-  const store = loadStore();
+export async function createVerificationRequestOffline(parcelId: string, requesterId: number, requesterName: string | null, notes?: string) {
+  const store = await loadStore();
   const request: VerificationRequestRecord = {
     id: store.nextRequestId++,
     parcelId,
@@ -316,11 +296,11 @@ export function createVerificationRequestOffline(parcelId: string, requesterId: 
     comment: 'Verification request created',
     createdAt: new Date(),
   });
-  saveStore(store);
+  await saveStore(store);
   return { success: true, requestId: request.id };
 }
 
-export function addVerificationDocumentOffline(
+export async function addVerificationDocumentOffline(
   requestId: number,
   documentType: string,
   fileName: string,
@@ -329,7 +309,7 @@ export function addVerificationDocumentOffline(
   mimeType: string,
   uploadedBy: number,
 ) {
-  const store = loadStore();
+  const store = await loadStore();
   const request = store.requests.find((item) => item.id === requestId);
   if (!request) {
     return { success: false, message: 'Verification request not found' };
@@ -363,12 +343,12 @@ export function addVerificationDocumentOffline(
     comment: `${documentType} uploaded`,
     createdAt: new Date(),
   });
-  saveStore(store);
+  await saveStore(store);
   return { success: true, documentId: doc.id };
 }
 
-export function submitVerificationRequestOffline(requestId: number, userId: number) {
-  const store = loadStore();
+export async function submitVerificationRequestOffline(requestId: number, userId: number) {
+  const store = await loadStore();
   const request = store.requests.find((item) => item.id === requestId);
   if (!request) {
     return { success: false, message: 'Verification request not found' };
@@ -393,12 +373,12 @@ export function submitVerificationRequestOffline(requestId: number, userId: numb
     comment: 'Request submitted for review',
     createdAt: new Date(),
   });
-  saveStore(store);
+  await saveStore(store);
   return { success: true };
 }
 
-export function assignReviewerOffline(requestId: number, reviewerId: number, assignedBy: number) {
-  const store = loadStore();
+export async function assignReviewerOffline(requestId: number, reviewerId: number, assignedBy: number) {
+  const store = await loadStore();
   const request = store.requests.find((item) => item.id === requestId);
   if (!request) {
     return { success: false, message: 'Verification request not found' };
@@ -421,12 +401,12 @@ export function assignReviewerOffline(requestId: number, reviewerId: number, ass
     comment: `Assigned to reviewer ID ${reviewerId}`,
     createdAt: new Date(),
   });
-  saveStore(store);
+  await saveStore(store);
   return { success: true };
 }
 
-export function approveVerificationRequestOffline(requestId: number, reviewerId: number, blockchainTxHash?: string) {
-  const store = loadStore();
+export async function approveVerificationRequestOffline(requestId: number, reviewerId: number, blockchainTxHash?: string) {
+  const store = await loadStore();
   const request = store.requests.find((item) => item.id === requestId);
   if (!request) {
     return { success: false, message: 'Verification request not found' };
@@ -451,12 +431,12 @@ export function approveVerificationRequestOffline(requestId: number, reviewerId:
     comment: blockchainTxHash ? `Approved and recorded on blockchain: ${blockchainTxHash}` : 'Approved',
     createdAt: new Date(),
   });
-  saveStore(store);
+  await saveStore(store);
   return { success: true };
 }
 
-export function rejectVerificationRequestOffline(requestId: number, reviewerId: number, reason: string) {
-  const store = loadStore();
+export async function rejectVerificationRequestOffline(requestId: number, reviewerId: number, reason: string) {
+  const store = await loadStore();
   const request = store.requests.find((item) => item.id === requestId);
   if (!request) {
     return { success: false, message: 'Verification request not found' };
@@ -481,6 +461,6 @@ export function rejectVerificationRequestOffline(requestId: number, reviewerId: 
     comment: reason,
     createdAt: new Date(),
   });
-  saveStore(store);
+  await saveStore(store);
   return { success: true };
 }

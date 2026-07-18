@@ -285,14 +285,22 @@ describe('Verification Workflow', () => {
     });
 
     it('should filter by parcel ID', async () => {
+      // Self-contained: create the request this assertion filters for.
+      const created = await verificationService.createVerificationRequest(
+        'LG-VI-2024-TEST-FILTER',
+        testRequesterId,
+        'Filter by parcel id test'
+      );
+      expect(created.success).toBe(true);
+
       const result = await verificationService.listVerificationRequests(
-        { parcelId: 'LG-VI-2024-TEST-FULL' },
+        { parcelId: 'LG-VI-2024-TEST-FILTER' },
         1,
         50
       );
 
       expect(result.requests.length).toBeGreaterThanOrEqual(1);
-      expect(result.requests.every((req) => req.parcelId === 'LG-VI-2024-TEST-FULL')).toBe(true);
+      expect(result.requests.every((req) => req.parcelId === 'LG-VI-2024-TEST-FILTER')).toBe(true);
     });
   });
 

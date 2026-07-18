@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type SupportTicketStatus = 'open' | 'in_progress' | 'waiting_on_customer' | 'resolved';
 export type SupportTicketPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -61,12 +60,6 @@ interface SupportStore {
   faqs: FaqRecord[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'support-store.json');
-
-function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function defaultStore(): SupportStore {
   return {
@@ -185,32 +178,12 @@ function defaultStore(): SupportStore {
   };
 }
 
-function loadStore(): SupportStore {
-  ensureDataDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as SupportStore;
-    if (!parsed || !Array.isArray(parsed.tickets) || !Array.isArray(parsed.messages) || !Array.isArray(parsed.knowledgeBase) || !Array.isArray(parsed.faqs)) {
-      const store = defaultStore();
-      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-      return store;
-    }
-    return parsed;
-  } catch {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
+async function loadStore(): Promise<SupportStore> {
+  return readJsonStore<SupportStore>('support-store', defaultStore);
 }
 
-function saveStore(store: SupportStore) {
-  ensureDataDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function saveStore(store: SupportStore) {
+  await writeJsonStore('support-store', store);
 }
 
 function computeSlaStatus(ticket: SupportTicketRecord) {
@@ -228,8 +201,8 @@ function computeSlaStatus(ticket: SupportTicketRecord) {
   return 'on_track' as const;
 }
 
-export function listSupportTickets() {
-  const store = loadStore();
+export async function listSupportTickets() {
+  const store = await loadStore();
   return store.tickets
     .slice()
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -240,7 +213,7 @@ export function listSupportTickets() {
     }));
 }
 
-export function createSupportTicket(input: {
+export async function createSupportTicket(input: {
   subject: string;
   category: SupportCategory;
   priority: SupportTicketPriority;
@@ -249,7 +222,7 @@ export function createSupportTicket(input: {
   customerEmail: string;
   message: string;
 }) {
-  const store = loadStore();
+  const store = await loadStore();
   const now = new Date().toISOString();
   const id = store.nextTicketId++;
   const ticket: SupportTicketRecord = {
@@ -279,12 +252,12 @@ export function createSupportTicket(input: {
 
   store.tickets.unshift(ticket);
   store.messages.push(message);
-  saveStore(store);
+  await saveStore(store);
   return { ...ticket, slaStatus: computeSlaStatus(ticket), messages: [message] };
 }
 
-export function addSupportMessage(input: { ticketId: number; senderType: 'customer' | 'support'; senderName: string; message: string }) {
-  const store = loadStore();
+export async function addSupportMessage(input: { ticketId: number; senderType: 'customer' | 'support'; senderName: string; message: string }) {
+  const store = await loadStore();
   const ticket = store.tickets.find((item) => item.id === input.ticketId);
   if (!ticket) {
     throw new Error('Support ticket not found');
@@ -306,12 +279,12 @@ export function addSupportMessage(input: { ticketId: number; senderType: 'custom
   }
   ticket.updatedAt = now;
   store.messages.push(message);
-  saveStore(store);
+  await saveStore(store);
   return message;
 }
 
-export function updateSupportTicketStatus(input: { ticketId: number; status: SupportTicketStatus }) {
-  const store = loadStore();
+export async function updateSupportTicketStatus(input: { ticketId: number; status: SupportTicketStatus }) {
+  const store = await loadStore();
   const ticket = store.tickets.find((item) => item.id === input.ticketId);
   if (!ticket) {
     throw new Error('Support ticket not found');
@@ -322,16 +295,16 @@ export function updateSupportTicketStatus(input: { ticketId: number; status: Sup
   if (input.status === 'resolved') {
     ticket.resolvedAt = ticket.updatedAt;
   }
-  saveStore(store);
+  await saveStore(store);
   return ticket;
 }
 
-export function listKnowledgeBaseArticles() {
-  return loadStore().knowledgeBase.slice().sort((a, b) => a.title.localeCompare(b.title));
+export async function listKnowledgeBaseArticles() {
+  return (await loadStore()).knowledgeBase.slice().sort((a, b) => a.title.localeCompare(b.title));
 }
 
-export function createKnowledgeBaseArticle(input: { title: string; category: KnowledgeBaseArticleRecord['category']; summary: string; content: string }) {
-  const store = loadStore();
+export async function createKnowledgeBaseArticle(input: { title: string; category: KnowledgeBaseArticleRecord['category']; summary: string; content: string }) {
+  const store = await loadStore();
   const article: KnowledgeBaseArticleRecord = {
     id: store.nextArticleId++,
     title: input.title,
@@ -341,16 +314,16 @@ export function createKnowledgeBaseArticle(input: { title: string; category: Kno
     updatedAt: new Date().toISOString(),
   };
   store.knowledgeBase.unshift(article);
-  saveStore(store);
+  await saveStore(store);
   return article;
 }
 
-export function listFaqs() {
-  return loadStore().faqs.slice().sort((a, b) => a.question.localeCompare(b.question));
+export async function listFaqs() {
+  return (await loadStore()).faqs.slice().sort((a, b) => a.question.localeCompare(b.question));
 }
 
-export function createFaq(input: { question: string; answer: string; category: string }) {
-  const store = loadStore();
+export async function createFaq(input: { question: string; answer: string; category: string }) {
+  const store = await loadStore();
   const faq: FaqRecord = {
     id: store.nextFaqId++,
     question: input.question,
@@ -359,12 +332,12 @@ export function createFaq(input: { question: string; answer: string; category: s
     updatedAt: new Date().toISOString(),
   };
   store.faqs.unshift(faq);
-  saveStore(store);
+  await saveStore(store);
   return faq;
 }
 
-export function getSupportAnalytics() {
-  const tickets = listSupportTickets();
+export async function getSupportAnalytics() {
+  const tickets = await listSupportTickets();
   const openTickets = tickets.filter((ticket) => ticket.status !== 'resolved').length;
   const resolvedTickets = tickets.filter((ticket) => ticket.status === 'resolved').length;
   const slaBreaches = tickets.filter((ticket) => ticket.slaStatus === 'breached').length;

@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export interface OfflineAdminUser {
   id: number;
@@ -30,12 +29,6 @@ interface OfflineAdminStore {
   activityLogs: OfflineAdminActivityLog[];
 }
 
-const dataDir = path.join(process.cwd(), 'server', 'data');
-const storePath = path.join(dataDir, 'admin-store.json');
-
-function ensureDataDir() {
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-}
 
 function seededStore(): OfflineAdminStore {
   return {
@@ -113,29 +106,16 @@ function reviveDate<T extends Record<string, any>>(record: T, keys: string[]) {
   return record;
 }
 
-function loadStore(): OfflineAdminStore {
-  ensureDataDir();
-  if (!fs.existsSync(storePath)) {
-    const seeded = seededStore();
-    fs.writeFileSync(storePath, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
-
-  const parsed = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as OfflineAdminStore;
-  parsed.users = parsed.users.map((user) =>
-    reviveDate(user, ['suspendedAt', 'createdAt', 'updatedAt', 'lastActive', 'lastSignedIn']),
-  );
-  parsed.activityLogs = parsed.activityLogs.map((log) => reviveDate(log, ['timestamp']));
-  return parsed;
+async function loadStore(): Promise<OfflineAdminStore> {
+  return readJsonStore<OfflineAdminStore>('admin-store', seededStore);
 }
 
-function saveStore(store: OfflineAdminStore) {
-  ensureDataDir();
-  fs.writeFileSync(storePath, JSON.stringify(store, null, 2));
+async function saveStore(store: OfflineAdminStore) {
+  await writeJsonStore('admin-store', store);
 }
 
-export function listOfflineAdminUsers(page = 1, limit = 50) {
-  const store = loadStore();
+export async function listOfflineAdminUsers(page = 1, limit = 50) {
+  const store = await loadStore();
   const sorted = [...store.users].sort((a, b) => b.lastActive.getTime() - a.lastActive.getTime());
   const start = (page - 1) * limit;
   return {
@@ -146,8 +126,8 @@ export function listOfflineAdminUsers(page = 1, limit = 50) {
   };
 }
 
-export function updateOfflineUserRole(userId: number, role: OfflineAdminUser['role'], adminId: number) {
-  const store = loadStore();
+export async function updateOfflineUserRole(userId: number, role: OfflineAdminUser['role'], adminId: number) {
+  const store = await loadStore();
   const user = store.users.find((entry) => entry.id === userId);
   if (!user) return { success: false as const };
   user.role = role;
@@ -159,12 +139,12 @@ export function updateOfflineUserRole(userId: number, role: OfflineAdminUser['ro
     timestamp: new Date(),
     details: { role, adminId },
   });
-  saveStore(store);
+  await saveStore(store);
   return { success: true as const, user };
 }
 
-export function suspendOfflineUser(userId: number, reason: string, adminId: number) {
-  const store = loadStore();
+export async function suspendOfflineUser(userId: number, reason: string, adminId: number) {
+  const store = await loadStore();
   const user = store.users.find((entry) => entry.id === userId);
   if (!user) return { success: false as const };
   user.suspended = true;
@@ -179,12 +159,12 @@ export function suspendOfflineUser(userId: number, reason: string, adminId: numb
     timestamp: new Date(),
     details: { reason, adminId },
   });
-  saveStore(store);
+  await saveStore(store);
   return { success: true as const, user };
 }
 
-export function activateOfflineUser(userId: number, adminId: number) {
-  const store = loadStore();
+export async function activateOfflineUser(userId: number, adminId: number) {
+  const store = await loadStore();
   const user = store.users.find((entry) => entry.id === userId);
   if (!user) return { success: false as const };
   user.suspended = false;
@@ -199,18 +179,18 @@ export function activateOfflineUser(userId: number, adminId: number) {
     timestamp: new Date(),
     details: { adminId },
   });
-  saveStore(store);
+  await saveStore(store);
   return { success: true as const, user };
 }
 
-export function listOfflineUserActivityLogs(userId?: number, limit = 50) {
-  const store = loadStore();
+export async function listOfflineUserActivityLogs(userId?: number, limit = 50) {
+  const store = await loadStore();
   const filtered = userId ? store.activityLogs.filter((log) => log.userId === userId) : store.activityLogs;
   return filtered.slice(0, limit);
 }
 
-export function getOfflineUserStats() {
-  const store = loadStore();
+export async function getOfflineUserStats() {
+  const store = await loadStore();
   const total = store.users.length;
   const suspended = store.users.filter((user) => user.suspended).length;
   const byRole: Record<string, number> = {};
@@ -225,7 +205,7 @@ export function getOfflineUserStats() {
   };
 }
 
-export function getOfflineAdminUser(userId: number) {
-  const store = loadStore();
+export async function getOfflineAdminUser(userId: number) {
+  const store = await loadStore();
   return store.users.find((user) => user.id === userId) ?? null;
 }

@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type ComplianceStatus = 'compliant' | 'needs_attention';
 export type ReportStatus = 'not_started' | 'in_progress' | 'completed';
@@ -48,12 +47,6 @@ interface ComplianceDashboardStore {
   certifications: CertificationRecord[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'compliance-dashboard-store.json');
-
-function ensureDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function defaultStore(): ComplianceDashboardStore {
   return {
@@ -81,24 +74,12 @@ function defaultStore(): ComplianceDashboardStore {
   };
 }
 
-function loadStore(): ComplianceDashboardStore {
-  ensureDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const seeded = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
-  try {
-    return JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as ComplianceDashboardStore;
-  } catch {
-    const seeded = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
+async function loadStore(): Promise<ComplianceDashboardStore> {
+  return readJsonStore<ComplianceDashboardStore>('compliance-dashboard-store', defaultStore);
 }
 
-export function getComplianceDashboardState() {
-  const store = loadStore();
+export async function getComplianceDashboardState() {
+  const store = await loadStore();
   const totalScore = store.regulations.reduce((sum, item) => sum + item.score, 0);
   const complianceScore = store.regulations.length > 0 ? Math.round(totalScore / store.regulations.length) : 0;
   return {

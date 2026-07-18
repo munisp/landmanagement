@@ -6,6 +6,15 @@ import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+/**
+ * Inject a database handle for integration tests (e.g. an embedded PGlite
+ * instance). Pass null to restore the default lazy connection behaviour.
+ * Test-only entry point — never called from production code paths.
+ */
+export function setDbForTests(db: ReturnType<typeof drizzle> | null) {
+  _db = db;
+}
+
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db) {

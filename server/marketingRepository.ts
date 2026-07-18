@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type MarketingChannel = 'email' | 'sms' | 'push';
 export type CampaignStatus = 'draft' | 'scheduled' | 'active' | 'completed';
@@ -49,12 +48,6 @@ interface MarketingStore {
   experiments: ExperimentRecord[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'marketing-store.json');
-
-function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function defaultStore(): MarketingStore {
   return {
@@ -147,36 +140,16 @@ function defaultStore(): MarketingStore {
   };
 }
 
-function loadStore(): MarketingStore {
-  ensureDataDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as MarketingStore;
-    if (!parsed || !Array.isArray(parsed.campaigns) || !Array.isArray(parsed.landingPages) || !Array.isArray(parsed.experiments)) {
-      const store = defaultStore();
-      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-      return store;
-    }
-    return parsed;
-  } catch {
-    const store = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-    return store;
-  }
+async function loadStore(): Promise<MarketingStore> {
+  return readJsonStore<MarketingStore>('marketing-store', defaultStore);
 }
 
-function saveStore(store: MarketingStore) {
-  ensureDataDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function saveStore(store: MarketingStore) {
+  await writeJsonStore('marketing-store', store);
 }
 
-export function getMarketingOverview() {
-  const store = loadStore();
+export async function getMarketingOverview() {
+  const store = await loadStore();
   const totals = {
     campaigns: store.campaigns.length,
     activeCampaigns: store.campaigns.filter((item) => item.status === 'active').length,
@@ -206,8 +179,8 @@ export function getMarketingOverview() {
   };
 }
 
-export function createCampaign(input: { name: string; channel: MarketingChannel; audience: string; scheduledFor: string; message: string }) {
-  const store = loadStore();
+export async function createCampaign(input: { name: string; channel: MarketingChannel; audience: string; scheduledFor: string; message: string }) {
+  const store = await loadStore();
   const now = new Date().toISOString();
   const campaign: MarketingCampaignRecord = {
     id: store.nextCampaignId++,
@@ -221,24 +194,24 @@ export function createCampaign(input: { name: string; channel: MarketingChannel;
     updatedAt: now,
   };
   store.campaigns.unshift(campaign);
-  saveStore(store);
+  await saveStore(store);
   return campaign;
 }
 
-export function updateCampaignStatus(input: { campaignId: number; status: CampaignStatus }) {
-  const store = loadStore();
+export async function updateCampaignStatus(input: { campaignId: number; status: CampaignStatus }) {
+  const store = await loadStore();
   const campaign = store.campaigns.find((item) => item.id === input.campaignId);
   if (!campaign) {
     throw new Error('Campaign not found');
   }
   campaign.status = input.status;
   campaign.updatedAt = new Date().toISOString();
-  saveStore(store);
+  await saveStore(store);
   return campaign;
 }
 
-export function createLandingPage(input: { name: string; slug: string; headline: string; body: string; ctaLabel: string; variant: 'A' | 'B' }) {
-  const store = loadStore();
+export async function createLandingPage(input: { name: string; slug: string; headline: string; body: string; ctaLabel: string; variant: 'A' | 'B' }) {
+  const store = await loadStore();
   const page: LandingPageRecord = {
     id: store.nextLandingPageId++,
     name: input.name,
@@ -250,12 +223,12 @@ export function createLandingPage(input: { name: string; slug: string; headline:
     updatedAt: new Date().toISOString(),
   };
   store.landingPages.unshift(page);
-  saveStore(store);
+  await saveStore(store);
   return page;
 }
 
-export function createExperiment(input: { name: string; hypothesis: string; variantA: string; variantB: string }) {
-  const store = loadStore();
+export async function createExperiment(input: { name: string; hypothesis: string; variantA: string; variantB: string }) {
+  const store = await loadStore();
   const experiment: ExperimentRecord = {
     id: store.nextExperimentId++,
     name: input.name,
@@ -269,6 +242,6 @@ export function createExperiment(input: { name: string; hypothesis: string; vari
     updatedAt: new Date().toISOString(),
   };
   store.experiments.unshift(experiment);
-  saveStore(store);
+  await saveStore(store);
   return experiment;
 }

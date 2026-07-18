@@ -254,7 +254,7 @@ export async function executePayment(transactionId: string): Promise<{
 export async function getPaymentStatus(transactionId: string): Promise<PaymentStatus | null> {
   const db = await getDb();
   if (!db) {
-    const transaction = getOfflineMojaloopTransaction(transactionId);
+    const transaction = await getOfflineMojaloopTransaction(transactionId);
     if (!transaction) return null;
     return {
       transactionId: transaction.transactionId,
@@ -298,7 +298,7 @@ export async function getPaymentStatus(transactionId: string): Promise<PaymentSt
 export async function getUserPaymentHistory(userId: number, limit: number = 10): Promise<PaymentStatus[]> {
   const db = await getDb();
   if (!db) {
-    return listOfflineMojaloopTransactions(userId, limit).map((tx) => ({
+    return (await listOfflineMojaloopTransactions(userId, limit)).map((tx) => ({
       transactionId: tx.transactionId,
       status: tx.status,
       amount: tx.amount.toString(),
@@ -335,12 +335,12 @@ export async function getUserPaymentHistory(userId: number, limit: number = 10):
 export async function cancelPayment(transactionId: string, reason: string): Promise<void> {
   const db = await getDb();
   if (!db) {
-    const transaction = getOfflineMojaloopTransaction(transactionId);
+    const transaction = await getOfflineMojaloopTransaction(transactionId);
     if (!transaction) throw new Error('Transaction not found');
     if (!['pending', 'quote_received'].includes(transaction.status)) {
       throw new Error(`Cannot cancel payment in status: ${transaction.status}`);
     }
-    updateOfflineMojaloopTransaction(transactionId, {
+    await updateOfflineMojaloopTransaction(transactionId, {
       status: 'rejected',
       errorDescription: `Cancelled by user: ${reason}`,
     });
@@ -383,7 +383,7 @@ export async function reconcilePaymentWithEscrow(
 ): Promise<void> {
   const db = await getDb();
   if (!db) {
-    updateOfflineMojaloopTransaction(transactionId, {
+    await updateOfflineMojaloopTransaction(transactionId, {
       blockchainTxHash,
       reconciledAt: new Date(),
     });

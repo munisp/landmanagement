@@ -1,4 +1,4 @@
-import { boolean, decimal, integer, json, jsonb, index, pgEnum, pgTable, real, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { bigint, boolean, decimal, doublePrecision, integer, json, jsonb, index, pgEnum, pgTable, real, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
@@ -567,25 +567,36 @@ export type InsertBlockchainTransaction = typeof blockchainTransactions.$inferIn
 /**
  * Parcels table for land registry
  */
-export const parcelStatusEnum = pgEnum("parcel_status", ["draft", "registered", "transferred", "disputed", "archived"]);
+export const parcelStatusEnum = pgEnum("parcel_status", ["draft", "pending_verification", "verified", "registered", "transferred", "disputed", "archived"]);
 
 export const parcels = pgTable("parcels", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   parcelId: varchar("parcel_id", { length: 64 }).notNull().unique(),
-  ownerId: integer("owner_id").notNull().references(() => users.id),
-  address: text("address").notNull(),
+  ownerId: integer("owner_id").references(() => users.id),
+  address: text("address"),
   city: varchar("city", { length: 128 }),
   state: varchar("state", { length: 128 }),
   country: varchar("country", { length: 128 }).default("Nigeria").notNull(),
   latitude: varchar("latitude", { length: 20 }),
   longitude: varchar("longitude", { length: 20 }),
-  area: integer("area"), // in square meters
+  area: doublePrecision("area"), // in square meters
   landUse: varchar("land_use", { length: 64 }), // residential, commercial, agricultural, etc.
   status: parcelStatusEnum("status").default("draft").notNull(),
   titleNumber: varchar("title_number", { length: 64 }),
   surveyPlanNumber: varchar("survey_plan_number", { length: 64 }),
   registrationDate: timestamp("registration_date"),
   lastTransferDate: timestamp("last_transfer_date"),
+  // --- Domain-repository columns (migration 0012) ---
+  parcelNumber: varchar("parcel_number", { length: 64 }).unique(),
+  lga: varchar("lga", { length: 128 }),
+  ward: varchar("ward", { length: 128 }),
+  estimatedValue: bigint("estimated_value", { mode: "number" }),
+  geometryGeoJSON: text("geometry_geojson"),
+  boundaryCoordinates: text("boundary_coordinates"),
+  surveyorId: varchar("surveyor_id", { length: 64 }),
+  verifierId: varchar("verifier_id", { length: 64 }),
+  verifiedAt: timestamp("verified_at"),
+  notes: text("notes"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -593,6 +604,7 @@ export const parcels = pgTable("parcels", {
   ownerIdx: index("parcels_owner_idx").on(table.ownerId),
   parcelIdIdx: index("parcels_parcel_id_idx").on(table.parcelId),
   statusIdx: index("parcels_status_idx").on(table.status),
+  lgaIdx: index("parcels_lga_idx").on(table.lga),
 }));
 
 export type Parcel = typeof parcels.$inferSelect;
@@ -2926,3 +2938,111 @@ export type AgencyClearance = typeof agencyClearances.$inferSelect;
 export type InsertAgencyClearance = typeof agencyClearances.$inferInsert;
 export type DataExchangeAudit = typeof dataExchangeAudits.$inferSelect;
 export type InsertDataExchangeAudit = typeof dataExchangeAudits.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Core repository persistence (migration 0012)
+// These tables back the domain repositories that previously persisted to JSON
+// files under server/data/. All records are now stored in PostgreSQL.
+// ---------------------------------------------------------------------------
+
+/**
+ * Registry transactions — workflow state machine for transfers, mortgages,
+ * and title perfection. Distinct from the legacy `transactions` table used by
+ * smart-contract/reporting services.
+ */
+export const registryTransactions = pgTable("registry_transactions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  type: varchar("type", { length: 64 }).notNull(),
+  parcelId: integer("parcel_id").notNull(),
+  initiatorId: integer("initiator_id").notNull(),
+  initiatorName: varchar("initiator_name", { length: 255 }).notNull(),
+  counterpartyName: varchar("counterparty_name", { length: 255 }),
+  titleId: integer("title_id"),
+  status: varchar("status", { length: 32 }).default("pending_approval").notNull(),
+  considerationAmount: bigint("consideration_amount", { mode: "number" }).default(0).notNull(),
+  workflowStage: varchar("workflow_stage", { length: 64 }).default("submission").notNull(),
+  paymentStatus: varchar("payment_status", { length: 16 }).default("unpaid").notNull(),
+  documentStatus: varchar("document_status", { length: 16 }).default("pending").notNull(),
+  externalReference: varchar("external_reference", { length: 128 }).unique(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  parcelIdx: index("registry_transactions_parcel_idx").on(table.parcelId),
+  statusIdx: index("registry_transactions_status_idx").on(table.status),
+}));
+
+export type RegistryTransaction = typeof registryTransactions.$inferSelect;
+export type InsertRegistryTransaction = typeof registryTransactions.$inferInsert;
+
+/**
+ * Payments — real persisted payment records. A payment reaches 'completed'
+ * only through explicit confirmation (provider webhook / bank reconciliation),
+ * never automatically at creation time.
+ */
+export const payments = pgTable("payments", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  transactionId: integer("transaction_id").notNull().references(() => registryTransactions.id),
+  payerId: integer("payer_id").notNull(),
+  amount: bigint("amount", { mode: "number" }).notNull(),
+  feeAmount: bigint("fee_amount", { mode: "number" }).notNull(),
+  totalAmount: bigint("total_amount", { mode: "number" }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("NGN").notNull(),
+  method: varchar("method", { length: 32 }).notNull(),
+  status: varchar("status", { length: 16 }).default("pending").notNull(),
+  reference: varchar("reference", { length: 64 }).notNull().unique(),
+  receiptNumber: varchar("receipt_number", { length: 64 }),
+  channelReference: varchar("channel_reference", { length: 128 }),
+  bankName: varchar("bank_name", { length: 255 }),
+  bankAccountName: varchar("bank_account_name", { length: 255 }),
+  bankAccountNumber: varchar("bank_account_number", { length: 32 }),
+  ussdCode: varchar("ussd_code", { length: 64 }),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  transactionIdx: index("payments_transaction_idx").on(table.transactionId),
+  statusIdx: index("payments_status_idx").on(table.status),
+}));
+
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = typeof payments.$inferInsert;
+
+/**
+ * Titles — ownership instruments per parcel.
+ */
+export const titles = pgTable("titles", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  titleNumber: varchar("title_number", { length: 64 }).notNull().unique(),
+  parcelId: integer("parcel_id").notNull(),
+  ownerId: integer("owner_id").notNull(),
+  ownerName: varchar("owner_name", { length: 255 }).notNull(),
+  ownershipType: varchar("ownership_type", { length: 32 }).notNull(),
+  ownershipPercentage: integer("ownership_percentage").default(100).notNull(),
+  titleType: varchar("title_type", { length: 64 }).notNull(),
+  status: varchar("status", { length: 32 }).default("pending_verification").notNull(),
+  issuedAt: timestamp("issued_at"),
+  verifiedAt: timestamp("verified_at"),
+  encumbranceNotes: text("encumbrance_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  parcelIdx: index("titles_parcel_idx").on(table.parcelId),
+  ownerIdx: index("titles_owner_idx").on(table.ownerId),
+}));
+
+export type Title = typeof titles.$inferSelect;
+export type InsertTitle = typeof titles.$inferInsert;
+
+/**
+ * Repository document stores (migration 0013) — JSONB persistence for the
+ * secondary feature repositories. One row per repository collection.
+ */
+export const repositoryStores = pgTable("repository_stores", {
+  collection: varchar("collection", { length: 128 }).primaryKey(),
+  data: jsonb("data").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type RepositoryStore = typeof repositoryStores.$inferSelect;
+export type InsertRepositoryStore = typeof repositoryStores.$inferInsert;

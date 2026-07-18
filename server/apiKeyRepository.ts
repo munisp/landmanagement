@@ -1,18 +1,11 @@
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
 import type { ApiKey, UsageStats } from './apiKeyService';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 interface ApiKeyStore {
   keys: ApiKey[];
 }
 
-const dataDir = path.join(process.cwd(), 'server', 'data');
-const storePath = path.join(dataDir, 'api-key-store.json');
-
-function ensureDataDir() {
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-}
 
 function seededStore(): ApiKeyStore {
   return {
@@ -42,32 +35,23 @@ function reviveKey(key: ApiKey): ApiKey {
   };
 }
 
-function loadStore(): ApiKeyStore {
-  ensureDataDir();
-  if (!fs.existsSync(storePath)) {
-    const seeded = seededStore();
-    fs.writeFileSync(storePath, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
-  const parsed = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as ApiKeyStore;
-  parsed.keys = parsed.keys.map(reviveKey);
-  return parsed;
+async function loadStore(): Promise<ApiKeyStore> {
+  return readJsonStore<ApiKeyStore>('api-key-store', seededStore);
 }
 
-function saveStore(store: ApiKeyStore) {
-  ensureDataDir();
-  fs.writeFileSync(storePath, JSON.stringify(store, null, 2));
+async function saveStore(store: ApiKeyStore) {
+  await writeJsonStore('api-key-store', store);
 }
 
-export function listOfflineApiKeys(userId: string): ApiKey[] {
-  const store = loadStore();
+export async function listOfflineApiKeys(userId: string): Promise<ApiKey[]> {
+  const store = await loadStore();
   return store.keys
     .filter((key) => key.userId === userId)
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
-export function createOfflineApiKey(userId: string, name: string): ApiKey {
-  const store = loadStore();
+export async function createOfflineApiKey(userId: string, name: string): Promise<ApiKey> {
+  const store = await loadStore();
   const key: ApiKey = {
     id: crypto.randomUUID(),
     userId,
@@ -81,21 +65,21 @@ export function createOfflineApiKey(userId: string, name: string): ApiKey {
     rateLimit: 1000,
   };
   store.keys.unshift(key);
-  saveStore(store);
+  await saveStore(store);
   return key;
 }
 
-export function revokeOfflineApiKey(userId: string, keyId: string): void {
-  const store = loadStore();
+export async function revokeOfflineApiKey(userId: string, keyId: string): Promise<void> {
+  const store = await loadStore();
   const key = store.keys.find((item) => item.userId === userId && item.id === keyId);
   if (key) {
     key.isActive = false;
   }
-  saveStore(store);
+  await saveStore(store);
 }
 
-export function rotateOfflineApiKey(userId: string, keyId: string): ApiKey {
-  const store = loadStore();
+export async function rotateOfflineApiKey(userId: string, keyId: string): Promise<ApiKey> {
+  const store = await loadStore();
   const oldKey = store.keys.find((item) => item.userId === userId && item.id === keyId);
   if (!oldKey) throw new Error('API key not found');
   oldKey.isActive = false;
@@ -112,23 +96,23 @@ export function rotateOfflineApiKey(userId: string, keyId: string): ApiKey {
     rateLimit: oldKey.rateLimit,
   };
   store.keys.unshift(newKey);
-  saveStore(store);
+  await saveStore(store);
   return newKey;
 }
 
-export function validateOfflineApiKey(keyValue: string): ApiKey | null {
-  const store = loadStore();
+export async function validateOfflineApiKey(keyValue: string): Promise<ApiKey | null> {
+  const store = await loadStore();
   const apiKey = store.keys.find((item) => item.key === keyValue && item.isActive);
   if (!apiKey) return null;
   if (apiKey.expiresAt && apiKey.expiresAt.getTime() < Date.now()) return null;
   apiKey.lastUsedAt = new Date();
   apiKey.requestCount += 1;
-  saveStore(store);
+  await saveStore(store);
   return apiKey;
 }
 
-export function getOfflineApiKeyUsageStats(userId: string): UsageStats {
-  const userKeys = listOfflineApiKeys(userId);
+export async function getOfflineApiKeyUsageStats(userId: string): Promise<UsageStats> {
+  const userKeys = await listOfflineApiKeys(userId);
   const totalKeys = userKeys.length;
   const activeKeys = userKeys.filter((key) => key.isActive).length;
   const totalRequests = userKeys.reduce((sum, key) => sum + key.requestCount, 0);

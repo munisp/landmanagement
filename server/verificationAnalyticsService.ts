@@ -71,8 +71,8 @@ function getDateRange(startDate?: Date, endDate?: Date) {
   };
 }
 
-function toOfflineRecords(): OfflineVerificationRecord[] {
-  return listVerificationAnalyticsRequests().map((request) => ({
+async function toOfflineRecords(): Promise<OfflineVerificationRecord[]> {
+  return (await listVerificationAnalyticsRequests()).map((request) => ({
     ...request,
     createdAt: new Date(request.createdAt),
     submittedAt: new Date(request.submittedAt),
@@ -107,7 +107,7 @@ function formatTrendKey(date: Date, interval: 'day' | 'week' | 'month') {
 
 async function getOfflineMetrics(startDate?: Date, endDate?: Date): Promise<VerificationMetrics> {
   const { start, end } = getDateRange(startDate, endDate);
-  const requests = toOfflineRecords().filter((record) => withinRange(record.createdAt, start, end));
+  const requests = (await toOfflineRecords()).filter((record) => withinRange(record.createdAt, start, end));
 
   const metrics: VerificationMetrics = {
     totalRequests: requests.length,
@@ -157,7 +157,7 @@ async function getOfflineMetrics(startDate?: Date, endDate?: Date): Promise<Veri
 
 async function getOfflineReviewerPerformance(startDate?: Date, endDate?: Date): Promise<ReviewerPerformance[]> {
   const { start, end } = getDateRange(startDate, endDate);
-  const requests = toOfflineRecords().filter((record) => {
+  const requests = (await toOfflineRecords()).filter((record) => {
     const inRange = withinRange(record.createdAt, start, end);
     return inRange && !!record.reviewerId && (record.status === 'approved' || record.status === 'rejected');
   });
@@ -201,7 +201,7 @@ async function getOfflineReviewerPerformance(startDate?: Date, endDate?: Date): 
 
 async function getOfflineBottleneckAnalysis(): Promise<BottleneckAnalysis[]> {
   const now = Date.now();
-  const requests = toOfflineRecords().filter((record) => record.status === 'submitted' || record.status === 'under_review');
+  const requests = (await toOfflineRecords()).filter((record) => record.status === 'submitted' || record.status === 'under_review');
   const grouped = new Map<string, OfflineVerificationRecord[]>();
 
   for (const request of requests) {
@@ -230,7 +230,7 @@ async function getOfflineBottleneckAnalysis(): Promise<BottleneckAnalysis[]> {
 
 async function getOfflineVerificationTrends(startDate?: Date, endDate?: Date, interval: 'day' | 'week' | 'month' = 'day'): Promise<TrendData[]> {
   const { start, end } = getDateRange(startDate, endDate);
-  const requests = toOfflineRecords().filter((record) => withinRange(record.createdAt, start, end));
+  const requests = (await toOfflineRecords()).filter((record) => withinRange(record.createdAt, start, end));
   const grouped = new Map<string, TrendData>();
 
   for (const request of requests) {
@@ -247,7 +247,7 @@ async function getOfflineVerificationTrends(startDate?: Date, endDate?: Date, in
 
 async function getOfflineProcessingTimeDistribution(startDate?: Date, endDate?: Date): Promise<{ bucket: string; count: number }[]> {
   const { start, end } = getDateRange(startDate, endDate);
-  const requests = toOfflineRecords().filter((record) => withinRange(record.createdAt, start, end) && (record.status === 'approved' || record.status === 'rejected'));
+  const requests = (await toOfflineRecords()).filter((record) => withinRange(record.createdAt, start, end) && (record.status === 'approved' || record.status === 'rejected'));
 
   const distribution = new Map<string, number>([
     ['< 1 day', 0],

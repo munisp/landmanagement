@@ -1,4 +1,5 @@
 import { getBlockchainExplorerState } from './blockchainExplorerRepository';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 type BlockchainTxStatus = 'pending' | 'confirmed' | 'failed';
 type BlockchainTxType =
@@ -35,12 +36,8 @@ interface BlockchainTransactionsState {
   escrows: EscrowRecord[];
 }
 
-const globalState = globalThis as typeof globalThis & {
-  __blockchainTransactionsState?: BlockchainTransactionsState;
-};
-
-function createSeedState(): BlockchainTransactionsState {
-  const explorer = getBlockchainExplorerState();
+async function createSeedState(): Promise<BlockchainTransactionsState> {
+  const explorer = await getBlockchainExplorerState();
   const transactions: BlockchainTransactionRecord[] = explorer.transactions.map((tx: any, index: number) => ({
     id: index + 1,
     transaction_hash: tx.txHash,
@@ -65,19 +62,16 @@ function createSeedState(): BlockchainTransactionsState {
   };
 }
 
-function getState(): BlockchainTransactionsState {
-  if (!globalState.__blockchainTransactionsState) {
-    globalState.__blockchainTransactionsState = createSeedState();
-  }
-  return globalState.__blockchainTransactionsState;
+function getState(): Promise<BlockchainTransactionsState> {
+  return readJsonStore<BlockchainTransactionsState>('blockchain-transactions-store', createSeedState);
 }
 
 function createHash(prefix: string, seed: number): string {
   return `0x${prefix}${String(seed).padStart(62 - prefix.length, 'a')}`;
 }
 
-export function listBlockchainTransactions(input?: { parcelId?: number; limit?: number }) {
-  const state = getState();
+export async function listBlockchainTransactions(input?: { parcelId?: number; limit?: number }) {
+  const state = await getState();
   let items = [...state.transactions].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
   if (typeof input?.parcelId === 'number') {
     items = items.filter((item) => item.parcel_id === input.parcelId);
@@ -88,12 +82,12 @@ export function listBlockchainTransactions(input?: { parcelId?: number; limit?: 
   return items;
 }
 
-export function createOfflinePropertyTransfer(input: {
+export async function createOfflinePropertyTransfer(input: {
   parcelId: number;
   newOwnerAddress: string;
   documentHash: string;
 }) {
-  const state = getState();
+  const state = await getState();
   const transaction_hash = createHash('pt', state.nextId);
   state.transactions.unshift({
     id: state.nextId++,
@@ -109,16 +103,17 @@ export function createOfflinePropertyTransfer(input: {
       source: 'offline-continuity',
     },
   });
+  await writeJsonStore('blockchain-transactions-store', state);
   return transaction_hash;
 }
 
-export function createOfflineEscrow(input: {
+export async function createOfflineEscrow(input: {
   parcelId: number;
   sellerAddress: string;
   buyerAddress: string;
   amount: string;
 }) {
-  const state = getState();
+  const state = await getState();
   const escrowId = state.nextEscrowId++;
   state.escrows.unshift({
     escrowId,
@@ -145,6 +140,7 @@ export function createOfflineEscrow(input: {
       source: 'offline-continuity',
     },
   });
+  await writeJsonStore('blockchain-transactions-store', state);
   return escrowId;
 }
 

@@ -78,7 +78,7 @@ export async function explainApplication(params: {
   const application = (await mortgageApplicationRepository.getMortgageApplicationByNumericId(applicationId)) as any;
   if (!application) throw new Error(`Mortgage application ${applicationId} not found`);
 
-  const parcel = application.parcelId ? parcelRepository.getParcelById(application.parcelId) : undefined;
+  const parcel = application.parcelId ? await parcelRepository.getParcelById(application.parcelId) : undefined;
 
   // Bureau signal (offline-capable via guarded fallback)
   let bureau: { score: number; rating: string; factors: string[] } = { score: 0, rating: 'unknown', factors: [] };

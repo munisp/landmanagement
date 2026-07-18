@@ -1,6 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import type { DroneImageUpload, ProcessingTask } from './odm';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 interface StoredTask {
   id: string;
@@ -20,14 +19,6 @@ interface DroneProcessingStore {
   nextSequence: number;
 }
 
-const dataDir = path.join(process.cwd(), 'server', 'data');
-const storePath = path.join(dataDir, 'drone-processing-store.json');
-
-function ensureDataDir() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-}
 
 function defaultStore(): DroneProcessingStore {
   const now = new Date();
@@ -58,26 +49,12 @@ function defaultStore(): DroneProcessingStore {
   };
 }
 
-function loadStore(): DroneProcessingStore {
-  ensureDataDir();
-  if (!fs.existsSync(storePath)) {
-    const seeded = defaultStore();
-    fs.writeFileSync(storePath, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
-
-  const parsed = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as DroneProcessingStore;
-  if (!Array.isArray(parsed.tasks) || typeof parsed.nextSequence !== 'number') {
-    const seeded = defaultStore();
-    fs.writeFileSync(storePath, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
-  return parsed;
+async function loadStore(): Promise<DroneProcessingStore> {
+  return readJsonStore<DroneProcessingStore>('drone-processing-store', defaultStore);
 }
 
-function saveStore(store: DroneProcessingStore) {
-  ensureDataDir();
-  fs.writeFileSync(storePath, JSON.stringify(store, null, 2));
+async function saveStore(store: DroneProcessingStore) {
+  await writeJsonStore('drone-processing-store', store);
 }
 
 function buildOutputs(taskId: string, options?: DroneImageUpload['options']) {
@@ -153,8 +130,8 @@ function hydrateTask(task: StoredTask): ProcessingTask {
   };
 }
 
-export function createDroneProcessingTask(input: DroneImageUpload): ProcessingTask {
-  const store = loadStore();
+export async function createDroneProcessingTask(input: DroneImageUpload): Promise<ProcessingTask> {
+  const store = await loadStore();
   const id = `drone-task-${String(store.nextSequence).padStart(4, '0')}`;
   const record: StoredTask = {
     id,
@@ -168,30 +145,30 @@ export function createDroneProcessingTask(input: DroneImageUpload): ProcessingTa
 
   store.tasks.unshift(record);
   store.nextSequence += 1;
-  saveStore(store);
+  await saveStore(store);
   return hydrateTask(record);
 }
 
-export function listDroneProcessingTasks(): ProcessingTask[] {
-  const store = loadStore();
+export async function listDroneProcessingTasks(): Promise<ProcessingTask[]> {
+  const store = await loadStore();
   const tasks = store.tasks.map((task) => hydrateTask(task));
-  saveStore(store);
+  await saveStore(store);
   return tasks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
-export function getDroneProcessingTask(taskId: string): ProcessingTask | null {
-  const store = loadStore();
+export async function getDroneProcessingTask(taskId: string): Promise<ProcessingTask | null> {
+  const store = await loadStore();
   const task = store.tasks.find((item) => item.id === taskId);
   if (!task) {
     return null;
   }
   const hydrated = hydrateTask(task);
-  saveStore(store);
+  await saveStore(store);
   return hydrated;
 }
 
-export function cancelDroneProcessingTask(taskId: string): boolean {
-  const store = loadStore();
+export async function cancelDroneProcessingTask(taskId: string): Promise<boolean> {
+  const store = await loadStore();
   const task = store.tasks.find((item) => item.id === taskId);
   if (!task) {
     return false;
@@ -200,6 +177,6 @@ export function cancelDroneProcessingTask(taskId: string): boolean {
   task.cancelledAt = new Date().toISOString();
   task.status = 'failed';
   task.progress = Math.min(task.progress, 95);
-  saveStore(store);
+  await saveStore(store);
   return true;
 }

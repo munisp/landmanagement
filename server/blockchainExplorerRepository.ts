@@ -14,9 +14,9 @@ export interface ExplorerTransactionRecord {
   data: Record<string, string>;
 }
 
-function seedTransactions(): ExplorerTransactionRecord[] {
-  const transactions = listTransactions({ limit: 3 }).transactions;
-  const documents = listAllDocuments();
+async function seedTransactions(): Promise<ExplorerTransactionRecord[]> {
+  const transactions = (await listTransactions({ limit: 3 })).transactions;
+  const documents = await listAllDocuments();
 
   return transactions.slice(0, 3).map((tx: any, index: number) => ({
     txHash: tx.blockchainTxHash || `0x${String(tx.id).padStart(6, '0')}${'a'.repeat(58)}`,
@@ -37,8 +37,8 @@ function seedTransactions(): ExplorerTransactionRecord[] {
   }));
 }
 
-export function getBlockchainExplorerState() {
-  const transactions = seedTransactions();
+export async function getBlockchainExplorerState() {
+  const transactions = await seedTransactions();
   return {
     latestBlock: Math.max(...transactions.map((tx) => tx.blockNumber)),
     totalTransactions: transactions.length,
@@ -48,14 +48,14 @@ export function getBlockchainExplorerState() {
   };
 }
 
-export function findBlockchainTransaction(query: string) {
-  const state = getBlockchainExplorerState();
+export async function findBlockchainTransaction(query: string) {
+  const state = await getBlockchainExplorerState();
   const normalized = query.trim().toLowerCase();
   return state.transactions.find((tx) => tx.txHash.toLowerCase().includes(normalized) || tx.parcelId.toLowerCase().includes(normalized)) || null;
 }
 
-export function verifyBlockchainTransaction(hash: string) {
-  const transaction = findBlockchainTransaction(hash);
+export async function verifyBlockchainTransaction(hash: string) {
+  const transaction = await findBlockchainTransaction(hash);
   if (!transaction) {
     return {
       verified: false,

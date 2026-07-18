@@ -125,6 +125,10 @@ export async function createSettlement(params: {
           status: 'pending' as const,
         }))
       );
+      // A freshly created settlement blocks on every required pending
+      // checkpoint — compute and persist that state immediately so readers
+      // never observe an inconsistent "pending with no blockers" record.
+      await recomputeSettlement(settlementId);
       return getSettlement(settlementId) as Promise<SettlementView>;
     } catch (error) {
       console.warn('[EscrowSettlement] Create failed, using memory fallback:', (error as Error).message);

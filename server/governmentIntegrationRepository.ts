@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export interface GovernmentIntegrationStatusRecord {
   id: string;
@@ -26,12 +25,6 @@ interface GovernmentIntegrationStore {
   nextId: number;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'server', 'data');
-const STORE_PATH = path.join(DATA_DIR, 'government-integration-store.json');
-
-function ensureDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 function defaultStore(): GovernmentIntegrationStore {
   return {
@@ -53,33 +46,20 @@ function defaultStore(): GovernmentIntegrationStore {
   };
 }
 
-function loadStore(): GovernmentIntegrationStore {
-  ensureDir();
-  if (!fs.existsSync(STORE_PATH)) {
-    const seeded = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
-  try {
-    return JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as GovernmentIntegrationStore;
-  } catch {
-    const seeded = defaultStore();
-    fs.writeFileSync(STORE_PATH, JSON.stringify(seeded, null, 2));
-    return seeded;
-  }
+async function loadStore(): Promise<GovernmentIntegrationStore> {
+  return readJsonStore<GovernmentIntegrationStore>('government-integration-store', defaultStore);
 }
 
-function writeStore(store: GovernmentIntegrationStore) {
-  ensureDir();
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+async function writeStore(store: GovernmentIntegrationStore) {
+  await writeJsonStore('government-integration-store', store);
 }
 
-export function getGovernmentIntegrationState() {
-  return loadStore();
+export async function getGovernmentIntegrationState() {
+  return await loadStore();
 }
 
-export function recordGovernmentVerification(input: Omit<GovernmentVerificationRecord, 'id' | 'timestamp'>) {
-  const store = loadStore();
+export async function recordGovernmentVerification(input: Omit<GovernmentVerificationRecord, 'id' | 'timestamp'>) {
+  const store = await loadStore();
   const record: GovernmentVerificationRecord = {
     id: store.nextId++,
     timestamp: new Date().toISOString(),
@@ -87,15 +67,15 @@ export function recordGovernmentVerification(input: Omit<GovernmentVerificationR
   };
   store.recentVerifications.unshift(record);
   store.recentVerifications = store.recentVerifications.slice(0, 20);
-  writeStore(store);
+  await writeStore(store);
   return record;
 }
 
-export function verifyCacRegistration(cacNumber: string) {
+export async function verifyCacRegistration(cacNumber: string) {
   const normalized = cacNumber.trim().toUpperCase();
   const valid = /^RC\d{7}$/.test(normalized);
   const companyName = valid ? 'Verified Corporate Entity' : 'Unknown Entity';
-  const record = recordGovernmentVerification({
+  const record = await recordGovernmentVerification({
     type: 'CAC Verification',
     identifier: normalized,
     name: companyName,

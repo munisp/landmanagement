@@ -6,21 +6,21 @@ import * as verificationService from './verificationService';
 describe('End-to-End Workflow Tests', () => {
   describe('Search Workflow', () => {
     it('should find parcels by parcel_id', async () => {
-      const results = searchParcels({ query: 'LG-VI-2024', page: 1, limit: 10 });
+      const results = await searchParcels({ query: 'LG-VI-2024', page: 1, limit: 10 });
 
       expect(results.parcels.length).toBeGreaterThan(0);
       expect(results.parcels[0].parcelNumber).toContain('LG-VI-2024');
     });
 
     it('should find parcels by location', async () => {
-      const results = searchParcels({ query: 'Victoria Island', page: 1, limit: 10 });
+      const results = await searchParcels({ query: 'Victoria Island', page: 1, limit: 10 });
 
       expect(results.parcels.length).toBeGreaterThan(0);
       expect(results.parcels[0].streetAddress).toContain('Victoria Island');
     });
 
     it('should retrieve parcel details with all fields', async () => {
-      const parcel = getParcelByNumber('LG-VI-2024-001');
+      const parcel = await getParcelByNumber('LG-VI-2024-001');
 
       expect(parcel).toBeDefined();
       expect(parcel).toHaveProperty('parcelNumber');
@@ -32,14 +32,14 @@ describe('End-to-End Workflow Tests', () => {
 
   describe('Transaction Workflow', () => {
     it('should retrieve pending transactions', async () => {
-      const results = listTransactions({ status: 'pending_approval', limit: 10 });
+      const results = await listTransactions({ status: 'pending_approval', limit: 10 });
 
       expect(results.transactions.length).toBeGreaterThan(0);
       expect(results.transactions[0].status).toBe('pending_approval');
     });
 
     it('should retrieve completed or registered transactions with lifecycle history', async () => {
-      const results = listTransactions({ limit: 100 });
+      const results = await listTransactions({ limit: 100 });
       const completedTx = results.transactions.find((tx) => tx.paymentStatus === 'paid' && tx.documentStatus === 'verified');
 
       expect(completedTx).toBeDefined();
@@ -49,8 +49,8 @@ describe('End-to-End Workflow Tests', () => {
     });
 
     it('should link transactions to parcels correctly', async () => {
-      const tx = listTransactions({ type: 'transfer', limit: 10 }).transactions[0];
-      const parcel = getParcelById(tx.parcelId);
+      const tx = (await listTransactions({ type: 'transfer', limit: 10 })).transactions[0];
+      const parcel = await getParcelById(tx.parcelId);
 
       expect(tx).toBeDefined();
       expect(parcel).toBeDefined();
@@ -58,7 +58,7 @@ describe('End-to-End Workflow Tests', () => {
     });
 
     it('should track transaction amounts correctly', async () => {
-      const tx = listTransactions({ type: 'transfer', limit: 10 }).transactions[0];
+      const tx = (await listTransactions({ type: 'transfer', limit: 10 })).transactions[0];
 
       expect(tx).toBeDefined();
       expect(tx.considerationAmount).toBeGreaterThan(0);
@@ -98,7 +98,7 @@ describe('End-to-End Workflow Tests', () => {
 
     it('should link verification requests to parcels', async () => {
       const verResults = await verificationService.listVerificationRequests({ parcelId: 'LG-VI-2024-001' }, 1, 10);
-      const parcel = getParcelByNumber('LG-VI-2024-001');
+      const parcel = await getParcelByNumber('LG-VI-2024-001');
 
       expect(verResults.requests.length).toBeGreaterThan(0);
       expect(parcel).toBeDefined();
@@ -107,7 +107,7 @@ describe('End-to-End Workflow Tests', () => {
 
   describe('Data Integrity', () => {
     it('should have consistent user references', async () => {
-      const txResults = listTransactions({ limit: 5 }).transactions;
+      const txResults = (await listTransactions({ limit: 5 })).transactions;
 
       for (const tx of txResults) {
         expect(tx.initiatorId).toBeGreaterThan(0);
@@ -115,7 +115,7 @@ describe('End-to-End Workflow Tests', () => {
     });
 
     it('should have valid timestamps', async () => {
-      const parcelResults = searchParcels({ limit: 5 }).parcels;
+      const parcelResults = (await searchParcels({ limit: 5 })).parcels;
 
       for (const parcel of parcelResults) {
         expect(new Date(parcel.createdAt).toString()).not.toBe('Invalid Date');
@@ -124,7 +124,7 @@ describe('End-to-End Workflow Tests', () => {
     });
 
     it('should have valid coordinates for parcels', async () => {
-      const parcel = getParcelByNumber('LG-VI-2024-001');
+      const parcel = await getParcelByNumber('LG-VI-2024-001');
 
       expect(parcel).toBeDefined();
       const lat = parcel!.coordinates.lat;

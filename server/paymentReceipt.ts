@@ -20,7 +20,7 @@ function writeRow(doc: PDFKit.PDFDocument, label: string, value: string, y: numb
 }
 
 export async function generatePaymentReceiptPdf(transactionId: number): Promise<Buffer> {
-  const payload = buildPaymentReceipt(transactionId);
+  const payload = await buildPaymentReceipt(transactionId);
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
