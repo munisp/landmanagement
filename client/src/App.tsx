@@ -63,6 +63,10 @@ const SupportCenter = lazy(() => import('./pages/SupportCenter'));
 const MarketingCenter = lazy(() => import('./pages/MarketingCenter'));
 const IoTOperations = lazy(() => import('./pages/IoTOperations'));
 const AIDocumentProcessing = lazy(() => import("./pages/AIDocumentProcessing"));
+const TitleRiskCopilot = lazy(() => import("./pages/TitleRiskCopilot"));
+const RegistryIntegrityDashboard = lazy(() => import("./pages/RegistryIntegrityDashboard"));
+const CommandCenter = lazy(() => import("./pages/CommandCenter"));
+const ParcelDigitalTwin = lazy(() => import("./pages/ParcelDigitalTwin"));
 const DroneProcessing = lazy(() => import("./pages/DroneProcessing"));
 const TaxAssessment = lazy(() => import("./pages/TaxAssessment"));
 const GeospatialSearchPage = lazy(() => import("./pages/GeospatialSearchPage"));
@@ -201,6 +205,10 @@ function Router() {
       <Route path="/marketing-center" component={MarketingCenter} />
       <Route path="/iot-operations" component={IoTOperations} />
       <Route path="/ai-document-processing" component={AIDocumentProcessing} />
+      <Route path="/title-risk" component={TitleRiskCopilot} />
+      <Route path="/registry-integrity" component={RegistryIntegrityDashboard} />
+      <Route path="/command-center" component={CommandCenter} />
+      <Route path="/digital-twin" component={ParcelDigitalTwin} />
       <Route path="/drone-processing" component={DroneProcessing} />
       <Route path="/tax-assessment" component={TaxAssessment} />
       <Route path={"/404"} component={NotFound} />
