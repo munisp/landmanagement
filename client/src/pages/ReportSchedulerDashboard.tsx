@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -952,9 +953,9 @@ export default function ReportSchedulerDashboard() {
               </div>
               <div className="bg-white border rounded-lg p-4">
                 <p className="text-sm font-medium mb-2">Email Body:</p>
-                <div 
+                <div
                   className="prose max-w-none"
-                  dangerouslySetInnerHTML={{ __html: previewData.html }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewData.html) }}
                 />
               </div>
             </div>
