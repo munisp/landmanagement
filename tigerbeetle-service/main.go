@@ -12,11 +12,9 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc/status"
 
 	pb "github.com/idlr-pts/tigerbeetle-service/proto"
 	tb "github.com/tigerbeetle/tigerbeetle-go"
@@ -24,8 +22,8 @@ import (
 )
 
 var (
-	port              = flag.Int("port", 50051, "The server port")
-	tigerBeetleAddr   = flag.String("tigerbeetle-addr", "3000", "TigerBeetle cluster address")
+	port               = flag.Int("port", 50051, "The server port")
+	tigerBeetleAddr    = flag.String("tigerbeetle-addr", "3000", "TigerBeetle cluster address")
 	tigerBeetleCluster = flag.Uint("tigerbeetle-cluster", 0, "TigerBeetle cluster ID")
 )
 
@@ -70,18 +68,15 @@ func (s *server) CreateAccount(ctx context.Context, req *pb.CreateAccountRequest
 
 	// Create TigerBeetle account
 	account := types.Account{
-		ID:             accountID,
-		UserData128:    userData,
-		UserData64:     0,
-		UserData32:     0,
-		Ledger:         req.LedgerId,
-		Code:           uint16(req.Code),
-		Flags:          flags,
-		DebitsPending:  0,
-		DebitsPosted:   0,
-		CreditsPending: 0,
-		CreditsPosted:  0,
-		Timestamp:      0, // TigerBeetle will set this
+		ID:          accountID,
+		UserData128: userData,
+		UserData64:  0,
+		UserData32:  0,
+		Ledger:      req.LedgerId,
+		Code:        uint16(req.Code),
+		Flags:       flags,
+		// Balance fields (DebitsPending/DebitsPosted/CreditsPending/CreditsPosted)
+		// and Timestamp are Uint128/uint64 zero values managed by TigerBeetle.
 	}
 
 	// Submit account creation
@@ -105,16 +100,16 @@ func (s *server) CreateAccount(ctx context.Context, req *pb.CreateAccountRequest
 	return &pb.CreateAccountResponse{
 		Success: true,
 		Account: &pb.Account{
-			AccountId:       req.AccountId,
-			LedgerId:        req.LedgerId,
-			Code:            req.Code,
-			Type:            req.Type,
-			DebitsPosted:    0,
-			CreditsPosted:   0,
-			DebitsPending:   0,
-			CreditsPending:  0,
-			UserData_128:    req.UserData_128,
-			Timestamp:       time.Now().UnixNano(),
+			AccountId:      req.AccountId,
+			LedgerId:       req.LedgerId,
+			Code:           req.Code,
+			Type:           req.Type,
+			DebitsPosted:   0,
+			CreditsPosted:  0,
+			DebitsPending:  0,
+			CreditsPending: 0,
+			UserData_128:   req.UserData_128,
+			Timestamp:      time.Now().UnixNano(),
 		},
 	}, nil
 }
@@ -153,16 +148,16 @@ func (s *server) GetAccount(ctx context.Context, req *pb.GetAccountRequest) (*pb
 	return &pb.GetAccountResponse{
 		Success: true,
 		Account: &pb.Account{
-			AccountId:       req.AccountId,
-			LedgerId:        account.Ledger,
-			Code:            uint32(account.Code),
-			Type:            accountType,
-			DebitsPosted:    int64(account.DebitsPosted),
-			CreditsPosted:   int64(account.CreditsPosted),
-			DebitsPending:   int64(account.DebitsPending),
-			CreditsPending:  int64(account.CreditsPending),
-			UserData_128:    formatUserData(account.UserData128),
-			Timestamp:       int64(account.Timestamp),
+			AccountId:      req.AccountId,
+			LedgerId:       account.Ledger,
+			Code:           uint32(account.Code),
+			Type:           accountType,
+			DebitsPosted:   int64(uint128ToUint64(account.DebitsPosted)),
+			CreditsPosted:  int64(uint128ToUint64(account.CreditsPosted)),
+			DebitsPending:  int64(uint128ToUint64(account.DebitsPending)),
+			CreditsPending: int64(uint128ToUint64(account.CreditsPending)),
+			UserData_128:   formatUserData(account.UserData128),
+			Timestamp:      int64(account.Timestamp),
 		},
 	}, nil
 }
@@ -195,15 +190,17 @@ func (s *server) GetAccountBalance(ctx context.Context, req *pb.GetAccountBalanc
 	}
 
 	account := accounts[0]
-	balance := int64(account.CreditsPosted) - int64(account.DebitsPosted)
+	debitsPosted := uint128ToUint64(account.DebitsPosted)
+	creditsPosted := uint128ToUint64(account.CreditsPosted)
+	balance := int64(creditsPosted) - int64(debitsPosted)
 
 	return &pb.GetAccountBalanceResponse{
-		Success:         true,
-		DebitsPosted:    int64(account.DebitsPosted),
-		CreditsPosted:   int64(account.CreditsPosted),
-		DebitsPending:   int64(account.DebitsPending),
-		CreditsPending:  int64(account.CreditsPending),
-		Balance:         balance,
+		Success:        true,
+		DebitsPosted:   int64(debitsPosted),
+		CreditsPosted:  int64(creditsPosted),
+		DebitsPending:  int64(uint128ToUint64(account.DebitsPending)),
+		CreditsPending: int64(uint128ToUint64(account.CreditsPending)),
+		Balance:        balance,
 	}, nil
 }
 
@@ -277,15 +274,15 @@ func (s *server) CreateTransfer(ctx context.Context, req *pb.CreateTransferReque
 	return &pb.CreateTransferResponse{
 		Success: true,
 		Transfer: &pb.Transfer{
-			TransferId:       req.TransferId,
-			DebitAccountId:   req.DebitAccountId,
-			CreditAccountId:  req.CreditAccountId,
-			Amount:           req.Amount,
-			LedgerId:         req.LedgerId,
-			Code:             req.Code,
-			Status:           pb.TransferStatus_TRANSFER_STATUS_POSTED,
-			UserData_128:     req.UserData_128,
-			Timestamp:        time.Now().UnixNano(),
+			TransferId:      req.TransferId,
+			DebitAccountId:  req.DebitAccountId,
+			CreditAccountId: req.CreditAccountId,
+			Amount:          req.Amount,
+			LedgerId:        req.LedgerId,
+			Code:            req.Code,
+			Status:          pb.TransferStatus_TRANSFER_STATUS_POSTED,
+			UserData_128:    req.UserData_128,
+			Timestamp:       time.Now().UnixNano(),
 		},
 	}, nil
 }
@@ -359,15 +356,15 @@ func (s *server) CreatePendingTransfer(ctx context.Context, req *pb.CreatePendin
 	return &pb.CreatePendingTransferResponse{
 		Success: true,
 		Transfer: &pb.Transfer{
-			TransferId:       req.TransferId,
-			DebitAccountId:   req.DebitAccountId,
-			CreditAccountId:  req.CreditAccountId,
-			Amount:           req.Amount,
-			LedgerId:         req.LedgerId,
-			Code:             req.Code,
-			Status:           pb.TransferStatus_TRANSFER_STATUS_PENDING,
-			UserData_128:     req.UserData_128,
-			Timestamp:        time.Now().UnixNano(),
+			TransferId:      req.TransferId,
+			DebitAccountId:  req.DebitAccountId,
+			CreditAccountId: req.CreditAccountId,
+			Amount:          req.Amount,
+			LedgerId:        req.LedgerId,
+			Code:            req.Code,
+			Status:          pb.TransferStatus_TRANSFER_STATUS_PENDING,
+			UserData_128:    req.UserData_128,
+			Timestamp:       time.Now().UnixNano(),
 		},
 	}, nil
 }
@@ -386,10 +383,10 @@ func (s *server) PostPendingTransfer(ctx context.Context, req *pb.PostPendingTra
 
 	// Create a post-pending transfer (commits the pending transfer)
 	postTransfer := types.Transfer{
-		ID:              types.ToUint128(0), // New ID for the post operation
-		PendingID:       transferID,
-		Flags:           types.TransferFlags{PostPendingTransfer: true}.ToUint16(),
-		Timestamp:       0,
+		ID:        types.ToUint128(0), // New ID for the post operation
+		PendingID: transferID,
+		Flags:     types.TransferFlags{PostPendingTransfer: true}.ToUint16(),
+		Timestamp: 0,
 	}
 
 	result, err := s.client.CreateTransfers([]types.Transfer{postTransfer})
@@ -426,10 +423,10 @@ func (s *server) VoidPendingTransfer(ctx context.Context, req *pb.VoidPendingTra
 
 	// Create a void-pending transfer (cancels the pending transfer)
 	voidTransfer := types.Transfer{
-		ID:              types.ToUint128(0), // New ID for the void operation
-		PendingID:       transferID,
-		Flags:           types.TransferFlags{VoidPendingTransfer: true}.ToUint16(),
-		Timestamp:       0,
+		ID:        types.ToUint128(0), // New ID for the void operation
+		PendingID: transferID,
+		Flags:     types.TransferFlags{VoidPendingTransfer: true}.ToUint16(),
+		Timestamp: 0,
 	}
 
 	result, err := s.client.CreateTransfers([]types.Transfer{voidTransfer})
@@ -562,15 +559,15 @@ func (s *server) GetTransfer(ctx context.Context, req *pb.GetTransferRequest) (*
 	return &pb.GetTransferResponse{
 		Success: true,
 		Transfer: &pb.Transfer{
-			TransferId:       req.TransferId,
-			DebitAccountId:   formatUUID(transfer.DebitAccountID),
-			CreditAccountId:  formatUUID(transfer.CreditAccountID),
-			Amount:           int64(types.BigIntFromUint128(transfer.Amount).Uint64()),
-			LedgerId:         transfer.Ledger,
-			Code:             uint32(transfer.Code),
-			Status:           status,
-			UserData_128:     formatUserData(transfer.UserData128),
-			Timestamp:        int64(transfer.Timestamp),
+			TransferId:      req.TransferId,
+			DebitAccountId:  formatUUID(transfer.DebitAccountID),
+			CreditAccountId: formatUUID(transfer.CreditAccountID),
+			Amount:          int64(uint128ToUint64(transfer.Amount)),
+			LedgerId:        transfer.Ledger,
+			Code:            uint32(transfer.Code),
+			Status:          status,
+			UserData_128:    formatUserData(transfer.UserData128),
+			Timestamp:       int64(transfer.Timestamp),
 		},
 	}, nil
 }
@@ -579,26 +576,114 @@ func (s *server) GetTransfer(ctx context.Context, req *pb.GetTransferRequest) (*
 func (s *server) GetAccountTransfers(ctx context.Context, req *pb.GetAccountTransfersRequest) (*pb.GetAccountTransfersResponse, error) {
 	log.Printf("GetAccountTransfers: account_id=%s, limit=%d", req.AccountId, req.Limit)
 
-	// Note: TigerBeetle doesn't have a direct "get transfers by account" query
-	// This would need to be implemented using a secondary index or separate tracking
-	// For now, return a not implemented error
+	accountID, err := parseUUID(req.AccountId)
+	if err != nil {
+		return &pb.GetAccountTransfersResponse{
+			Success: false,
+			Error:   fmt.Sprintf("invalid account_id: %v", err),
+		}, nil
+	}
+
+	// TigerBeetle natively supports per-account transfer history via the
+	// get_account_transfers operation (no secondary index required).
+	limit := uint32(req.Limit)
+	if limit == 0 || limit > 8190 {
+		limit = 8190 // TigerBeetle maximum batch size
+	}
+
+	filter := types.AccountFilter{
+		AccountID: accountID,
+		Limit:     limit,
+		Flags: types.AccountFilterFlags{
+			Debits:   true,
+			Credits:  true,
+			Reversed: true,
+		}.ToUint32(),
+	}
+	if req.TimestampMin > 0 {
+		filter.TimestampMin = uint64(req.TimestampMin)
+	}
+	if req.TimestampMax > 0 {
+		filter.TimestampMax = uint64(req.TimestampMax)
+	}
+
+	transfers, err := s.client.GetAccountTransfers(filter)
+	if err != nil {
+		return &pb.GetAccountTransfersResponse{
+			Success: false,
+			Error:   fmt.Sprintf("failed to query account transfers: %v", err),
+		}, nil
+	}
+
+	pbTransfers := make([]*pb.Transfer, 0, len(transfers))
+	for _, transfer := range transfers {
+		pbTransfers = append(pbTransfers, &pb.Transfer{
+			TransferId:      formatUUID(transfer.ID),
+			DebitAccountId:  formatUUID(transfer.DebitAccountID),
+			CreditAccountId: formatUUID(transfer.CreditAccountID),
+			Amount:          int64(uint128ToUint64(transfer.Amount)),
+			LedgerId:        transfer.Ledger,
+			Code:            uint32(transfer.Code),
+			Status:          transferStatusFromFlags(transfer.Flags),
+			UserData_128:    formatUserData(transfer.UserData128),
+			Timestamp:       int64(transfer.Timestamp),
+		})
+	}
+
 	return &pb.GetAccountTransfersResponse{
-		Success: false,
-		Error:   "GetAccountTransfers not yet implemented - requires secondary indexing",
-	}, status.Error(codes.Unimplemented, "method not implemented")
+		Success:   true,
+		Transfers: pbTransfers,
+	}, nil
 }
 
 // GetLedgerBalance retrieves total ledger balance
 func (s *server) GetLedgerBalance(ctx context.Context, req *pb.GetLedgerBalanceRequest) (*pb.GetLedgerBalanceResponse, error) {
 	log.Printf("GetLedgerBalance: ledger_id=%d", req.LedgerId)
 
-	// Note: TigerBeetle doesn't have a direct "get ledger balance" query
-	// This would need to be calculated by summing all accounts in the ledger
-	// For now, return a not implemented error
+	// Aggregate posted debits/credits across every account in the ledger using
+	// TigerBeetle's native query_accounts operation, paging at the maximum
+	// batch size until the ledger is exhausted.
+	var totalDebits uint64
+	var totalCredits uint64
+	var timestampMin uint64
+
+	for {
+		accounts, err := s.client.QueryAccounts(types.QueryFilter{
+			Ledger:       req.LedgerId,
+			Limit:        8190, // TigerBeetle maximum batch size
+			TimestampMin: timestampMin,
+		})
+		if err != nil {
+			return &pb.GetLedgerBalanceResponse{
+				Success: false,
+				Error:   fmt.Sprintf("failed to query ledger accounts: %v", err),
+			}, nil
+		}
+		if len(accounts) == 0 {
+			break
+		}
+
+		for _, account := range accounts {
+			totalDebits += uint128ToUint64(account.DebitsPosted)
+			totalCredits += uint128ToUint64(account.CreditsPosted)
+			if account.Timestamp > timestampMin {
+				timestampMin = account.Timestamp
+			}
+		}
+
+		if len(accounts) < 8190 {
+			break
+		}
+		// Advance past the last account in this page (timestamps are unique).
+		timestampMin++
+	}
+
 	return &pb.GetLedgerBalanceResponse{
-		Success: false,
-		Error:   "GetLedgerBalance not yet implemented - requires account aggregation",
-	}, status.Error(codes.Unimplemented, "method not implemented")
+		Success:      true,
+		TotalDebits:  int64(totalDebits),
+		TotalCredits: int64(totalCredits),
+		Balance:      int64(totalCredits) - int64(totalDebits),
+	}, nil
 }
 
 func main() {
@@ -606,8 +691,8 @@ func main() {
 
 	// Initialize TigerBeetle client
 	log.Printf("Connecting to TigerBeetle at %s (cluster %d)...", *tigerBeetleAddr, *tigerBeetleCluster)
-	
-	client, err := tb.NewClient(uint128(*tigerBeetleCluster), []string{*tigerBeetleAddr}, 32)
+
+	client, err := tb.NewClient(uint128(uint64(*tigerBeetleCluster)), []string{*tigerBeetleAddr})
 	if err != nil {
 		log.Fatalf("Failed to create TigerBeetle client: %v", err)
 	}
@@ -622,15 +707,15 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	
+
 	// Register ledger service
 	pb.RegisterLedgerServiceServer(grpcServer, NewServer(client))
-	
+
 	// Register health service
 	healthServer := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
-	
+
 	// Register reflection service (for grpcurl)
 	reflection.Register(grpcServer)
 
@@ -650,6 +735,13 @@ func main() {
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
+}
+
+// uint128ToUint64 converts a TigerBeetle Uint128 amount to a uint64.
+// TigerBeetle monetary amounts fit comfortably in uint64 for this platform.
+func uint128ToUint64(value types.Uint128) uint64 {
+	bi := value.BigInt()
+	return bi.Uint64()
 }
 
 // Helper function to convert UUID string to Uint128
@@ -672,7 +764,7 @@ func generateUUIDFromString(s string) (types.Uint128, error) {
 
 // Helper function to format UUID
 func formatUUID(id types.Uint128) string {
-	return fmt.Sprintf("%d", types.BigIntFromUint128(id).Uint64())
+	return fmt.Sprintf("%d", uint128ToUint64(id))
 }
 
 // Helper function to parse user data
@@ -687,7 +779,7 @@ func parseUserData(data string) (types.Uint128, error) {
 
 // Helper function to format user data
 func formatUserData(data types.Uint128) string {
-	return fmt.Sprintf("%d", types.BigIntFromUint128(data).Uint64())
+	return fmt.Sprintf("%d", uint128ToUint64(data))
 }
 
 // Helper function to convert account type to flags
@@ -716,13 +808,15 @@ func flagsToAccountType(flags uint16) pb.AccountType {
 
 // Helper function to get transfer status from flags
 func transferStatusFromFlags(flags uint16) pb.TransferStatus {
-	transferFlags := types.TransferFlags{}
-	transferFlags.FromUint16(flags)
-	
-	if transferFlags.Pending {
-		return pb.TransferStatus_TRANSFER_STATUS_PENDING
-	} else if transferFlags.VoidPendingTransfer {
+	// Decode per the TigerBeetle transfer flags bit layout:
+	// bit 1 = pending, bit 2 = post_pending_transfer, bit 3 = void_pending_transfer.
+	pending := (flags>>1)&0x1 == 1
+	voidPending := (flags>>3)&0x1 == 1
+
+	if voidPending {
 		return pb.TransferStatus_TRANSFER_STATUS_VOIDED
+	} else if pending {
+		return pb.TransferStatus_TRANSFER_STATUS_PENDING
 	}
 	return pb.TransferStatus_TRANSFER_STATUS_POSTED
 }
