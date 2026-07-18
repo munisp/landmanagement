@@ -239,6 +239,27 @@ test_cache_functionality() {
     fi
 }
 
+# Next-generation feature routers (2026-07-18)
+# These are authenticated routers: a 401 response proves the route is
+# registered AND that authentication is enforced (a 404 would mean the
+# router failed to mount).
+test_nextgen_feature_routers() {
+    log_info "=== Next-Generation Feature Router Smoke Tests ==="
+    local -a protected_queries=(
+        "titleRisk.portfolioSummary"
+        "titleRisk.list"
+        "registryIntegrity.stats"
+        "registryIntegrity.findings"
+        "escrowSettlement.list"
+        "mortgageExplainability.list"
+        "dataExchange.policies"
+        "clearanceExchange.catalog"
+    )
+    for procedure in "${protected_queries[@]}"; do
+        run_test "Feature router mounted + auth enforced: $procedure" "/api/trpc/$procedure" 401
+    done
+}
+
 # Main test flow
 main() {
     echo ""
@@ -265,7 +286,8 @@ main() {
     test_response_times
     test_database_connectivity
     test_cache_functionality
-    
+    test_nextgen_feature_routers
+
     # Summary
     echo ""
     log_info "========================================="
