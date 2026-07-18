@@ -5,6 +5,7 @@
 
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
+import { authenticateWebSocketUpgrade } from './webSocketAuth';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
@@ -32,29 +33,31 @@ export class DashboardWebSocketService {
       path: '/api/dashboard/ws',
     });
 
-    this.wss.on('connection', (ws: AuthenticatedWebSocket, req) => {
+    this.wss.on('connection', async (ws: AuthenticatedWebSocket, req) => {
       console.log('[DashboardWS] New connection attempt');
-      
-      // Extract user ID from query parameters
-      const url = new URL(req.url!, `http://${req.headers.host}`);
-      const userId = url.searchParams.get('userId');
-      
-      if (!userId || isNaN(parseInt(userId))) {
-        console.log('[DashboardWS] Connection rejected: invalid userId');
-        ws.close(1008, 'Invalid userId');
+
+      // Authenticate the upgrade request against the session pipeline and
+      // derive the user identity from the verified session. The legacy
+      // ?userId= query parameter is intentionally ignored — client-supplied
+      // identities are trivially spoofable.
+      const user = await authenticateWebSocketUpgrade(req);
+      if (!user || typeof user.id !== 'number') {
+        console.log('[DashboardWS] Connection rejected: unauthenticated');
+        ws.close(1008, 'Authentication required');
         return;
       }
 
-      ws.userId = parseInt(userId);
+      const userId = user.id;
+      ws.userId = userId;
       ws.isAlive = true;
 
       // Add client to tracking
-      if (!this.clients.has(ws.userId)) {
-        this.clients.set(ws.userId, new Set());
+      if (!this.clients.has(userId)) {
+        this.clients.set(userId, new Set());
       }
-      this.clients.get(ws.userId)!.add(ws);
+      this.clients.get(userId)!.add(ws);
 
-      console.log(`[DashboardWS] User ${ws.userId} connected. Total clients: ${this.getTotalClients()}`);
+      console.log(`[DashboardWS] User ${userId} connected. Total clients: ${this.getTotalClients()}`);
 
       // Send connection confirmation
       ws.send(JSON.stringify({

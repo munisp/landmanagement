@@ -1,15 +1,7 @@
-import { getDb } from './db';
-import { apiKeys } from '../drizzle/schema';
-import { eq, and, desc, sql, gte } from 'drizzle-orm';
+import { requireDb } from './db';
+import { apiKeys, apiKeyUsageEvents } from '../drizzle/schema';
+import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
-import {
-  createOfflineApiKey,
-  getOfflineApiKeyUsageStats,
-  listOfflineApiKeys,
-  revokeOfflineApiKey,
-  rotateOfflineApiKey,
-  validateOfflineApiKey,
-} from './apiKeyRepository';
 
 export interface ApiKey {
   id: string;
@@ -46,8 +38,7 @@ function generateApiKey(): string {
  * List all API keys for a user
  */
 export async function listApiKeys(userId: string): Promise<ApiKey[]> {
-  const db = await getDb();
-  if (!db) return listOfflineApiKeys(userId);
+  const db = await requireDb();
   const keys = await db
     .select()
     .from(apiKeys)
@@ -72,8 +63,7 @@ export async function listApiKeys(userId: string): Promise<ApiKey[]> {
  * Create a new API key
  */
 export async function createApiKey(userId: string, name: string): Promise<ApiKey> {
-  const db = await getDb();
-  if (!db) return createOfflineApiKey(userId, name);
+  const db = await requireDb();
   const key = generateApiKey();
   
   const [newKey] = await db
@@ -110,8 +100,7 @@ export async function createApiKey(userId: string, name: string): Promise<ApiKey
  * Revoke an API key
  */
 export async function revokeApiKey(userId: string, keyId: string): Promise<void> {
-  const db = await getDb();
-  if (!db) return revokeOfflineApiKey(userId, keyId);
+  const db = await requireDb();
   await db
     .update(apiKeys)
     .set({ isActive: false })
@@ -122,8 +111,7 @@ export async function revokeApiKey(userId: string, keyId: string): Promise<void>
  * Rotate an API key (revoke old, create new with same name)
  */
 export async function rotateApiKey(userId: string, keyId: string): Promise<ApiKey> {
-  const db = await getDb();
-  if (!db) return rotateOfflineApiKey(userId, keyId);
+  const db = await requireDb();
   
   // Get the old key
   const [oldKey] = await db
@@ -146,8 +134,7 @@ export async function rotateApiKey(userId: string, keyId: string): Promise<ApiKe
  * Get usage statistics for a user's API keys
  */
 export async function getUsageStats(userId: string): Promise<UsageStats> {
-  const db = await getDb();
-  if (!db) return getOfflineApiKeyUsageStats(userId);
+  const db = await requireDb();
   
   // Get all keys for the user
   const userKeys = await db
@@ -157,19 +144,52 @@ export async function getUsageStats(userId: string): Promise<UsageStats> {
   
   const totalKeys = userKeys.length;
   const activeKeys = userKeys.filter(k => k.isActive).length;
-  
-  // Calculate total requests
-  const totalRequests = userKeys.reduce((sum: number, k: any) => sum + k.requestCount, 0);
-  
-  // For demo purposes, simulate today's and this month's requests
-  // In production, you would track this in a separate analytics table
-  const requestsToday = Math.floor(totalRequests * 0.1); // 10% of total
-  const requestsThisMonth = Math.floor(totalRequests * 0.5); // 50% of total
-  
-  // Simulate rate limit hits and error rate
-  const rateLimitHits = Math.floor(totalRequests * 0.02); // 2% hit rate limit
-  const errorRate = 0.5; // 0.5% error rate
-  
+
+  // Real aggregates from the api_key_usage_events table — no simulation.
+  // Events are recorded by validateApiKey on every validated request; rate
+  // limit hits and errors are recorded by the enforcing gateway/middleware.
+  const now = new Date();
+  const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+  const keyIds = userKeys.map(k => k.id);
+  const emptyStats = {
+    totalKeys,
+    activeKeys,
+    requestsToday: 0,
+    requestsThisMonth: 0,
+    rateLimitHits: 0,
+    errorRate: 0,
+  };
+  if (keyIds.length === 0) {
+    return emptyStats;
+  }
+
+  const events = await db
+    .select({ event: apiKeyUsageEvents.event, createdAt: apiKeyUsageEvents.createdAt })
+    .from(apiKeyUsageEvents)
+    .where(inArray(apiKeyUsageEvents.keyId, keyIds));
+
+  let requestsToday = 0;
+  let requestsThisMonth = 0;
+  let rateLimitHits = 0;
+  let errorCount = 0;
+  let totalRequests = 0;
+  for (const e of events) {
+    if (e.event === 'request') {
+      totalRequests += 1;
+      if (e.createdAt >= startOfDay) requestsToday += 1;
+      if (e.createdAt >= startOfMonth) requestsThisMonth += 1;
+    } else if (e.event === 'rate_limit_hit') {
+      rateLimitHits += 1;
+    } else if (e.event === 'error') {
+      errorCount += 1;
+    }
+  }
+  const errorRate = totalRequests + errorCount > 0
+    ? (errorCount / (totalRequests + errorCount)) * 100
+    : 0;
+
   return {
     totalKeys,
     activeKeys,
@@ -184,8 +204,7 @@ export async function getUsageStats(userId: string): Promise<UsageStats> {
  * Validate an API key and increment request count
  */
 export async function validateApiKey(key: string): Promise<ApiKey | null> {
-  const db = await getDb();
-  if (!db) return validateOfflineApiKey(key);
+  const db = await requireDb();
   
   const [apiKey] = await db
     .select()
@@ -201,7 +220,8 @@ export async function validateApiKey(key: string): Promise<ApiKey | null> {
     return null;
   }
   
-  // Update last used timestamp and increment request count
+  // Update last used timestamp, increment request count, and record a real
+  // usage event so getUsageStats aggregates observed traffic.
   await db
     .update(apiKeys)
     .set({
@@ -209,6 +229,7 @@ export async function validateApiKey(key: string): Promise<ApiKey | null> {
       requestCount: sql`${apiKeys.requestCount} + 1`,
     })
     .where(eq(apiKeys.id, apiKey.id));
+  await db.insert(apiKeyUsageEvents).values({ keyId: apiKey.id, event: 'request' });
   
   return {
     id: apiKey.id,

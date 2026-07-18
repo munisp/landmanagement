@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createApiKey, listApiKeys, revokeApiKey, rotateApiKey, getUsageStats, validateApiKey } from './apiKeyService';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { users } from '../drizzle/schema';
 
 describe('API Key Service', () => {
@@ -9,16 +9,11 @@ describe('API Key Service', () => {
   let testKeyValue: string;
 
   beforeAll(async () => {
-    // Get a test user ID from the database when available, otherwise use the offline seed user.
-    const db = await getDb();
-    if (!db) {
-      testUserId = '901';
-      return;
-    }
-    
+    // PGlite is always provisioned by the test setup; requireDb fails fast otherwise.
+    const db = await requireDb();
     const usersList = await db.select().from(users).limit(1);
     if (usersList.length === 0) throw new Error('No users found in database');
-    
+
     testUserId = String(usersList[0].id);
   });
 

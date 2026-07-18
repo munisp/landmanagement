@@ -161,10 +161,16 @@ class SDKServer {
   }
 
   private getSessionSecret() {
+    // ENV.cookieSecret is guaranteed non-empty: env.ts fails fast in
+    // production when JWT_SECRET is missing/weak and substitutes a clearly
+    // marked dev-only secret otherwise. There is deliberately NO predictable
+    // fallback here — a guessable session secret would let anyone forge
+    // admin sessions.
     const configuredSecret = ENV.cookieSecret?.trim();
-    const fallbackSecret = `preview-cookie-secret-${this.getEffectiveAppId()}`;
-    const secret = configuredSecret && configuredSecret.length > 0 ? configuredSecret : fallbackSecret;
-    return new TextEncoder().encode(secret);
+    if (!configuredSecret) {
+      throw new Error("[Auth] Session secret is not configured");
+    }
+    return new TextEncoder().encode(configuredSecret);
   }
 
   /**

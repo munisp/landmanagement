@@ -41,10 +41,15 @@ export function getSessionCookieOptions(
 
   const secure = isSecureRequest(req);
 
+  // SameSite=None (cross-site cookie transport) weakens CSRF defenses and is
+  // therefore opt-in via CROSS_SITE_COOKIES=true for deployments that genuinely
+  // serve the UI cross-origin. Same-origin deployments keep the Lax default.
+  const crossSiteEnabled = process.env.CROSS_SITE_COOKIES === "true";
+
   return {
     httpOnly: true,
     path: "/",
-    sameSite: secure ? "none" : "lax",
+    sameSite: secure && crossSiteEnabled ? "none" : "lax",
     secure,
   };
 }

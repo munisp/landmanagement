@@ -86,11 +86,13 @@ export function corsMiddleware() {
         return callback(null, true);
       }
       
-      // Check if origin is allowed
+      // Check if origin is allowed. Disallowed origins proceed WITHOUT CORS
+      // headers (browser blocks the response client-side) instead of raising
+      // a server error, so misbehaving clients cannot trigger 500s.
       if (allowedOrigins.includes(origin) || NODE_ENV === 'development') {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        callback(null, false);
       }
     },
     credentials: true, // Allow cookies
@@ -110,7 +112,17 @@ export function helmetMiddleware() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Allow inline scripts for development
+        // Production ships external bundles only, so script-src stays strict.
+        // Manus-hosted builds inject an inline `manus-runtime` bootstrap into
+        // index.html; deployments on that platform must opt in to inline
+        // scripts via CSP_ALLOW_INLINE_SCRIPTS=true. Inline/eval are otherwise
+        // a development-only concession to the Vite runtime.
+        scriptSrc:
+          NODE_ENV === 'production'
+            ? process.env.CSP_ALLOW_INLINE_SCRIPTS === 'true'
+              ? ["'self'", "'unsafe-inline'"]
+              : ["'self'"]
+            : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
         imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
@@ -275,6 +287,49 @@ export function requestSizeLimiter(maxSize: string = '10mb') {
 }
 
 /**
+ * Same-origin guard — CSRF defense-in-depth for cookie-authenticated requests.
+ *
+ * The platform's session cookie is SameSite=Lax by default, which already
+ * blocks cross-site sending; this guard adds a second layer: browsers always
+ * attach an Origin (or Referer) header to cross-site POST/PUT/PATCH/DELETE
+ * requests, so a mutating request that carries cookies AND a foreign Origin
+ * is rejected. Bearer-token and API-key clients are exempt (browsers never
+ * attach those credentials automatically, so they are not CSRF vectors), as
+ * are cookie-less requests (nothing to ride).
+ */
+export function sameOriginGuard() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      return next();
+    }
+    if (req.headers.authorization || req.headers['x-api-key']) {
+      return next();
+    }
+    if (!req.headers.cookie) {
+      return next();
+    }
+
+    const originHeader = (req.headers.origin || req.headers.referer) as string | undefined;
+    if (!originHeader) {
+      // Non-browser clients (curl, server-to-server) may omit Origin; without
+      // a browser there is no cross-site cookie-riding vector.
+      return next();
+    }
+
+    try {
+      const originHost = new URL(originHeader).host;
+      if (originHost !== req.headers.host) {
+        return res.status(403).json({ error: 'Cross-origin request rejected' });
+      }
+    } catch {
+      return res.status(403).json({ error: 'Invalid Origin header' });
+    }
+
+    next();
+  };
+}
+
+/**
  * Security headers middleware
  */
 export function securityHeaders() {
@@ -375,5 +430,6 @@ export default {
   validateApiKey,
   ipWhitelist,
   requestSizeLimiter,
+  sameOriginGuard,
   securityHeaders,
 };

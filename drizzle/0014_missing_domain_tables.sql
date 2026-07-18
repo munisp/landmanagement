@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS "mojaloop_fsp_config" (
 	CONSTRAINT "mojaloop_fsp_config_fsp_id_unique" UNIQUE("fsp_id")
 );--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "api_keys" (
-	"id" varchar(64),
+	"id" varchar(64) PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
 	"name" varchar(255) NOT NULL,
 	"key" varchar(128) NOT NULL,
@@ -336,3 +336,7 @@ ALTER TABLE "loan_pool_loans" ADD CONSTRAINT "loan_pool_loans_application_id_mor
 ALTER TABLE "agency_clearances" ADD CONSTRAINT "agency_clearances_transaction_id_transactions_id_fk" FOREIGN KEY ("transaction_id") REFERENCES "public"."registry_transactions"("id") ON DELETE no action ON UPDATE no action;;--> statement-breakpoint
 ALTER TABLE "escrow_settlements" ADD CONSTRAINT "escrow_settlements_transaction_id_transactions_id_fk" FOREIGN KEY ("transaction_id") REFERENCES "public"."registry_transactions"("id") ON DELETE no action ON UPDATE no action;;--> statement-breakpoint
 ALTER TABLE "title_risk_assessments" ADD CONSTRAINT "title_risk_assessments_transaction_id_transactions_id_fk" FOREIGN KEY ("transaction_id") REFERENCES "public"."registry_transactions"("id") ON DELETE no action ON UPDATE no action;;--> statement-breakpoint
+
+-- api_keys ownership FK (users is created in 0000; omitted from the initial
+-- version of this migration together with the id PRIMARY KEY, both fixed here).
+ALTER TABLE "api_keys" ADD CONSTRAINT "api_keys_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;;--> statement-breakpoint

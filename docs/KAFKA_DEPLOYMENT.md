@@ -910,10 +910,10 @@ keytool -keystore kafka.broker1.keystore.jks -alias localhost -import -file cert
 listeners=SSL://kafka-1:9093
 advertised.listeners=SSL://kafka-1:9093
 ssl.keystore.location=/etc/kafka/secrets/kafka.broker1.keystore.jks
-ssl.keystore.password=changeit
-ssl.key.password=changeit
+ssl.keystore.password=<keystore-password>
+ssl.key.password=<key-password>
 ssl.truststore.location=/etc/kafka/secrets/kafka.broker1.truststore.jks
-ssl.truststore.password=changeit
+ssl.truststore.password=<truststore-password>
 ssl.client.auth=required
 ```
 
@@ -934,7 +934,7 @@ Create `kafka_server_jaas.conf`:
 KafkaServer {
    org.apache.kafka.common.security.plain.PlainLoginModule required
    username="admin"
-   password="admin-secret"
+   password="<admin-password>"
    user_admin="admin-secret"
    user_idlr="idlr-secret";
 };

@@ -2,6 +2,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { getDb } from './db';
 import { mortgageApplications, brokerCommissions, loanPools } from '../drizzle/schema';
 import { eq, desc } from 'drizzle-orm';
+import { authenticateWebSocketUpgrade } from './webSocketAuth';
 
 export interface MortgageEvent {
   type: 'application_submitted' | 'application_approved' | 'application_rejected' | 
@@ -24,12 +25,22 @@ class RealtimeWebSocketService {
   initialize(server: any) {
     this.wss = new WebSocketServer({ server, path: '/ws/mortgage-events' });
 
-    this.wss.on('connection', (ws: WebSocket, req: any) => {
-      const clientId = this.generateClientId();
-      console.log(`[WebSocket] New client connected: ${clientId}`);
+    this.wss.on('connection', async (ws: WebSocket, req: any) => {
+      // Authenticate the upgrade request against the session pipeline; the
+      // verified session user is bound to the connection for targeted
+      // broadcasts. Client-supplied identities are never trusted.
+      const user = await authenticateWebSocketUpgrade(req);
+      if (!user) {
+        console.log('[WebSocket] Connection rejected: unauthenticated');
+        ws.close(1008, 'Authentication required');
+        return;
+      }
 
-      // Store client connection
-      this.clients.set(clientId, { ws });
+      const clientId = this.generateClientId();
+      console.log(`[WebSocket] New client connected: ${clientId} (user ${user.id})`);
+
+      // Store client connection with the session-derived user identity
+      this.clients.set(clientId, { ws, userId: typeof user.id === 'number' ? user.id : undefined });
 
       // Send connection success message
       ws.send(JSON.stringify({
@@ -80,12 +91,12 @@ class RealtimeWebSocketService {
 
     switch (data.type) {
       case 'authenticate':
-        // Store user ID for targeted broadcasts
-        client.userId = data.userId;
-        this.clients.set(clientId, client);
+        // The user identity was bound from the verified session at upgrade
+        // time. The client-supplied userId is intentionally IGNORED — acting
+        // on it would let any connection impersonate any user.
         client.ws.send(JSON.stringify({
           type: 'authenticated',
-          userId: data.userId,
+          userId: client.userId ?? null,
           timestamp: new Date().toISOString(),
         }));
         break;

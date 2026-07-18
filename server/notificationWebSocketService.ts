@@ -3,6 +3,7 @@ import type { Server } from 'http';
 import { getDb } from './db';
 import { adminNotifications } from '../drizzle/schema';
 import { eq, and, desc } from 'drizzle-orm';
+import { authenticateWebSocketUpgrade } from './webSocketAuth';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
@@ -20,32 +21,34 @@ export class NotificationWebSocketService {
       path: '/api/notifications/ws',
     });
 
-    this.wss.on('connection', (ws: AuthenticatedWebSocket, req) => {
+    this.wss.on('connection', async (ws: AuthenticatedWebSocket, req) => {
       console.log('[WebSocket] New connection attempt');
-      
-      // Extract user ID from query parameters or headers
-      const url = new URL(req.url!, `http://${req.headers.host}`);
-      const userId = url.searchParams.get('userId');
-      
-      if (!userId || isNaN(parseInt(userId))) {
-        console.log('[WebSocket] Connection rejected: invalid userId');
-        ws.close(1008, 'Invalid userId');
+
+      // Authenticate the upgrade request against the session pipeline and
+      // derive the user identity from the verified session. The legacy
+      // ?userId= query parameter is intentionally ignored — client-supplied
+      // identities are trivially spoofable.
+      const user = await authenticateWebSocketUpgrade(req);
+      if (!user || typeof user.id !== 'number') {
+        console.log('[WebSocket] Connection rejected: unauthenticated');
+        ws.close(1008, 'Authentication required');
         return;
       }
 
-      ws.userId = parseInt(userId);
+      const userId = user.id;
+      ws.userId = userId;
       ws.isAlive = true;
 
       // Add client to tracking
-      if (!this.clients.has(ws.userId)) {
-        this.clients.set(ws.userId, new Set());
+      if (!this.clients.has(userId)) {
+        this.clients.set(userId, new Set());
       }
-      this.clients.get(ws.userId)!.add(ws);
+      this.clients.get(userId)!.add(ws);
 
-      console.log(`[WebSocket] User ${ws.userId} connected. Total clients: ${this.getTotalClients()}`);
+      console.log(`[WebSocket] User ${userId} connected. Total clients: ${this.getTotalClients()}`);
 
       // Send initial unread count
-      this.sendUnreadCount(ws.userId);
+      this.sendUnreadCount(userId);
 
       // Handle pong responses
       ws.on('pong', () => {

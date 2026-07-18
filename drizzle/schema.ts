@@ -668,6 +668,22 @@ export const apiKeys = pgTable("api_keys", {
   isActiveIdx: index("api_keys_is_active_idx").on(table.isActive),
 }));
 
+/**
+ * Real per-event usage telemetry for API keys. validateApiKey appends a
+ * 'request' event on every validated call; the enforcing gateway/middleware
+ * appends 'rate_limit_hit' and 'error' events. getUsageStats aggregates this
+ * table — no simulated metrics.
+ */
+export const apiKeyUsageEvents = pgTable("api_key_usage_events", {
+  id: serial("id").primaryKey(),
+  keyId: varchar("key_id", { length: 64 }).notNull().references(() => apiKeys.id, { onDelete: 'cascade' }),
+  event: varchar("event", { length: 32 }).notNull(), // 'request' | 'rate_limit_hit' | 'error'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  keyIdx: index("api_key_usage_events_key_idx").on(table.keyId),
+  createdAtIdx: index("api_key_usage_events_created_at_idx").on(table.createdAt),
+}));
+
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type InsertApiKey = typeof apiKeys.$inferInsert;
 
