@@ -78,6 +78,13 @@
       "when": 1784330400000,
       "tag": "0010_silent_control",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784380422398,
+      "tag": "0011_nextgen_feature_domain",
+      "breakpoints": true
     }
   ]
 }
