@@ -4,6 +4,7 @@
  */
 
 import axios from 'axios';
+import { assertMockFallbackAllowed } from './_core/mockGuard';
 
 // ============================================
 // BANK API INTEGRATION
@@ -454,7 +455,8 @@ export async function getCreditScore(userId: number): Promise<CreditScoreRespons
       factors: response.data.factors,
     };
   } catch (error: any) {
-    // Return mock data if credit bureau is unavailable
+    // Mock credit data must never silently drive production underwriting.
+    assertMockFallbackAllowed('credit-bureau-score');
     return {
       score: 650,
       rating: 'Fair',
