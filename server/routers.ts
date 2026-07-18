@@ -29,6 +29,16 @@ import { cachedParcelRouter } from './api/routers/cached-parcel';
 import { cachedTransactionRouter } from './api/routers/cached-transaction';
 import { integrationHealthRouter } from './api/routers/integration-health';
 import { integrationRegistryRouter } from './api/routers/integration-registry';
+import { titleRiskRouter } from './api/routers/title-risk';
+import { registryIntegrityRouter } from './api/routers/registry-integrity';
+import { escrowSettlementRouter } from './api/routers/escrow-settlement';
+import { mortgageExplainabilityRouter } from './api/routers/mortgage-explainability';
+import { dataExchangeRouter } from './api/routers/data-exchange';
+import { clearanceExchangeRouter } from './api/routers/clearance-exchange';
+import { parcelDigitalTwinRouter } from './api/routers/parcel-digital-twin';
+import { caseConciergeRouter } from './api/routers/case-concierge';
+import { operationalEventsRouter } from './api/routers/operational-events';
+import { commandCenterRouter } from './api/routers/command-center';
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { notificationService } from "./notifications";
@@ -141,6 +151,16 @@ export const appRouter = router({
   cachedTransaction: cachedTransactionRouter,
   integrationHealth: integrationHealthRouter,
   integrationRegistry: integrationRegistryRouter,
+  titleRisk: titleRiskRouter,
+  registryIntegrity: registryIntegrityRouter,
+  escrowSettlement: escrowSettlementRouter,
+  mortgageExplainability: mortgageExplainabilityRouter,
+  dataExchange: dataExchangeRouter,
+  clearanceExchange: clearanceExchangeRouter,
+  parcelDigitalTwin: parcelDigitalTwinRouter,
+  caseConcierge: caseConciergeRouter,
+  operationalEvents: operationalEventsRouter,
+  commandCenter: commandCenterRouter,
 
   // Storage upload endpoint
   storage: router({

@@ -2757,3 +2757,172 @@ export type LakehouseSyncJob = typeof lakehouseSyncJobs.$inferSelect;
 export type InsertLakehouseSyncJob = typeof lakehouseSyncJobs.$inferInsert;
 export type LakehouseQueryAudit = typeof lakehouseQueryAudit.$inferSelect;
 export type InsertLakehouseQueryAudit = typeof lakehouseQueryAudit.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Next-generation feature domain (2026-07-18)
+// Title Risk Copilot, Registry Integrity Monitoring, Programmable Escrow
+// Settlement, Explainable Mortgage Decisioning, Federated Clearance Exchange,
+// Privacy-Aware Data Exchange Gateway
+// ---------------------------------------------------------------------------
+
+export const riskBandEnum = pgEnum("risk_band", ["low", "medium", "high", "critical"]);
+export const integrityFindingSeverityEnum = pgEnum("integrity_finding_severity", ["info", "low", "medium", "high", "critical"]);
+export const integrityFindingStatusEnum = pgEnum("integrity_finding_status", ["open", "acknowledged", "resolved", "dismissed"]);
+export const settlementStatusEnum = pgEnum("settlement_status", ["draft", "pending", "release_ready", "released", "blocked", "cancelled"]);
+export const checkpointStatusEnum = pgEnum("checkpoint_status", ["pending", "fulfilled", "waived", "failed"]);
+export const clearanceStatusEnum = pgEnum("clearance_status", ["pending", "submitted", "approved", "rejected", "expired"]);
+export const exchangeDecisionEnum = pgEnum("exchange_decision", ["allowed", "denied", "conditional"]);
+
+/** Title Risk Copilot — persisted risk assessments per parcel/transaction. */
+export const titleRiskAssessments = pgTable("title_risk_assessments", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  parcelId: integer("parcel_id").references(() => parcels.id),
+  transactionId: integer("transaction_id").references(() => transactions.id),
+  overallScore: integer("overall_score").notNull(),
+  riskBand: riskBandEnum("risk_band").notNull(),
+  factorScores: jsonb("factor_scores"),
+  drivers: jsonb("drivers"),
+  recommendations: jsonb("recommendations"),
+  assessedBy: integer("assessed_by").references(() => users.id),
+  assessedAt: timestamp("assessed_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  parcelIdx: index("title_risk_assessments_parcel_idx").on(table.parcelId),
+  bandIdx: index("title_risk_assessments_band_idx").on(table.riskBand),
+  assessedAtIdx: index("title_risk_assessments_assessed_at_idx").on(table.assessedAt),
+}));
+
+/** Registry Integrity Monitoring — anomaly findings with operator review queue. */
+export const registryIntegrityFindings = pgTable("registry_integrity_findings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  checkType: varchar("check_type", { length: 64 }).notNull(),
+  severity: integrityFindingSeverityEnum("severity").default("medium").notNull(),
+  status: integrityFindingStatusEnum("status").default("open").notNull(),
+  parcelId: integer("parcel_id").references(() => parcels.id),
+  relatedEntityType: varchar("related_entity_type", { length: 64 }),
+  relatedEntityId: integer("related_entity_id"),
+  description: text("description").notNull(),
+  evidence: jsonb("evidence"),
+  detectedBy: varchar("detected_by", { length: 64 }).default("manual").notNull(),
+  scanRunId: varchar("scan_run_id", { length: 64 }),
+  acknowledgedBy: integer("acknowledged_by").references(() => users.id),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  resolvedBy: integer("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNotes: text("resolution_notes"),
+  detectedAt: timestamp("detected_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index("registry_integrity_findings_status_idx").on(table.status),
+  severityIdx: index("registry_integrity_findings_severity_idx").on(table.severity),
+  checkTypeIdx: index("registry_integrity_findings_check_type_idx").on(table.checkType),
+  parcelIdx: index("registry_integrity_findings_parcel_idx").on(table.parcelId),
+}));
+
+/** Programmable Escrow & Settlement Orchestrator — settlement envelopes. */
+export const escrowSettlements = pgTable("escrow_settlements", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  settlementRef: varchar("settlement_ref", { length: 64 }).notNull().unique(),
+  transactionId: integer("transaction_id").references(() => transactions.id),
+  amount: decimal("amount", { precision: 18, scale: 2 }),
+  currency: varchar("currency", { length: 3 }).default("NGN").notNull(),
+  status: settlementStatusEnum("status").default("draft").notNull(),
+  releaseDecision: jsonb("release_decision"),
+  blockingReasons: jsonb("blocking_reasons"),
+  releasedAt: timestamp("released_at"),
+  releasedBy: integer("released_by").references(() => users.id),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index("escrow_settlements_status_idx").on(table.status),
+  transactionIdx: index("escrow_settlements_transaction_idx").on(table.transactionId),
+}));
+
+/** Settlement checkpoints — deterministic release conditions. */
+export const settlementCheckpoints = pgTable("settlement_checkpoints", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  settlementId: integer("settlement_id").references(() => escrowSettlements.id).notNull(),
+  checkpointKey: varchar("checkpoint_key", { length: 64 }).notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  required: boolean("required").default(true).notNull(),
+  status: checkpointStatusEnum("status").default("pending").notNull(),
+  evidence: jsonb("evidence"),
+  fulfilledBy: integer("fulfilled_by").references(() => users.id),
+  fulfilledAt: timestamp("fulfilled_at"),
+  waivedBy: integer("waived_by").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  settlementIdx: index("settlement_checkpoints_settlement_idx").on(table.settlementId),
+  statusIdx: index("settlement_checkpoints_status_idx").on(table.status),
+}));
+
+/** Explainable Mortgage Decisioning — persisted underwriting explanations. */
+export const mortgageDecisionExplanations = pgTable("mortgage_decision_explanations", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  applicationId: integer("application_id").references(() => mortgageApplications.id).notNull(),
+  overallRecommendation: varchar("overall_recommendation", { length: 64 }).notNull(),
+  overallScore: integer("overall_score").notNull(),
+  factors: jsonb("factors"),
+  policyVersion: varchar("policy_version", { length: 32 }).default("v1").notNull(),
+  generatedBy: integer("generated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  applicationIdx: index("mortgage_decision_explanations_application_idx").on(table.applicationId),
+}));
+
+/** Federated Inter-Agency Clearance Exchange — per-agency clearance states. */
+export const agencyClearances = pgTable("agency_clearances", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  transactionId: integer("transaction_id").references(() => transactions.id).notNull(),
+  agency: varchar("agency", { length: 64 }).notNull(),
+  status: clearanceStatusEnum("status").default("pending").notNull(),
+  referenceNumber: varchar("reference_number", { length: 128 }),
+  slaDueAt: timestamp("sla_due_at"),
+  submittedAt: timestamp("submitted_at"),
+  decidedAt: timestamp("decided_at"),
+  decisionNotes: text("decision_notes"),
+  payload: jsonb("payload"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  transactionIdx: index("agency_clearances_transaction_idx").on(table.transactionId),
+  agencyIdx: index("agency_clearances_agency_idx").on(table.agency),
+  statusIdx: index("agency_clearances_status_idx").on(table.status),
+}));
+
+/** Privacy-Aware Data Exchange Gateway — export authorization audit trail. */
+export const dataExchangeAudits = pgTable("data_exchange_audits", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  subjectUserId: integer("subject_user_id").references(() => users.id),
+  requestorUserId: integer("requestor_user_id").references(() => users.id),
+  requestorRole: varchar("requestor_role", { length: 64 }).notNull(),
+  purpose: varchar("purpose", { length: 128 }).notNull(),
+  jurisdiction: varchar("jurisdiction", { length: 64 }).default("NG").notNull(),
+  dataCategories: jsonb("data_categories"),
+  decision: exchangeDecisionEnum("decision").notNull(),
+  decisionReasons: jsonb("decision_reasons"),
+  conditions: jsonb("conditions"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  subjectIdx: index("data_exchange_audits_subject_idx").on(table.subjectUserId),
+  decisionIdx: index("data_exchange_audits_decision_idx").on(table.decision),
+  purposeIdx: index("data_exchange_audits_purpose_idx").on(table.purpose),
+}));
+
+export type TitleRiskAssessment = typeof titleRiskAssessments.$inferSelect;
+export type InsertTitleRiskAssessment = typeof titleRiskAssessments.$inferInsert;
+export type RegistryIntegrityFinding = typeof registryIntegrityFindings.$inferSelect;
+export type InsertRegistryIntegrityFinding = typeof registryIntegrityFindings.$inferInsert;
+export type EscrowSettlement = typeof escrowSettlements.$inferSelect;
+export type InsertEscrowSettlement = typeof escrowSettlements.$inferInsert;
+export type SettlementCheckpoint = typeof settlementCheckpoints.$inferSelect;
+export type InsertSettlementCheckpoint = typeof settlementCheckpoints.$inferInsert;
+export type MortgageDecisionExplanation = typeof mortgageDecisionExplanations.$inferSelect;
+export type InsertMortgageDecisionExplanation = typeof mortgageDecisionExplanations.$inferInsert;
+export type AgencyClearance = typeof agencyClearances.$inferSelect;
+export type InsertAgencyClearance = typeof agencyClearances.$inferInsert;
+export type DataExchangeAudit = typeof dataExchangeAudits.$inferSelect;
+export type InsertDataExchangeAudit = typeof dataExchangeAudits.$inferInsert;

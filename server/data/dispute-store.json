@@ -1,0 +1,187 @@
+{
+  "disputes": [
+    {
+      "id": 1,
+      "caseNumber": "DSP-2024-001",
+      "parcelId": 1,
+      "parcelNumber": "LG-VI-2024-001",
+      "titleId": 1,
+      "transactionId": 1,
+      "type": "boundary_dispute",
+      "status": "mediation",
+      "state": "Lagos",
+      "lga": "Victoria Island",
+      "filedBy": "Amina Bello",
+      "filedByUserId": 1,
+      "respondent": "Femi Adeyemi",
+      "assignedOfficer": "Registrar Ngozi Eze",
+      "mediator": "Chief Mediator Okonkwo",
+      "hearingDate": "2024-04-20T10:00:00.000Z",
+      "filedDate": "2024-04-02T09:15:00.000Z",
+      "description": "Complainant alleges the neighbouring parcel fence encroaches on the registered survey line and obstructs access to the parcel frontage.",
+      "requestedRelief": "Reinstatement of approved boundary beacons and supervised site demarcation.",
+      "slaDays": 21,
+      "evidence": [
+        {
+          "id": "DSP-2024-001-E1",
+          "fileName": "survey-overlay-victoria-island.pdf",
+          "fileType": "application/pdf",
+          "uploadedBy": "Amina Bello",
+          "uploadedAt": "2024-04-02T09:20:00.000Z",
+          "note": "Overlay of beacon coordinates against field measurements."
+        }
+      ],
+      "tags": [
+        "boundary",
+        "beacon",
+        "survey"
+      ],
+      "createdAt": "2024-04-02T09:15:00.000Z",
+      "updatedAt": "2024-04-12T14:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "caseNumber": "DSP-2024-002",
+      "parcelId": 2,
+      "parcelNumber": "AB-FCT-2024-002",
+      "titleId": 2,
+      "type": "ownership_dispute",
+      "status": "pending",
+      "state": "FCT",
+      "lga": "Garki",
+      "filedBy": "Ahmed Ibrahim",
+      "filedByUserId": 2,
+      "respondent": "Fatima Yusuf",
+      "assignedOfficer": "Dispute Desk Ibrahim Musa",
+      "mediator": null,
+      "hearingDate": null,
+      "filedDate": "2024-04-10T11:00:00.000Z",
+      "description": "Competing transfer instruments were lodged for the same parcel, requiring registry review of chain-of-title and consent instruments.",
+      "requestedRelief": "Suspension of further dealings until ownership is conclusively determined.",
+      "slaDays": 30,
+      "evidence": [
+        {
+          "id": "DSP-2024-002-E1",
+          "fileName": "deed-of-assignment-scan.pdf",
+          "fileType": "application/pdf",
+          "uploadedBy": "Ahmed Ibrahim",
+          "uploadedAt": "2024-04-10T11:05:00.000Z",
+          "note": "Registered deed and proof of stamp duty payment."
+        }
+      ],
+      "tags": [
+        "ownership",
+        "consent",
+        "chain-of-title"
+      ],
+      "createdAt": "2024-04-10T11:00:00.000Z",
+      "updatedAt": "2024-04-10T11:00:00.000Z"
+    },
+    {
+      "id": 3,
+      "caseNumber": "DSP-2024-003",
+      "parcelId": 3,
+      "parcelNumber": "KN-KN-2024-003",
+      "titleId": 3,
+      "type": "title_dispute",
+      "status": "resolved",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "filedBy": "Musa Garba Farms",
+      "filedByUserId": 3,
+      "respondent": "Northern Agri Holdings",
+      "assignedOfficer": "Justice Panel Secretary Binta Lawal",
+      "mediator": "Justice Adeyemi",
+      "hearingDate": "2024-03-05T09:30:00.000Z",
+      "filedDate": "2024-02-18T08:30:00.000Z",
+      "description": "Challenge to the validity of a title perfection submission after conflicting governor-consent records were detected during verification.",
+      "requestedRelief": "Invalidate duplicate instrument and retain perfected title in favour of original allottee.",
+      "resolution": "Registry review upheld the complainant title package after confirming authentic governor-consent reference and survey provenance.",
+      "resolvedDate": "2024-03-05T13:45:00.000Z",
+      "slaDays": 14,
+      "evidence": [
+        {
+          "id": "DSP-2024-003-E1",
+          "fileName": "governor-consent-register-extract.pdf",
+          "fileType": "application/pdf",
+          "uploadedBy": "Registry Clerk",
+          "uploadedAt": "2024-02-20T10:00:00.000Z",
+          "note": "Certified extract from consent register."
+        }
+      ],
+      "tags": [
+        "title",
+        "consent",
+        "registry-review"
+      ],
+      "createdAt": "2024-02-18T08:30:00.000Z",
+      "updatedAt": "2024-03-05T13:45:00.000Z"
+    }
+  ],
+  "timeline": [
+    {
+      "id": "DSP-2024-001-filed",
+      "disputeId": 1,
+      "status": "pending",
+      "title": "Dispute lodged",
+      "description": "Boundary dispute registered and intake screening completed.",
+      "actor": "Registry Intake Desk",
+      "createdAt": "2024-04-02T09:15:00.000Z"
+    },
+    {
+      "id": "DSP-2024-001-investigating",
+      "disputeId": 1,
+      "status": "investigating",
+      "title": "Field verification ordered",
+      "description": "Survey reconciliation and site inspection were requested.",
+      "actor": "Registrar Ngozi Eze",
+      "createdAt": "2024-04-04T12:00:00.000Z"
+    },
+    {
+      "id": "DSP-2024-001-mediation",
+      "disputeId": 1,
+      "status": "mediation",
+      "title": "Mediation scheduled",
+      "description": "Parties were invited to mediation before escalation to formal hearing.",
+      "actor": "Chief Mediator Okonkwo",
+      "createdAt": "2024-04-12T14:00:00.000Z"
+    },
+    {
+      "id": "DSP-2024-002-filed",
+      "disputeId": 2,
+      "status": "pending",
+      "title": "Dispute lodged",
+      "description": "Ownership dispute received pending assignment to reviewing officer.",
+      "actor": "Registry Intake Desk",
+      "createdAt": "2024-04-10T11:00:00.000Z"
+    },
+    {
+      "id": "DSP-2024-003-filed",
+      "disputeId": 3,
+      "status": "pending",
+      "title": "Dispute lodged",
+      "description": "Title dispute accepted for documentary review.",
+      "actor": "Registry Intake Desk",
+      "createdAt": "2024-02-18T08:30:00.000Z"
+    },
+    {
+      "id": "DSP-2024-003-hearing",
+      "disputeId": 3,
+      "status": "hearing",
+      "title": "Formal hearing concluded",
+      "description": "Panel heard parties and compared consent references against registry records.",
+      "actor": "Justice Adeyemi",
+      "createdAt": "2024-03-05T09:30:00.000Z"
+    },
+    {
+      "id": "DSP-2024-003-resolved",
+      "disputeId": 3,
+      "status": "resolved",
+      "title": "Determination issued",
+      "description": "Title validity confirmed in favour of the complainant.",
+      "actor": "Justice Adeyemi",
+      "createdAt": "2024-03-05T13:45:00.000Z"
+    }
+  ],
+  "nextId": 4
+}

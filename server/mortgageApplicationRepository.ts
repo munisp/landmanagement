@@ -496,6 +496,16 @@ export async function getMortgageApplicationById(applicationId: string, userId?:
   return application;
 }
 
+/**
+ * Look up an application by its surrogate numeric id (as opposed to the
+ * public string applicationId code). Added for decisioning/analytics services
+ * that reference applications by numeric foreign key.
+ */
+export async function getMortgageApplicationByNumericId(id: number) {
+  const store = await readStore();
+  return store.applications.find((entry) => Number(entry.id) === Number(id)) ?? null;
+}
+
 export async function getMortgageWorkflow(applicationId: string, userId?: number) {
   const application = await getMortgageApplicationById(applicationId, userId);
   if (!application) return null;
