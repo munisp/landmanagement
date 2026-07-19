@@ -20,8 +20,6 @@ import {
   checkTigerBeetleConnection,
 } from './integrations';
 
-const db = getDb();
-
 type CheckStatus = 'up' | 'down' | 'degraded';
 
 export interface HealthStatus {
@@ -45,6 +43,27 @@ function mapIntegrationStatus(status: 'up' | 'down' | 'degraded' | 'not_configur
   return 'degraded';
 }
 
+const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+/**
+ * Detailed health output discloses internal dependency topology, versions,
+ * and error messages — useful to operators, useful to attackers. Only
+ * loopback callers (orchestrators, on-host monitors) or callers presenting
+ * the HEALTH_PROBE_TOKEN header receive it; everyone else gets the bare
+ * status needed for uptime checks.
+ */
+function isInternalProbe(req: Request): boolean {
+  const ip = req.ip ?? req.socket.remoteAddress ?? '';
+  if (LOOPBACK_IPS.has(ip)) return true;
+  const token = process.env.HEALTH_PROBE_TOKEN;
+  if (!token) return false;
+  return req.headers['x-health-probe'] === token;
+}
+
+function publicHealthBody(health: HealthStatus) {
+  return { status: health.status, timestamp: health.timestamp };
+}
+
 /**
  * Liveness probe - basic health check
  * Returns 200 if the service process is running.
@@ -65,7 +84,7 @@ export async function livenessProbe(req: Request, res: Response) {
 export async function readinessProbe(req: Request, res: Response) {
   const health = await checkHealth();
   const statusCode = health.checks.database?.status === 'up' ? 200 : 503;
-  res.status(statusCode).json(health);
+  res.status(statusCode).json(isInternalProbe(req) ? health : publicHealthBody(health));
 }
 
 /**
@@ -74,7 +93,7 @@ export async function readinessProbe(req: Request, res: Response) {
 export async function healthCheck(req: Request, res: Response) {
   const health = await checkHealth();
   const statusCode = health.status === 'unhealthy' ? 503 : 200;
-  res.status(statusCode).json(health);
+  res.status(statusCode).json(isInternalProbe(req) ? health : publicHealthBody(health));
 }
 
 /**
@@ -117,7 +136,7 @@ async function checkDatabase() {
   const start = Date.now();
 
   try {
-    const dbInstance = await db;
+    const dbInstance = await getDb();
     if (!dbInstance) {
       throw new Error('Database not initialized');
     }
@@ -314,7 +333,7 @@ export async function startupProbe(req: Request, res: Response) {
 
 async function checkStartup(): Promise<boolean> {
   try {
-    const dbInstance = await db;
+    const dbInstance = await getDb();
     if (!dbInstance) return false;
     await dbInstance.execute('SELECT 1');
     return true;

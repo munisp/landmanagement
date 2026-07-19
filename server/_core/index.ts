@@ -18,6 +18,7 @@ import {
 import { notificationWS } from "../notificationWebSocketService";
 import { dashboardWS } from "../dashboardWebSocketService";
 import { realtimeWebSocketService } from "../realtimeWebSocketService";
+import { externalApiRouter } from "../externalApi";
 import { startEmailQueueProcessor } from "../emailQueueService";
 import { healthCheck, livenessProbe, readinessProbe, startupProbe } from "./healthCheck";
 
@@ -110,6 +111,9 @@ export function configureApp(app: express.Express): void {
   app.get('/api/health', healthCheck);
   app.get('/api/ready', readinessProbe);
   app.get('/api/startup', startupProbe);
+
+  // External integrator API (x-api-key authenticated, read-only)
+  app.use("/api/v1/external", externalApiRouter);
 
   // tRPC API
   app.use(

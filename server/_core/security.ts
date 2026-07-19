@@ -14,9 +14,9 @@
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import cors from 'cors';
-import crypto from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 import { validateApiKey as validateStoredApiKey } from '../apiKeyService';
+import { recordAuthEvent } from '../authAudit.js';
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -222,26 +222,45 @@ export function validateApiKey() {
       });
     }
 
+    // Fail-closed: only keys persisted through the admin api-keys surface are
+    // honored. A format-only check accepts any well-formed forgery, so when
+    // the validation backend is unavailable the request is rejected (503)
+    // instead of being let through.
+    let validatedKey: Awaited<ReturnType<typeof validateStoredApiKey>>;
     try {
-      const validatedKey = await validateStoredApiKey(apiKey);
-      if (validatedKey) {
-        (req as Request & { apiKeyAuth?: { id: string; userId: string; name: string } }).apiKeyAuth = {
-          id: validatedKey.id,
-          userId: validatedKey.userId,
-          name: validatedKey.name,
-        };
-        return next();
-      }
+      validatedKey = await validateStoredApiKey(apiKey);
     } catch (error) {
-      console.warn('[Security] API key database validation unavailable, falling back to configured keys:', error);
+      console.error('[Security] API key validation backend unavailable; rejecting request:', error);
+      void recordAuthEvent({
+        type: 'api_key_rejected',
+        description: 'API key rejected (validation backend unavailable)',
+        metadata: { path: req.path, ip: req.ip ?? null },
+      });
+      return res.status(503).json({ error: 'API key validation unavailable' });
     }
 
-    if (!isValidApiKey(apiKey)) {
+    if (!validatedKey) {
+      void recordAuthEvent({
+        type: 'api_key_rejected',
+        description: 'Invalid API key presented',
+        metadata: { path: req.path, ip: req.ip ?? null, keyPrefix: apiKey.slice(0, 12) },
+      });
       return res.status(401).json({
         error: 'Invalid API key',
       });
     }
 
+    void recordAuthEvent({
+      type: 'api_key_accepted',
+      userId: Number(validatedKey.userId) || null,
+      description: `API key authenticated: ${validatedKey.name}`,
+      metadata: { path: req.path, keyId: validatedKey.id },
+    });
+    (req as Request & { apiKeyAuth?: { id: string; userId: string; name: string } }).apiKeyAuth = {
+      id: validatedKey.id,
+      userId: validatedKey.userId,
+      name: validatedKey.name,
+    };
     next();
   };
 }
@@ -381,28 +400,7 @@ function sanitizeValue(value: any): any {
     .trim();
 }
 
-function isValidApiKey(apiKey: string): boolean {
-  if (!/^idlr_[a-f0-9]{64}$/i.test(apiKey)) {
-    return false;
-  }
 
-  const validApiKeys = (process.env.VALID_API_KEYS?.split(',') || [])
-    .map((key) => key.trim())
-    .filter(Boolean);
-
-  return validApiKeys.some((configuredKey) => secureCompare(configuredKey, apiKey));
-}
-
-function secureCompare(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-
-  if (leftBuffer.length !== rightBuffer.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
-}
 
 function parseSize(size: string): number {
   const units: Record<string, number> = {
