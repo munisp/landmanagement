@@ -37,6 +37,14 @@ export interface DataIngestionRequest {
   mode?: 'append' | 'overwrite' | 'merge';
 }
 
+export interface GeospatialWorkbenchRequest {
+  anchor_parcel: Record<string, any>;
+  nearby_parcels?: Record<string, any>[];
+  local_open_dispute_count?: number;
+  nearby_open_dispute_count?: number;
+  active_transaction_count?: number;
+}
+
 // Health check
 export async function checkLakehouseHealth(): Promise<boolean> {
   try {
@@ -149,6 +157,26 @@ export async function getSearchInsights() {
   }
 }
 
+export async function getGeospatialRuntimeStatus() {
+  try {
+    const response = await lakehouseApi.get('/analytics/geospatial/runtime-status');
+    return response.data;
+  } catch (error: any) {
+    console.error('[Lakehouse] Geospatial runtime status query failed:', error.message);
+    throw new Error(`Lakehouse geospatial runtime status failed: ${error.message}`);
+  }
+}
+
+export async function getGeospatialWorkbench(request: GeospatialWorkbenchRequest) {
+  try {
+    const response = await lakehouseApi.post('/analytics/geospatial/workbench', request);
+    return response.data;
+  } catch (error: any) {
+    console.error('[Lakehouse] Geospatial workbench query failed:', error.message);
+    throw new Error(`Lakehouse geospatial workbench failed: ${error.message}`);
+  }
+}
+
 // Batch ingestion helpers
 export async function ingestParcels(parcels: any[]) {
   return ingestDataToLakehouse('parcels', { data: parcels, mode: 'append' });
@@ -174,6 +202,8 @@ export default {
   getTransactionVolumeByMonth,
   getPropertyValueTrends,
   getSearchInsights,
+  getGeospatialRuntimeStatus,
+  getGeospatialWorkbench,
   ingestParcels,
   ingestTransactions,
   ingestAuditLogs,

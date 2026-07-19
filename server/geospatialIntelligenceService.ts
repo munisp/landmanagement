@@ -2,6 +2,7 @@ import { buildDigitalTwin, compareScenarios } from './parcelDigitalTwinService';
 import { getParcelById, searchParcels, type ParcelRecord } from './parcelRepository';
 import { listDisputes } from './disputeRepository';
 import { listTransactions } from './transactionRepository';
+import { getGeospatialRuntimeStatus, getGeospatialWorkbench as getLakehouseGeospatialWorkbench } from './lakehouseClient';
 
 const OPEN_DISPUTE_STATUSES = new Set(['pending', 'investigating', 'mediation', 'hearing', 'filed', 'in_review', 'hearing_scheduled', 'escalated']);
 const ACTIVE_TRANSACTION_STATUSES = new Set(['draft', 'pending_approval', 'pending_payment', 'in_review', 'registered']);
@@ -93,6 +94,41 @@ export async function getParcelGeospatialWorkbench(parcelId: number) {
   ]);
 
   const bestScenario = developmentScenarios.best;
+  let lakehouseRuntimeStatus: Record<string, any> | null = null;
+  let lakehouseSpatialWorkbench: Record<string, any> | null = null;
+  try {
+    [lakehouseRuntimeStatus, lakehouseSpatialWorkbench] = await Promise.all([
+      getGeospatialRuntimeStatus(),
+      getLakehouseGeospatialWorkbench({
+        anchor_parcel: {
+          id: parcel.id,
+          parcelNumber: parcel.parcelNumber,
+          coordinates: parcel.coordinates,
+          estimatedValue: parcel.estimatedValue,
+          areaSquareMeters: parcel.areaSquareMeters,
+          status: parcel.status,
+          landUseType: parcel.landUseType,
+          geometryGeoJSON: (parcel as any).geometryGeoJSON,
+        },
+        nearby_parcels: nearbyParcels.map((candidate) => ({
+          id: candidate.id,
+          parcelNumber: candidate.parcelNumber,
+          coordinates: candidate.coordinates,
+          estimatedValue: candidate.estimatedValue,
+          areaSquareMeters: candidate.areaSquareMeters,
+          status: candidate.status,
+          landUseType: candidate.landUseType,
+          geometryGeoJSON: (candidate as any).geometryGeoJSON,
+        })),
+        local_open_dispute_count: openLocalDisputes.length,
+        nearby_open_dispute_count: openNearbyDisputes.length,
+        active_transaction_count: activeTransactions.length,
+      }),
+    ]);
+  } catch {
+    lakehouseRuntimeStatus = null;
+    lakehouseSpatialWorkbench = null;
+  }
   const nearbyDensityScore = clamp(nearbyParcels.length * 8 + (openNearbyDisputes.length > 0 ? 8 : 0));
   const accessIndex = clamp(Math.round(digitalTwin.amenitySignal * 100) + (nearbyParcels.length >= 5 ? 10 : 0) - openNearbyDisputes.length * 5);
   const environmentalResilience = clamp(100 - Math.round(digitalTwin.elevationSignal < 0.25 ? 50 : digitalTwin.elevationSignal < 0.45 ? 30 : 15));
@@ -206,6 +242,8 @@ export async function getParcelGeospatialWorkbench(parcelId: number) {
     },
     transactions: parcelTransactions.slice(0, 10),
     scenarios: developmentScenarios,
+    lakehouseSpatialWorkbench,
+    runtimeStatus: lakehouseRuntimeStatus,
     generatedAt: new Date().toISOString(),
   };
 }

@@ -590,3 +590,203 @@ async def search_insights():
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+class SedonaSpatialWorkbenchRequest(BaseModel):
+    anchor_parcel: Dict[str, Any]
+    nearby_parcels: List[Dict[str, Any]] = Field(default_factory=list)
+    local_open_dispute_count: int = 0
+    nearby_open_dispute_count: int = 0
+    active_transaction_count: int = 0
+
+
+def _sedona_runtime_status() -> Dict[str, Any]:
+    import importlib.util
+
+    sedona_spec = importlib.util.find_spec("sedona")
+    pyspark_spec = importlib.util.find_spec("pyspark")
+    return {
+        "sedona_python_available": sedona_spec is not None,
+        "pyspark_available": pyspark_spec is not None,
+        "execution_mode": "apache_sedona_ready" if sedona_spec is not None and pyspark_spec is not None else "geopandas_fallback",
+    }
+
+
+def _square_polygon_from_point(lat: float, lng: float, area_square_meters: float):
+    from shapely.geometry import Polygon
+    import math
+
+    edge_meters = max(math.sqrt(max(area_square_meters, 100.0)), 10.0)
+    lat_offset = edge_meters / 111000.0 / 2.0
+    lng_divisor = max(0.1, math.cos(math.radians(lat)) * 111000.0)
+    lng_offset = edge_meters / lng_divisor / 2.0
+    return Polygon([
+        (lng - lng_offset, lat - lat_offset),
+        (lng + lng_offset, lat - lat_offset),
+        (lng + lng_offset, lat + lat_offset),
+        (lng - lng_offset, lat + lat_offset),
+        (lng - lng_offset, lat - lat_offset),
+    ])
+
+
+def _geometry_from_payload(parcel: Dict[str, Any]):
+    from shapely.geometry import Point, shape
+
+    geometry_geojson = parcel.get("geometryGeoJSON") or parcel.get("geometry_geojson")
+    if geometry_geojson:
+        try:
+            return shape(json.loads(geometry_geojson) if isinstance(geometry_geojson, str) else geometry_geojson)
+        except Exception:
+            pass
+
+    coords = parcel.get("coordinates") or {}
+    lat = coords.get("lat") if isinstance(coords, dict) else None
+    lng = coords.get("lng") if isinstance(coords, dict) else None
+    if lat is None or lng is None:
+        lat = parcel.get("lat")
+        lng = parcel.get("lng")
+
+    if lat is None or lng is None:
+        return None
+
+    area_square_meters = float(parcel.get("areaSquareMeters") or parcel.get("area_square_meters") or 400.0)
+    if area_square_meters >= 200:
+        return _square_polygon_from_point(float(lat), float(lng), area_square_meters)
+    return Point(float(lng), float(lat))
+
+
+@app.get("/analytics/geospatial/runtime-status")
+async def geospatial_runtime_status():
+    status = _sedona_runtime_status()
+    return {
+        **status,
+        "supports": {
+            "range_query": True,
+            "knn": True,
+            "clustering": True,
+            "outlier_detection": True,
+            "geojson": True,
+        },
+        "generated_at": datetime.utcnow().isoformat(),
+    }
+
+
+@app.post("/analytics/geospatial/workbench")
+async def geospatial_spatial_workbench(request: SedonaSpatialWorkbenchRequest):
+    try:
+        import geopandas as gpd
+        import numpy as np
+        from sklearn.cluster import DBSCAN
+        from sklearn.neighbors import LocalOutlierFactor
+
+        anchor = request.anchor_parcel
+        nearby = request.nearby_parcels or []
+        rows: List[Dict[str, Any]] = []
+
+        anchor_geom = _geometry_from_payload(anchor)
+        if anchor_geom is None:
+            raise HTTPException(status_code=400, detail="Anchor parcel geometry or coordinates are required")
+
+        anchor_coords = anchor.get("coordinates") or {}
+        anchor_lat = float(anchor_coords.get("lat", anchor.get("lat", 0)))
+        anchor_lng = float(anchor_coords.get("lng", anchor.get("lng", 0)))
+
+        rows.append({
+            "parcel_id": anchor.get("id"),
+            "parcel_number": anchor.get("parcelNumber"),
+            "role": "anchor",
+            "estimated_value": float(anchor.get("estimatedValue") or 0),
+            "area_square_meters": float(anchor.get("areaSquareMeters") or 0),
+            "lat": anchor_lat,
+            "lng": anchor_lng,
+            "geometry": anchor_geom,
+        })
+
+        for parcel in nearby:
+            geom = _geometry_from_payload(parcel)
+            if geom is None:
+                continue
+            coords = parcel.get("coordinates") or {}
+            rows.append({
+                "parcel_id": parcel.get("id"),
+                "parcel_number": parcel.get("parcelNumber"),
+                "role": "nearby",
+                "estimated_value": float(parcel.get("estimatedValue") or 0),
+                "area_square_meters": float(parcel.get("areaSquareMeters") or 0),
+                "lat": float(coords.get("lat", parcel.get("lat", 0))),
+                "lng": float(coords.get("lng", parcel.get("lng", 0))),
+                "geometry": geom,
+            })
+
+        gdf = gpd.GeoDataFrame(rows, geometry="geometry", crs="EPSG:4326")
+        minx, miny, maxx, maxy = gdf.total_bounds.tolist()
+
+        points = np.array([[row["lat"], row["lng"]] for row in rows], dtype=float)
+        labels = []
+        if len(points) >= 2:
+            clusterer = DBSCAN(eps=0.05, min_samples=2)
+            labels = clusterer.fit_predict(points).tolist()
+        else:
+            labels = [0]
+
+        value_area_vectors = np.array([
+            [float(row["estimated_value"]), float(row["area_square_meters"])] for row in rows
+        ], dtype=float)
+        outlier_flags = [False for _ in rows]
+        if len(rows) >= 3:
+            n_neighbors = min(3, len(rows) - 1)
+            if n_neighbors >= 2:
+                lof = LocalOutlierFactor(n_neighbors=n_neighbors)
+                predictions = lof.fit_predict(value_area_vectors)
+                outlier_flags = [prediction == -1 for prediction in predictions.tolist()]
+
+        anchor_point = gdf[gdf["role"] == "anchor"].geometry.iloc[0].centroid
+        nearest = []
+        for index, row in gdf[gdf["role"] == "nearby"].iterrows():
+            distance_deg = row.geometry.centroid.distance(anchor_point)
+            distance_km = float(distance_deg * 111.0)
+            nearest.append({
+                "parcel_id": row["parcel_id"],
+                "parcel_number": row["parcel_number"],
+                "distance_km": round(distance_km, 2),
+                "cluster_label": int(labels[index]) if index < len(labels) else 0,
+                "outlier": bool(outlier_flags[index]) if index < len(outlier_flags) else False,
+            })
+        nearest.sort(key=lambda item: item["distance_km"])
+
+        cluster_count = len({label for label in labels if label != -1})
+        noise_count = sum(1 for label in labels if label == -1)
+        outlier_count = sum(1 for flag in outlier_flags if flag)
+        comparable_rows = [row for row in rows[1:] if row["estimated_value"] > 0]
+        comparable_average = round(sum(row["estimated_value"] for row in comparable_rows) / len(comparable_rows), 2) if comparable_rows else 0.0
+        anchor_value = float(anchor.get("estimatedValue") or 0)
+        value_delta_pct = round(((anchor_value - comparable_average) / comparable_average) * 100, 1) if comparable_average else 0.0
+
+        runtime = _sedona_runtime_status()
+        hotspot_score = max(0, min(100, round(cluster_count * 18 + request.nearby_open_dispute_count * 10 + request.active_transaction_count * 8 + noise_count * 6)))
+        spatial_risk_score = max(0, min(100, round(request.local_open_dispute_count * 20 + request.nearby_open_dispute_count * 8 + outlier_count * 12 + request.active_transaction_count * 8)))
+
+        return {
+            "runtime": runtime,
+            "bounding_box": {
+                "west": round(float(minx), 6),
+                "south": round(float(miny), 6),
+                "east": round(float(maxx), 6),
+                "north": round(float(maxy), 6),
+            },
+            "sedona_aligned_insights": {
+                "cluster_count": cluster_count,
+                "noise_count": noise_count,
+                "outlier_count": outlier_count,
+                "hotspot_score": hotspot_score,
+                "spatial_risk_score": spatial_risk_score,
+                "nearest_neighbors": nearest[:5],
+                "comparable_average_value": comparable_average,
+                "comparable_value_delta_pct": value_delta_pct,
+            },
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
