@@ -30,7 +30,7 @@ export function ConnectedActivityFeed({ limit = 10 }: ConnectedActivityFeedProps
   const transformedActivities: Activity[] = activities.map((activity) => ({
     id: String(activity.id),
     type: activity.type as any, // Type will be validated by backend
-    userId: activity.userId,
+    userId: activity.userId ?? 0, // nullable in schema: anonymous/system events render as user 0
     userName: activity.userName || 'System',
     userAvatar: activity.userAvatar,
     description: activity.description,

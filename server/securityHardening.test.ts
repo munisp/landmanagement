@@ -1,12 +1,35 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import express from 'express';
 import request from 'supertest';
+import type { Request, Response } from 'express';
 import { configureApp } from './_core/index';
 import { sdk } from './_core/sdk';
 import { COOKIE_NAME } from '@shared/const';
 import { authenticateWebSocketUpgrade } from './webSocketAuth';
 import { getSessionCookieOptions } from './_core/cookies';
 import { createApiKey, getUsageStats, validateApiKey } from './apiKeyService';
+
+// Lets the fail-closed middleware tests simulate a validation-backend outage
+// while every other test keeps using the real PGlite-backed service.
+const apiKeyBackendState = vi.hoisted(() => ({ fail: false }));
+vi.mock('./apiKeyService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./apiKeyService')>();
+  return {
+    ...actual,
+    validateApiKey: async (key: string) => {
+      if (apiKeyBackendState.fail) throw new Error('database unavailable');
+      return actual.validateApiKey(key);
+    },
+  };
+});
+
+import { validateApiKey as validateApiKeyMiddleware } from './_core/security';
+import { healthCheck, readinessProbe } from './_core/healthCheck';
+import { requireDb } from './db';
+import { activityLogs } from '../drizzle/schema';
+import { desc, eq } from 'drizzle-orm';
 
 /**
  * Security hardening tests — exercise the REAL wired HTTP stack (helmet,
@@ -199,5 +222,189 @@ describe('API key usage telemetry (real, not simulated)', () => {
   it('rejects unknown keys without recording usage', async () => {
     const bogus = await validateApiKey('idlr_' + '0'.repeat(64));
     expect(bogus).toBeNull();
+  });
+});
+
+describe('validateApiKey middleware (fail-closed)', () => {
+  function mockReq(overrides: Partial<Request> = {}): Request {
+    return {
+      headers: {},
+      ip: '203.0.113.10',
+      path: '/api/v1/external/parcels',
+      socket: { remoteAddress: '203.0.113.10' },
+      ...overrides,
+    } as unknown as Request;
+  }
+
+  function mockRes() {
+    const state: { statusCode: number | null; body: unknown } = { statusCode: null, body: null };
+    const res = {
+      status(code: number) {
+        state.statusCode = code;
+        return res;
+      },
+      json(payload: unknown) {
+        state.body = payload;
+        return res;
+      },
+    } as unknown as Response;
+    return { res, state };
+  }
+
+  async function latestAuditEvent(type: string) {
+    const db = await requireDb();
+    const rows = await db
+      .select()
+      .from(activityLogs)
+      .where(eq(activityLogs.type, type))
+      .orderBy(desc(activityLogs.id))
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
+  beforeEach(() => {
+    apiKeyBackendState.fail = false;
+  });
+
+  it('rejects requests without an API key', async () => {
+    const middleware = validateApiKeyMiddleware();
+    const { res, state } = mockRes();
+    const next = vi.fn();
+
+    await middleware(mockReq(), res, next);
+
+    expect(state.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('rejects keys that are not persisted, and audits the rejection', async () => {
+    const middleware = validateApiKeyMiddleware();
+    const { res, state } = mockRes();
+    const next = vi.fn();
+
+    await middleware(
+      mockReq({ headers: { 'x-api-key': 'idlr_' + 'a'.repeat(64) } } as unknown as Request),
+      res,
+      next
+    );
+
+    expect(state.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+
+    // The audit write is fire-and-forget; give it a tick to land.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const event = await latestAuditEvent('api_key_rejected');
+    expect(event).not.toBeNull();
+    expect(event!.userId).toBeNull(); // anonymous: no attributable user
+    expect(event!.description).toContain('Invalid API key');
+  });
+
+  it('returns 503 when the validation backend is unavailable — never bypasses', async () => {
+    apiKeyBackendState.fail = true;
+    const middleware = validateApiKeyMiddleware();
+    const { res, state } = mockRes();
+    const next = vi.fn();
+
+    await middleware(
+      mockReq({ headers: { 'x-api-key': 'idlr_' + 'b'.repeat(64) } } as unknown as Request),
+      res,
+      next
+    );
+
+    expect(state.statusCode).toBe(503);
+    expect(next).not.toHaveBeenCalled();
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const event = await latestAuditEvent('api_key_rejected');
+    expect(event!.description).toContain('validation backend unavailable');
+  });
+
+  it('authenticates persisted keys, attaches identity, and audits acceptance', async () => {
+    const key = await createApiKey('1', 'Fail-Closed Middleware Test Key');
+    const middleware = validateApiKeyMiddleware();
+    const { res } = mockRes();
+    const next = vi.fn();
+    const req = mockReq({ headers: { 'x-api-key': key.key } } as unknown as Request);
+
+    await middleware(req, res, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    const attached = (req as Request & { apiKeyAuth?: { id: string; userId: string; name: string } }).apiKeyAuth;
+    expect(attached).toBeDefined();
+    expect(attached!.name).toBe('Fail-Closed Middleware Test Key');
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const event = await latestAuditEvent('api_key_accepted');
+    expect(event).not.toBeNull();
+    expect(event!.userId).toBe(1);
+    expect(event!.description).toContain('Fail-Closed Middleware Test Key');
+  });
+});
+
+describe('health endpoint redaction', () => {
+  function healthReq(ip: string): Request {
+    return {
+      headers: {},
+      ip,
+      socket: { remoteAddress: ip },
+    } as unknown as Request;
+  }
+
+  function healthRes() {
+    const state: { statusCode: number | null; body: unknown } = { statusCode: null, body: null };
+    const res = {
+      status(code: number) {
+        state.statusCode = code;
+        return res;
+      },
+      json(payload: unknown) {
+        state.body = payload;
+        return res;
+      },
+    } as unknown as Response;
+    return { res, state };
+  }
+
+  it('external callers receive only status and timestamp', async () => {
+    const { res, state } = healthRes();
+    await healthCheck(healthReq('203.0.113.10'), res);
+
+    expect(state.body).toBeDefined();
+    const body = state.body as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['status', 'timestamp']);
+    expect(body.checks).toBeUndefined();
+  });
+
+  it('loopback callers receive full dependency details', async () => {
+    const { res, state } = healthRes();
+    await healthCheck(healthReq('127.0.0.1'), res);
+
+    const body = state.body as Record<string, unknown>;
+    expect(body.checks).toBeDefined();
+    expect((body.checks as Record<string, unknown>).database).toBeDefined();
+  });
+
+  it('readiness probe redacts for external callers but keeps status semantics', async () => {
+    const { res, state } = healthRes();
+    await readinessProbe(healthReq('203.0.113.10'), res);
+
+    // PGlite is up in tests, so readiness must be 200 — but without internals.
+    expect(state.statusCode).toBe(200);
+    const body = state.body as Record<string, unknown>;
+    expect(body.checks).toBeUndefined();
+  });
+});
+
+describe('fraud block threshold governance', () => {
+  it('platform owns the block decision via env-configurable threshold', () => {
+    const source = readFileSync(
+      join(__dirname, 'api/routers/ai-services.ts'),
+      'utf-8'
+    );
+    // Tripwire: the threshold and the platform-side blocked decision must not
+    // be silently removed in favor of trusting the model's own flag.
+    expect(source).toContain('FRAUD_SCORE_BLOCK_THRESHOLD');
+    expect(source).toContain('fraudScore >= FRAUD_SCORE_BLOCK_THRESHOLD');
+    expect(source).toContain('blocked,');
   });
 });

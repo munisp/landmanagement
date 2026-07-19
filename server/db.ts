@@ -137,9 +137,42 @@ export async function getDatabaseFeatureStatus() {
   };
 }
 
+// Microservice calls are best-effort enrichments: when a sidecar service is
+// down, callers fall back to the database. Without a breaker, every such call
+// still pays a full network timeout before falling back, so a dead service
+// makes the whole API sluggish. Three consecutive failures open the circuit
+// for 30 seconds; MICROSERVICES_ENABLED=false disables calls outright.
+const MICROSERVICES_ENABLED = process.env.MICROSERVICES_ENABLED !== 'false';
+const MICROSERVICE_TIMEOUT_MS = parseInt(process.env.MICROSERVICE_TIMEOUT_MS || '3000', 10);
+
+class CircuitBreaker {
+  private failures = 0;
+  private openUntil = 0;
+  private static readonly THRESHOLD = 3;
+  private static readonly COOLDOWN_MS = 30_000;
+
+  isOpen(): boolean {
+    return Date.now() < this.openUntil;
+  }
+
+  onSuccess(): void {
+    this.failures = 0;
+    this.openUntil = 0;
+  }
+
+  onFailure(): void {
+    this.failures++;
+    if (this.failures >= CircuitBreaker.THRESHOLD) {
+      this.openUntil = Date.now() + CircuitBreaker.COOLDOWN_MS;
+      this.failures = 0;
+    }
+  }
+}
+
 // API client for microservices
 export class MicroserviceClient {
   private baseURL: string;
+  private breaker = new CircuitBreaker();
 
   constructor(serviceName: string) {
     // In production, use service discovery or API gateway
@@ -154,6 +187,33 @@ export class MicroserviceClient {
     this.baseURL = serviceURLs[serviceName] || 'http://localhost:8080';
   }
 
+  private assertAvailable() {
+    if (!MICROSERVICES_ENABLED) {
+      throw new Error('Microservices disabled via MICROSERVICES_ENABLED=false');
+    }
+    if (this.breaker.isOpen()) {
+      throw new Error(`Circuit open for ${this.baseURL} — failing fast`);
+    }
+  }
+
+  private async request(input: string, init?: RequestInit) {
+    this.assertAvailable();
+    try {
+      const response = await fetch(input, {
+        ...init,
+        signal: AbortSignal.timeout(MICROSERVICE_TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        throw new Error(`Microservice request failed: ${response.statusText}`);
+      }
+      this.breaker.onSuccess();
+      return response.json();
+    } catch (error) {
+      this.breaker.onFailure();
+      throw error;
+    }
+  }
+
   async get(path: string, params?: Record<string, any>) {
     const url = new URL(path, this.baseURL);
     if (params) {
@@ -162,55 +222,36 @@ export class MicroserviceClient {
       });
     }
 
-    const response = await fetch(url.toString());
-    if (!response.ok) {
-      throw new Error(`Microservice request failed: ${response.statusText}`);
-    }
-    return response.json();
+    return this.request(url.toString());
   }
 
   async post(path: string, data: any) {
     const url = new URL(path, this.baseURL);
-    const response = await fetch(url.toString(), {
+    return this.request(url.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
     });
-
-    if (!response.ok) {
-      throw new Error(`Microservice request failed: ${response.statusText}`);
-    }
-    return response.json();
   }
 
   async put(path: string, data: any) {
     const url = new URL(path, this.baseURL);
-    const response = await fetch(url.toString(), {
+    return this.request(url.toString(), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
     });
-
-    if (!response.ok) {
-      throw new Error(`Microservice request failed: ${response.statusText}`);
-    }
-    return response.json();
   }
 
   async delete(path: string) {
     const url = new URL(path, this.baseURL);
-    const response = await fetch(url.toString(), {
+    return this.request(url.toString(), {
       method: 'DELETE',
     });
-
-    if (!response.ok) {
-      throw new Error(`Microservice request failed: ${response.statusText}`);
-    }
-    return response.json();
   }
 }
 

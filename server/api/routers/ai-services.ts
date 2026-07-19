@@ -5,6 +5,16 @@ import { TRPCError } from '@trpc/server';
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8001';
 const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL || `${AI_SERVICE_URL}/ocr`;
 const FRAUD_SERVICE_URL = process.env.FRAUD_SERVICE_URL || `${AI_SERVICE_URL}/fraud`;
+
+/**
+ * Governance-owned block decision. The Python service scores; the platform
+ * decides what score blocks a transaction. Operators tune the cutoff via
+ * FRAUD_SCORE_BLOCK_THRESHOLD without redeploying the model.
+ */
+const FRAUD_SCORE_BLOCK_THRESHOLD = (() => {
+  const raw = parseInt(process.env.FRAUD_SCORE_BLOCK_THRESHOLD || '80', 10);
+  return Number.isFinite(raw) && raw >= 0 && raw <= 100 ? raw : 80;
+})();
 const AI_HEALTH_URL = process.env.AI_HEALTH_URL || `${AI_SERVICE_URL}/health`;
 
 export const aiServicesRouter = router({
@@ -102,13 +112,19 @@ export const aiServicesRouter = router({
         }
 
         const result = await response.json();
+        const fraudScore = Number(result.fraud_score) || 0;
+        // Platform policy: the score threshold — not the model's own flag —
+        // decides whether a transaction is blocked.
+        const blocked = fraudScore >= FRAUD_SCORE_BLOCK_THRESHOLD;
         return {
           success: true,
-          isFraudulent: result.is_fraudulent,
-          fraudScore: result.fraud_score,
+          isFraudulent: Boolean(result.is_fraudulent) || blocked,
+          fraudScore,
           riskLevel: result.risk_level,
           anomalies: result.anomalies,
-          recommendation: result.recommendation,
+          recommendation: blocked ? 'block' : result.recommendation,
+          blocked,
+          blockThreshold: FRAUD_SCORE_BLOCK_THRESHOLD,
         };
       } catch (error) {
         console.error('Fraud analysis error:', error);
