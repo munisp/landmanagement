@@ -2,7 +2,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { requireDb } from './db';
 import { mortgageApplications, brokerCommissions, loanPools } from '../drizzle/schema';
 import { eq, desc } from 'drizzle-orm';
-import { authenticateWebSocketUpgrade } from './webSocketAuth';
+import { authenticateWebSocketUpgrade, recordWebSocketAuthFailure } from './webSocketAuth';
 
 export interface MortgageEvent {
   type: 'application_submitted' | 'application_approved' | 'application_rejected' | 
@@ -32,6 +32,7 @@ class RealtimeWebSocketService {
       const user = await authenticateWebSocketUpgrade(req);
       if (!user) {
         console.log('[WebSocket] Connection rejected: unauthenticated');
+        recordWebSocketAuthFailure(req, 'unauthenticated upgrade');
         ws.close(1008, 'Authentication required');
         return;
       }

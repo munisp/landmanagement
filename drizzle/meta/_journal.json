@@ -127,6 +127,13 @@
       "when": 1784396700000,
       "tag": "0017_mortgage_consolidation",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1784000000000,
+      "tag": "0018_activity_logs_nullable_user",
+      "breakpoints": true
     }
   ]
 }
