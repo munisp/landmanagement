@@ -30,6 +30,7 @@ import { cachedTransactionRouter } from './api/routers/cached-transaction';
 import { integrationHealthRouter } from './api/routers/integration-health';
 import { integrationRegistryRouter } from './api/routers/integration-registry';
 import { titleRiskRouter } from './api/routers/title-risk';
+import { titleIntelligenceRouter } from './api/routers/title-intelligence';
 import { registryIntegrityRouter } from './api/routers/registry-integrity';
 import { escrowSettlementRouter } from './api/routers/escrow-settlement';
 import { mortgageExplainabilityRouter } from './api/routers/mortgage-explainability';
@@ -156,6 +157,7 @@ export const appRouter = router({
   integrationHealth: integrationHealthRouter,
   integrationRegistry: integrationRegistryRouter,
   titleRisk: titleRiskRouter,
+  titleIntelligence: titleIntelligenceRouter,
   registryIntegrity: registryIntegrityRouter,
   escrowSettlement: escrowSettlementRouter,
   mortgageExplainability: mortgageExplainabilityRouter,
