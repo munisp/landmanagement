@@ -166,6 +166,12 @@ async function startServer() {
     console.log('Background processors are disabled for the current runtime');
   }
 
+  const enableCacheWarmup = process.env.ENABLE_CACHE_WARMUP !== 'false';
+  if (enableCacheWarmup) {
+    const { warmProductionCaches } = await import('../productionQueryCache');
+    await warmProductionCaches();
+  }
+
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });

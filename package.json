@@ -10,6 +10,8 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
+    "test:regression": "vitest run server/api/routers/phase4.test.ts server/notifications.presence.test.ts",
+    "test:load": "node tests/load/comprehensive-load-test.js",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

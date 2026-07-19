@@ -934,7 +934,8 @@ export const appRouter = router({
         try {
           return await parcelService.get('/api/v1/parcels', input);
         } catch (error) {
-          return searchParcelRepository(input);
+          const { getCachedParcelSearch } = await import('./productionQueryCache');
+          return await getCachedParcelSearch(input);
         }
       }),
 
@@ -944,7 +945,8 @@ export const appRouter = router({
         try {
           return await parcelService.get(`/api/v1/parcels/${input.id}`);
         } catch (error) {
-          const parcel = getParcelFromRepository(input.id);
+          const { getCachedParcelById } = await import('./productionQueryCache');
+          const parcel = await getCachedParcelById(input.id);
           if (!parcel) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcel not found' });
           }
@@ -958,7 +960,8 @@ export const appRouter = router({
         try {
           return await parcelService.get(`/api/v1/parcels/number/${input.parcelNumber}`);
         } catch (error) {
-          const parcel = getParcelByNumberFromRepository(input.parcelNumber);
+          const { getCachedParcelByNumber } = await import('./productionQueryCache');
+          const parcel = await getCachedParcelByNumber(input.parcelNumber);
           if (!parcel) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcel not found' });
           }
@@ -985,10 +988,13 @@ export const appRouter = router({
             surveyorId: ctx.user.id,
           });
         } catch (error) {
-          return await createParcel({
+          const created = await createParcel({
             ...input,
             surveyorId: String(ctx.user.id),
           });
+          const { invalidateParcelQueryCaches } = await import('./productionQueryCache');
+          await invalidateParcelQueryCaches(created.id, created.parcelNumber);
+          return created;
         }
       }),
 
@@ -1005,7 +1011,10 @@ export const appRouter = router({
         try {
           return await parcelService.put(`/api/v1/parcels/${input.id}`, input.data);
         } catch (error) {
-          return updateParcelInRepository(input.id, input.data);
+          const updated = updateParcelInRepository(input.id, input.data);
+          const { invalidateParcelQueryCaches } = await import('./productionQueryCache');
+          await invalidateParcelQueryCaches(updated.id, updated.parcelNumber);
+          return updated;
         }
       }),
 
@@ -1017,7 +1026,10 @@ export const appRouter = router({
             verifierId: ctx.user.id,
           });
         } catch (error) {
-          return verifyParcelInRepository(input.id, String(ctx.user.id));
+          const verified = verifyParcelInRepository(input.id, String(ctx.user.id));
+          const { invalidateParcelQueryCaches } = await import('./productionQueryCache');
+          await invalidateParcelQueryCaches(verified.id, verified.parcelNumber);
+          return verified;
         }
       }),
 
@@ -1030,7 +1042,12 @@ export const appRouter = router({
         try {
           return await parcelService.post('/api/v1/parcels/batch/assign', input);
         } catch (error) {
-          return batchAssignParcels(input.parcelIds, input.surveyorId);
+          const updated = batchAssignParcels(input.parcelIds, input.surveyorId);
+          const { invalidateParcelQueryCaches } = await import('./productionQueryCache');
+          for (const parcel of updated) {
+            await invalidateParcelQueryCaches(parcel.id, parcel.parcelNumber);
+          }
+          return updated;
         }
       }),
 
@@ -1045,7 +1062,12 @@ export const appRouter = router({
             verifierId: ctx.user.id,
           });
         } catch (error) {
-          return batchVerifyParcels(input.parcelIds, String(ctx.user.id));
+          const updated = batchVerifyParcels(input.parcelIds, String(ctx.user.id));
+          const { invalidateParcelQueryCaches } = await import('./productionQueryCache');
+          for (const parcel of updated) {
+            await invalidateParcelQueryCaches(parcel.id, parcel.parcelNumber);
+          }
+          return updated;
         }
       }),
 
@@ -1171,7 +1193,8 @@ export const appRouter = router({
         try {
           return await transactionService.get('/api/v1/transactions', input);
         } catch (error) {
-          return await listTransactions(input);
+          const { getCachedTransactionList } = await import('./productionQueryCache');
+          return await getCachedTransactionList(input);
         }
       }),
 
@@ -1181,7 +1204,8 @@ export const appRouter = router({
         try {
           return await transactionService.get(`/api/v1/transactions/${input.id}`);
         } catch (error) {
-          const transaction = await getTransactionById(input.id);
+          const { getCachedTransactionById } = await import('./productionQueryCache');
+          const transaction = await getCachedTransactionById(input.id);
           if (!transaction) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Transaction not found' });
           }
@@ -1225,6 +1249,8 @@ export const appRouter = router({
             considerationAmount: input.transactionAmount ?? 0,
             notes: input.description,
           });
+          const { invalidateTransactionQueryCaches } = await import('./productionQueryCache');
+          await invalidateTransactionQueryCaches(created.id);
 
           return {
             ...created,
@@ -1256,6 +1282,8 @@ export const appRouter = router({
           notificationService.sendNotification(notification);
         }
 
+        const { invalidateTransactionQueryCaches } = await import('./productionQueryCache');
+        await invalidateTransactionQueryCaches(input.id);
         return result;
       }),
 
@@ -1285,6 +1313,8 @@ export const appRouter = router({
           notificationService.sendNotification(notification);
         }
 
+        const { invalidateTransactionQueryCaches } = await import('./productionQueryCache');
+        await invalidateTransactionQueryCaches(input.id);
         return result;
       }),
 
@@ -1294,7 +1324,10 @@ export const appRouter = router({
         try {
           return await transactionService.post(`/api/v1/transactions/${input.id}/complete`, {});
         } catch (error) {
-          return await advanceTransaction(input.id, 'complete');
+          const completed = await advanceTransaction(input.id, 'complete');
+          const { invalidateTransactionQueryCaches } = await import('./productionQueryCache');
+          await invalidateTransactionQueryCaches(input.id);
+          return completed;
         }
       }),
   }),
