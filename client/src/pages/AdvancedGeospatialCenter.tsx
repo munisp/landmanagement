@@ -66,12 +66,14 @@ export default function AdvancedGeospatialCenter() {
               <Button variant="outline" asChild><Link href="/geo-analytics">Open Geo Analytics</Link></Button>
               <Button variant="outline" asChild><Link href="/drone-processing">Open Drone Processing</Link></Button>
               <Button variant="outline" asChild><Link href={`/parcels/${activeParcelId}/map`}>Open Parcel Map</Link></Button>
+              <Button variant="outline" asChild><Link href="/geolibre-workspace">Open GeoLibre Workspace</Link></Button>
             </div>
             <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-              This workbench now integrates a dedicated MapLibre surface, Sedona-aligned lakehouse analytics, and AI/CV/NLP-ready photo-analysis hooks alongside the earlier geospatial intelligence features.
+              This workbench now integrates a dedicated MapLibre surface, Sedona-aligned lakehouse analytics, AI/CV/NLP-ready photo-analysis hooks, and a direct launch path into the exact upstream GeoLibre companion workspace.
             </div>
             <div className="flex flex-wrap gap-2 text-sm">
               <Badge variant="outline">MapLibre enabled</Badge>
+              <Badge variant="outline">GeoLibre connected</Badge>
               <Badge variant="outline">Sedona-aligned analytics</Badge>
               <Badge variant="outline">AI / CV / NLP enabled</Badge>
             </div>

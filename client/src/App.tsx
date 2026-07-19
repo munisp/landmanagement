@@ -73,6 +73,7 @@ const CoastalZoneCenter = lazy(() => import('./pages/CoastalZoneCenter'));
 const ForestReserveCenter = lazy(() => import('./pages/ForestReserveCenter'));
 const InfrastructureDevelopmentCenter = lazy(() => import('./pages/InfrastructureDevelopmentCenter'));
 const AdvancedGeospatialCenter = lazy(() => import('./pages/AdvancedGeospatialCenter'));
+const GeoLibreWorkspace = lazy(() => import('./pages/GeoLibreWorkspace'));
 const AccessibilityCenter = lazy(() => import('./pages/AccessibilityCenter'));
 const TrainingSupportCenter = lazy(() => import('./pages/TrainingSupportCenter'));
 const DataGovernanceCenter = lazy(() => import('./pages/DataGovernanceCenter'));
@@ -230,6 +231,7 @@ function Router() {
       <Route path="/forest-reserve-center" component={ForestReserveCenter} />
       <Route path="/infrastructure-development-center" component={InfrastructureDevelopmentCenter} />
       <Route path="/advanced-geospatial-center" component={AdvancedGeospatialCenter} />
+      <Route path="/geolibre-workspace" component={GeoLibreWorkspace} />
       <Route path="/accessibility-center" component={AccessibilityCenter} />
       <Route path="/training-support-center" component={TrainingSupportCenter} />
       <Route path="/data-governance-center" component={DataGovernanceCenter} />
