@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   webhook_endpoints,
   webhook_delivery_log,
@@ -65,8 +65,7 @@ export async function registerWebhookEndpoint(data: {
   // Generate secure random secret
   const secret = crypto.randomBytes(32).toString('hex');
 
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [endpoint] = await db
     .insert(webhook_endpoints)
@@ -104,8 +103,7 @@ export async function updateWebhookEndpoint(
   if (data.description !== undefined) updates.description = data.description;
   if (data.status) updates.status = data.status;
 
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [updated] = await db
     .update(webhook_endpoints)
@@ -120,8 +118,7 @@ export async function updateWebhookEndpoint(
  * Delete webhook endpoint
  */
 export async function deleteWebhookEndpoint(endpointId: number): Promise<boolean> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   await db
     .delete(webhook_endpoints)
@@ -134,8 +131,7 @@ export async function deleteWebhookEndpoint(endpointId: number): Promise<boolean
  * Get all webhook endpoints for a user
  */
 export async function getWebhookEndpoints(userId: number, activeOnly: boolean = false): Promise<WebhookEndpoint[]> {
-  const db = await getDb();
-  if (!db) return [];
+  const db = await requireDb();
   
   if (activeOnly) {
     return await db
@@ -158,8 +154,7 @@ export async function getWebhookEndpoints(userId: number, activeOnly: boolean = 
  * Get webhook endpoint by ID
  */
 export async function getWebhookEndpoint(endpointId: number): Promise<WebhookEndpoint | null> {
-  const db = await getDb();
-  if (!db) return null;
+  const db = await requireDb();
   
   const [endpoint] = await db
     .select()
@@ -177,8 +172,7 @@ async function deliverWebhook(
   event: WebhookEvent,
   logId: number
 ): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const payload = JSON.stringify(event);
   const signature = generateSignature(payload, endpoint.secret || '');
@@ -269,8 +263,7 @@ async function deliverWebhook(
  * Trigger webhook event
  */
 export async function triggerWebhookEvent(event: WebhookEvent): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   // Get all active endpoints subscribed to this event type
   const endpoints = await db
@@ -316,8 +309,7 @@ export async function getWebhookDeliveryLogs(
   webhookId: number,
   limit: number = 50
 ): Promise<WebhookDeliveryLog[]> {
-  const db = await getDb();
-  if (!db) return [];
+  const db = await requireDb();
   
   return await db
     .select()
@@ -331,8 +323,7 @@ export async function getWebhookDeliveryLogs(
  * Get webhook delivery statistics
  */
 export async function getWebhookStats(userId: number, webhookId?: number): Promise<any> {
-  const db = await getDb();
-  if (!db) return null;
+  const db = await requireDb();
   
   if (webhookId) {
     const [endpoint] = await db

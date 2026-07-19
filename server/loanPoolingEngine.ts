@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   mortgageApplications,
   loanPools,
@@ -79,8 +79,7 @@ function calculateRiskTier(creditScore: number, loanToValue: number): string {
  * Get eligible loans for pooling
  */
 export async function getEligibleLoans(): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   // Get approved loans that are not already in a pool
   const approvedLoans = await db
@@ -286,8 +285,7 @@ export async function createOptimizedPools(
  * Rebalance existing draft pools
  */
 export async function rebalancePools(): Promise<{ rebalanced: number }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   // Get draft pools
   const draftPools = await db
@@ -319,8 +317,7 @@ export async function rebalancePools(): Promise<{ rebalanced: number }> {
  * Monitor pool performance
  */
 export async function monitorPoolPerformance(): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   // Get active and sold pools
   const activePools = await db
@@ -361,8 +358,7 @@ export async function monitorPoolPerformance(): Promise<any[]> {
  * Auto-close pools that meet criteria
  */
 export async function autoClosePools(): Promise<{ closed: number }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   // Get draft pools
   const draftPools = await db

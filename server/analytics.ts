@@ -3,7 +3,7 @@
  * Provides metrics and insights for the analytics dashboard
  */
 
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   activityLogs,
   parcels,
@@ -53,17 +53,8 @@ type AIPrediction =
  * Get key metrics for dashboard
  */
 export async function getKeyMetrics() {
-  const db = await getDb();
-  if (!db) {
-    return {
-      totalTransactions: 0,
-      totalValue: 0,
-      activeUsers: 0,
-      pendingApprovals: 0,
-      fraudAlerts: 0,
-      avgProcessingTime: 0,
-    };
-  }
+  const db = await requireDb();
+
 
   const [transactionSummary] = await db
     .select({
@@ -101,13 +92,8 @@ export async function getKeyMetrics() {
  * Get transaction trend data
  */
 export async function getTransactionTrend(startDate: Date, endDate: Date) {
-  const db = await getDb();
-  if (!db) {
-    return {
-      labels: [],
-      values: [],
-    };
-  }
+  const db = await requireDb();
+
 
   const rows = await db
     .select({
@@ -130,13 +116,8 @@ export async function getTransactionTrend(startDate: Date, endDate: Date) {
  * Get property value distribution
  */
 export async function getPropertyValueDistribution() {
-  const db = await getDb();
-  if (!db) {
-    return {
-      ranges: [],
-      counts: [],
-    };
-  }
+  const db = await requireDb();
+
 
   const rows = await db
     .select({
@@ -165,13 +146,8 @@ export async function getPropertyValueDistribution() {
  * Get transaction type breakdown
  */
 export async function getTransactionTypeBreakdown() {
-  const db = await getDb();
-  if (!db) {
-    return {
-      types: [],
-      counts: [],
-    };
-  }
+  const db = await requireDb();
+
 
   const rows = await db
     .select({
@@ -192,14 +168,8 @@ export async function getTransactionTypeBreakdown() {
  * Get revenue trend with forecast
  */
 export async function getRevenueTrend(startDate: Date, endDate: Date) {
-  const db = await getDb();
-  if (!db) {
-    return {
-      labels: [],
-      revenue: [],
-      forecast: [],
-    };
-  }
+  const db = await requireDb();
+
 
   const rows = await db
     .select({
@@ -226,14 +196,8 @@ export async function getRevenueTrend(startDate: Date, endDate: Date) {
  * Get user activity metrics
  */
 export async function getUserActivity(startDate: Date, endDate: Date) {
-  const db = await getDb();
-  if (!db) {
-    return {
-      labels: [],
-      activeUsers: [],
-      newUsers: [],
-    };
-  }
+  const db = await requireDb();
+
 
   const activeRows = await db
     .select({
@@ -270,10 +234,8 @@ export async function getUserActivity(startDate: Date, endDate: Date) {
  * Get fraud alerts
  */
 export async function getFraudAlerts(limit: number = 10): Promise<FraudAlert[]> {
-  const db = await getDb();
-  if (!db) {
-    return [];
-  }
+  const db = await requireDb();
+
 
   const rows = await db
     .select({
@@ -309,10 +271,8 @@ export async function getFraudAlerts(limit: number = 10): Promise<FraudAlert[]> 
  * Get AI predictions
  */
 export async function getAIPredictions(limit: number = 10): Promise<AIPrediction[]> {
-  const db = await getDb();
-  if (!db) {
-    return [];
-  }
+  const db = await requireDb();
+
 
   const [parcelPrediction] = await db
     .select({
@@ -397,10 +357,8 @@ export async function exportAnalyticsData(
   startDate: Date,
   endDate: Date
 ): Promise<string> {
-  const db = await getDb();
-  if (!db) {
-    return '';
-  }
+  const db = await requireDb();
+
 
   if (dataType === 'transactions') {
     const rows = await db

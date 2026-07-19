@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { appRouter } from './routers';
-import { getDb, upsertUser } from './db';
+import { requireDb, upsertUser } from './db';
 import { users } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -22,17 +22,8 @@ describe('Blockchain Integration', () => {
       role: 'admin',
     });
 
-    const db = await getDb();
-    if (!db) {
-      testUser = {
-        id: 1301,
-        openId: 'test-blockchain-user',
-        name: 'Blockchain Test User',
-        role: 'admin',
-      };
-      testUserId = testUser.id;
-      return;
-    }
+    const db = await requireDb();
+
 
     const result = await db.select().from(users).where(eq(users.openId, 'test-blockchain-user')).limit(1);
     if (result.length === 0) throw new Error('Test user not created');

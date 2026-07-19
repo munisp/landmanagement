@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import { sql } from 'drizzle-orm';
 
 export class ExecutiveAnalyticsService {
@@ -6,8 +6,7 @@ export class ExecutiveAnalyticsService {
    * Get executive KPIs for dashboard
    */
   static async getExecutiveKPIs(startDate: Date, endDate: Date) {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
     const result = await db.execute(sql`
       SELECT 
         COALESCE(SUM(transaction_count), 0) as total_transactions,
@@ -76,8 +75,7 @@ export class ExecutiveAnalyticsService {
    * Get daily time series data for charts
    */
   static async getDailyTimeSeries(startDate: Date, endDate: Date) {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
     const result = await db.execute(sql`
       SELECT 
         date,
@@ -179,8 +177,7 @@ export class ExecutiveAnalyticsService {
    * Get revenue breakdown by transaction type
    */
   static async getRevenueBreakdown(startDate: Date, endDate: Date) {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
 
     const result = await db.execute(sql`
       SELECT
@@ -215,8 +212,7 @@ export class ExecutiveAnalyticsService {
    * Get system performance metrics
    */
   static async getSystemMetrics(hours: number = 24) {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
     const startTime = new Date();
     startTime.setHours(startTime.getHours() - hours);
 

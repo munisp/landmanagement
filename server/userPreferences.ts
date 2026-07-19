@@ -3,7 +3,7 @@
  * Handle user preferences storage and retrieval
  */
 
-import { getDb } from './db';
+import { requireDb } from './db';
 import { userPreferences } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -40,10 +40,8 @@ export interface UserPreferences {
  * Get user preferences
  */
 export async function getUserPreferences(userId: number): Promise<UserPreferences | null> {
-  const db = await getDb();
-  if (!db) {
-    return null;
-  }
+  const db = await requireDb();
+
 
   const result = await db.select()
     .from(userPreferences)
@@ -98,10 +96,8 @@ export async function updateUserPreferences(
   userId: number,
   preferences: Partial<UserPreferences>
 ): Promise<UserPreferences> {
-  const db = await getDb();
-  if (!db) {
-    throw new Error('Database connection failed');
-  }
+  const db = await requireDb();
+
 
   const current = await getUserPreferences(userId);
   if (!current) {
@@ -146,10 +142,8 @@ export async function saveDashboardLayout(
   userId: number,
   layout: DashboardLayoutItem[]
 ): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    throw new Error('Database connection failed');
-  }
+  const db = await requireDb();
+
 
   // Ensure user preferences exist
   await getUserPreferences(userId);
@@ -163,10 +157,8 @@ export async function saveDashboardLayout(
  * Get dashboard layout
  */
 export async function getDashboardLayout(userId: number): Promise<DashboardLayoutItem[] | null> {
-  const db = await getDb();
-  if (!db) {
-    return null;
-  }
+  const db = await requireDb();
+
 
   const result = await db.select()
     .from(userPreferences)
@@ -187,10 +179,8 @@ export async function updateNotificationSettings(
   userId: number,
   settings: Partial<NotificationSettings>
 ): Promise<NotificationSettings> {
-  const db = await getDb();
-  if (!db) {
-    throw new Error('Database connection failed');
-  }
+  const db = await requireDb();
+
 
   const current = await getUserPreferences(userId);
   const currentSettings = current?.notificationSettings ?? {

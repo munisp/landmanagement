@@ -3,7 +3,7 @@
  * Provides analytics and metrics for parcel verification workflow
  */
 
-import { getDb } from './db';
+import { requireDb } from './db';
 import { verificationRequests, users } from '../drizzle/schema';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { listVerificationAnalyticsRequests } from './verificationAnalyticsRepository';
@@ -270,8 +270,7 @@ async function getOfflineProcessingTimeDistribution(startDate?: Date, endDate?: 
  * Get verification metrics for a time period
  */
 export async function getVerificationMetrics(startDate?: Date, endDate?: Date): Promise<VerificationMetrics> {
-  const db = await getDb();
-  if (!db) return getOfflineMetrics(startDate, endDate);
+  const db = await requireDb();
 
   const { start, end } = getDateRange(startDate, endDate);
 
@@ -329,8 +328,7 @@ export async function getVerificationMetrics(startDate?: Date, endDate?: Date): 
 }
 
 export async function getReviewerPerformance(startDate?: Date, endDate?: Date): Promise<ReviewerPerformance[]> {
-  const db = await getDb();
-  if (!db) return getOfflineReviewerPerformance(startDate, endDate);
+  const db = await requireDb();
 
   const { start, end } = getDateRange(startDate, endDate);
 
@@ -389,8 +387,7 @@ export async function getReviewerPerformance(startDate?: Date, endDate?: Date): 
 }
 
 export async function getBottleneckAnalysis(): Promise<BottleneckAnalysis[]> {
-  const db = await getDb();
-  if (!db) return getOfflineBottleneckAnalysis();
+  const db = await requireDb();
 
   const result = await db
     .select({
@@ -429,8 +426,7 @@ export async function getBottleneckAnalysis(): Promise<BottleneckAnalysis[]> {
 }
 
 export async function getVerificationTrends(startDate?: Date, endDate?: Date, interval: 'day' | 'week' | 'month' = 'day'): Promise<TrendData[]> {
-  const db = await getDb();
-  if (!db) return getOfflineVerificationTrends(startDate, endDate, interval);
+  const db = await requireDb();
 
   const { start, end } = getDateRange(startDate, endDate);
   let dateFormat = 'YYYY-MM-DD';
@@ -459,8 +455,7 @@ export async function getVerificationTrends(startDate?: Date, endDate?: Date, in
 }
 
 export async function getProcessingTimeDistribution(startDate?: Date, endDate?: Date): Promise<{ bucket: string; count: number }[]> {
-  const db = await getDb();
-  if (!db) return getOfflineProcessingTimeDistribution(startDate, endDate);
+  const db = await requireDb();
 
   const { start, end } = getDateRange(startDate, endDate);
   const result = await db.execute(sql`

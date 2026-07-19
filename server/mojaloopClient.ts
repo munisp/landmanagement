@@ -8,7 +8,7 @@
  */
 
 import crypto from 'crypto';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { mojaloopTransactions, mojaloopPaymentEvents, mojaloopFspConfig } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -322,8 +322,7 @@ export class MojaloopClient {
     fspId?: string;
   }): Promise<void> {
     try {
-      const db = await getDb();
-      if (!db) throw new Error('Database connection failed');
+      const db = await requireDb();
       await db.insert(mojaloopPaymentEvents).values(event);
     } catch (error) {
       console.error('Failed to log payment event:', error);
@@ -336,8 +335,7 @@ export class MojaloopClient {
  * Get Mojaloop client instance with configuration from database
  */
 export async function getMojaloopClient(fspId?: string): Promise<MojaloopClient> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
   
   // Get FSP configuration from database
   const configs = await db

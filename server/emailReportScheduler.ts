@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   scheduled_reports,
   report_history,
@@ -103,8 +103,7 @@ async function generateReport(
 export async function executeScheduledReport(
   scheduleId: number
 ): Promise<ReportGenerationResult> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   try {
     // Get schedule details
@@ -337,8 +336,7 @@ export async function processDueReports(): Promise<{
   failed: number;
   errors: string[];
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   let processed = 0;
   let failed = 0;

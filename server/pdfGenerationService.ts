@@ -1,5 +1,5 @@
 import puppeteer from 'puppeteer';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { mortgageApplications, brokerCommissions, loanPools, poolInvestments } from '../drizzle/schema';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
 
@@ -54,8 +54,7 @@ async function fetchAnalyticsData(
   startDate?: Date,
   endDate?: Date
 ): Promise<AnalyticsData> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const start = startDate || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   const end = endDate || new Date();
@@ -145,8 +144,7 @@ async function fetchCommissionStatementData(
   startDate: Date,
   endDate: Date
 ): Promise<CommissionStatementData> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const commissions = await db
     .select()

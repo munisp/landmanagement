@@ -7,7 +7,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { eq } from 'drizzle-orm';
 import { users } from '../drizzle/schema';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { getAccountSettings, updateAccountProfile } from './accountSettingsRepository';
 
 const GDPR_STORE_DIR = path.join(process.cwd(), 'server', 'data', 'gdpr');
@@ -68,28 +68,8 @@ async function writeJsonArray<T>(filePath: string, value: T[]): Promise<void> {
 }
 
 async function getUserRecord(userId: number, fallbackProfile?: PrivacyProfileFallback) {
-  const db = await getDb();
-  if (!db) {
-    const offlineAccount = await getAccountSettings(userId, {
-      name: fallbackProfile?.name || `User ${userId}`,
-      email: fallbackProfile?.email || `user${userId}@idlr.local`,
-      phone: fallbackProfile?.phone || '+234 000 000 0000',
-      role: fallbackProfile?.role || 'user',
-    });
+  const db = await requireDb();
 
-    return {
-      db: null,
-      user: {
-        id: userId,
-        name: offlineAccount.profile.name,
-        email: offlineAccount.profile.email,
-        role: offlineAccount.profile.role,
-        phone: offlineAccount.profile.phone,
-        createdAt: offlineAccount.profile.updatedAt,
-        updatedAt: offlineAccount.profile.updatedAt,
-      },
-    };
-  }
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) {

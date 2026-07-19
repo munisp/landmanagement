@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { sql } from 'drizzle-orm';
 
 // Property Transfer Smart Contract ABI (simplified)
@@ -315,8 +315,7 @@ export class BlockchainService {
 
   // Database Operations
   private async recordTransaction(data: any): Promise<void> {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
     await db.execute(sql`
       INSERT INTO blockchain_transactions (
         transaction_hash, parcel_id, transaction_type, from_address, to_address,
@@ -331,8 +330,7 @@ export class BlockchainService {
   }
 
   private async updateTransaction(txHash: string, updates: any): Promise<void> {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
     const setClauses: string[] = [];
     const values: any[] = [];
 
@@ -363,8 +361,7 @@ export class BlockchainService {
   }
 
   async getTransactionHistory(parcelId?: number, limit: number = 50): Promise<any[]> {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
     const query = parcelId
       ? sql`SELECT * FROM blockchain_transactions WHERE parcel_id = ${parcelId} ORDER BY created_at DESC LIMIT ${limit}`
       : sql`SELECT * FROM blockchain_transactions ORDER BY created_at DESC LIMIT ${limit}`;

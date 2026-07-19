@@ -19,7 +19,7 @@ import {
 } from './kafkaClient';
 import { getTigerBeetleClient } from './tigerBeetleClient';
 // Payment and smart contract services will be imported when needed
-import { getDb } from './db';
+import { requireDb } from './db';
 import { mojaloopTransactions, blockchainTransactions } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -418,11 +418,8 @@ export class ReconciliationConsumer {
   }
 
   private async reconcilePaymentWithBlockchain(paymentEvent: PaymentEvent): Promise<void> {
-    const db = await getDb();
-    if (!db) {
-      console.error('Database not available');
-      return;
-    }
+    const db = await requireDb();
+
 
     // Find corresponding blockchain transaction
     const [payment] = await db

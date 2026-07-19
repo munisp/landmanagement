@@ -1,5 +1,5 @@
 import { WebSocket, WebSocketServer } from 'ws';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { mortgageApplications, brokerCommissions, loanPools } from '../drizzle/schema';
 import { eq, desc } from 'drizzle-orm';
 import { authenticateWebSocketUpgrade } from './webSocketAuth';
@@ -207,8 +207,7 @@ export const realtimeWebSocketService = new RealtimeWebSocketService();
  */
 
 export async function broadcastApplicationSubmitted(applicationId: number) {
-  const db = await getDb();
-  if (!db) return;
+  const db = await requireDb();
   const application = await db.select().from(mortgageApplications).where(eq(mortgageApplications.id, applicationId)).limit(1);
   
   if (application.length > 0) {
@@ -229,8 +228,7 @@ export async function broadcastApplicationSubmitted(applicationId: number) {
 }
 
 export async function broadcastApplicationApproved(applicationId: number) {
-  const db = await getDb();
-  if (!db) return;
+  const db = await requireDb();
   const application = await db.select().from(mortgageApplications).where(eq(mortgageApplications.id, applicationId)).limit(1);
   
   if (application.length > 0) {
@@ -252,8 +250,7 @@ export async function broadcastApplicationApproved(applicationId: number) {
 }
 
 export async function broadcastApplicationRejected(applicationId: number, reason: string) {
-  const db = await getDb();
-  if (!db) return;
+  const db = await requireDb();
   const application = await db.select().from(mortgageApplications).where(eq(mortgageApplications.id, applicationId)).limit(1);
   
   if (application.length > 0) {
@@ -274,8 +271,7 @@ export async function broadcastApplicationRejected(applicationId: number, reason
 }
 
 export async function broadcastCommissionPaid(commissionId: number) {
-  const db = await getDb();
-  if (!db) return;
+  const db = await requireDb();
   const commission = await db.select().from(brokerCommissions).where(eq(brokerCommissions.id, commissionId)).limit(1);
   
   if (commission.length > 0) {
@@ -295,8 +291,7 @@ export async function broadcastCommissionPaid(commissionId: number) {
 }
 
 export async function broadcastPoolCreated(poolId: number) {
-  const db = await getDb();
-  if (!db) return;
+  const db = await requireDb();
   const pool = await db.select().from(loanPools).where(eq(loanPools.id, poolId)).limit(1);
   
   if (pool.length > 0) {

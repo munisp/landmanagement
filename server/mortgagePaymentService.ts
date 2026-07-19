@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   mortgageApplications,
   mortgagePaymentSchedule,
@@ -17,8 +17,7 @@ const FLUTTERWAVE_SECRET_KEY = process.env.FLUTTERWAVE_SECRET_KEY || 'FLWSECK_TE
  * Generate payment schedule for approved mortgage
  */
 export async function generatePaymentSchedule(applicationId: number): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Get mortgage application details
   const [application] = await db
@@ -99,8 +98,7 @@ export async function createAutoDebitMandate(params: {
   bankName: string;
   gatewayProvider: 'paystack' | 'flutterwave';
 }): Promise<{ mandateId: string; authorizationUrl?: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Get application details
   const [application] = await db
@@ -190,8 +188,7 @@ export async function processAutomaticDebits(): Promise<{
   successful: number;
   failed: number;
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -260,8 +257,7 @@ async function processDebit(
   mandate: any,
   scheduleEntry: any
 ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const transactionId = `PAY-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
@@ -385,8 +381,7 @@ export async function processManualPayment(params: {
   paymentGateway?: string;
   gatewayReference?: string;
 }): Promise<{ success: boolean; transactionId: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const transactionId = `PAY-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
@@ -451,8 +446,7 @@ export async function processManualPayment(params: {
  * Get payment history for an application
  */
 export async function getPaymentHistory(applicationId: number): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const payments = await db
     .select()

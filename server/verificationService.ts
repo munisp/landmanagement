@@ -4,7 +4,7 @@
  * reviewer assignment, status transitions, and blockchain recording
  */
 
-import { getDb } from './db';
+import { requireDb } from './db';
 import { 
   verificationRequests, 
   verificationDocuments, 
@@ -13,17 +13,6 @@ import {
 } from '../drizzle/schema';
 import { eq, desc, and, or, sql } from 'drizzle-orm';
 import { notificationService } from './notifications';
-import {
-  addVerificationDocumentOffline,
-  approveVerificationRequestOffline,
-  assignReviewerOffline,
-  createVerificationRequestOffline,
-  getVerificationHistoryOffline,
-  getVerificationRequestDetailsOffline,
-  listVerificationRequestsOffline,
-  rejectVerificationRequestOffline,
-  submitVerificationRequestOffline,
-} from './verificationRepository';
 
 export interface VerificationRequestDetails {
   id: number;
@@ -69,10 +58,8 @@ export async function createVerificationRequest(
   requesterId: number,
   notes?: string
 ): Promise<{ success: boolean; requestId?: number }> {
-  const db = await getDb();
-  if (!db) {
-    return createVerificationRequestOffline(parcelId, requesterId, `User ${requesterId}`, notes);
-  }
+  const db = await requireDb();
+
 
   const [request] = await db
     .insert(verificationRequests)
@@ -109,10 +96,8 @@ export async function submitVerificationRequest(
   requestId: number,
   userId: number
 ): Promise<{ success: boolean; message?: string }> {
-  const db = await getDb();
-  if (!db) {
-    return submitVerificationRequestOffline(requestId, userId);
-  }
+  const db = await requireDb();
+
 
   // Check if request exists and is in draft status
   const [request] = await db
@@ -174,10 +159,8 @@ export async function assignReviewer(
   reviewerId: number,
   assignedBy: number
 ): Promise<{ success: boolean; message?: string }> {
-  const db = await getDb();
-  if (!db) {
-    return assignReviewerOffline(requestId, reviewerId, assignedBy);
-  }
+  const db = await requireDb();
+
 
   const [request] = await db
     .select()
@@ -228,10 +211,8 @@ export async function approveVerificationRequest(
   reviewerId: number,
   blockchainTxHash?: string
 ): Promise<{ success: boolean; message?: string }> {
-  const db = await getDb();
-  if (!db) {
-    return approveVerificationRequestOffline(requestId, reviewerId, blockchainTxHash);
-  }
+  const db = await requireDb();
+
 
   const [request] = await db
     .select()
@@ -284,10 +265,8 @@ export async function rejectVerificationRequest(
   reviewerId: number,
   reason: string
 ): Promise<{ success: boolean; message?: string }> {
-  const db = await getDb();
-  if (!db) {
-    return rejectVerificationRequestOffline(requestId, reviewerId, reason);
-  }
+  const db = await requireDb();
+
 
   const [request] = await db
     .select()
@@ -344,13 +323,8 @@ export async function addVerificationDocument(
   mimeType: string,
   uploadedBy: number
 ): Promise<{ success: boolean; documentId?: number }> {
-  const db = await getDb();
-  if (!db) {
-    return (await addVerificationDocumentOffline(requestId, documentType, fileName, fileUrl, fileSize, mimeType, uploadedBy)) as {
-      success: boolean;
-      documentId?: number;
-    };
-  }
+  const db = await requireDb();
+
 
   const [doc] = await db
     .insert(verificationDocuments)
@@ -387,10 +361,8 @@ export async function addVerificationDocument(
 export async function getVerificationRequestDetails(
   requestId: number
 ): Promise<VerificationRequestDetails | null> {
-  const db = await getDb();
-  if (!db) {
-    return (await getVerificationRequestDetailsOffline(requestId)) as VerificationRequestDetails | null;
-  }
+  const db = await requireDb();
+
 
   const [request] = await db
     .select({
@@ -476,15 +448,8 @@ export async function listVerificationRequests(
   page: number;
   limit: number;
 }> {
-  const db = await getDb();
-  if (!db) {
-    return (await listVerificationRequestsOffline(filters, page, limit)) as {
-      requests: VerificationRequestDetails[];
-      total: number;
-      page: number;
-      limit: number;
-    };
-  }
+  const db = await requireDb();
+
 
   const offset = (page - 1) * limit;
 
@@ -589,10 +554,8 @@ export async function listVerificationRequests(
  * Get verification history for a request
  */
 export async function getVerificationHistory(requestId: number) {
-  const db = await getDb();
-  if (!db) {
-    return getVerificationHistoryOffline(requestId);
-  }
+  const db = await requireDb();
+
 
   const history = await db
     .select({

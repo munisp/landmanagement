@@ -1,12 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { getDb } from './db';
-import {
-  deleteOfflineFieldData,
-  getOfflineFieldDataStats,
-  listOfflineFieldData,
-  listOfflineFieldDataByParcel,
-  syncOfflineFieldData,
-} from './fieldDataRepository';
+import { requireDb } from './db';
 
 export interface FieldDataRecord {
   parcelNumber: string;
@@ -36,11 +29,9 @@ export interface SyncedFieldData {
 
 export const FieldDataService = {
   async syncFieldData(userId: number, data: FieldDataRecord): Promise<SyncedFieldData> {
-    const db = await getDb();
+    const db = await requireDb();
 
-    if (!db) {
-      return syncOfflineFieldData(userId, data);
-    }
+
 
     const result = await db.execute(sql`
       INSERT INTO field_data (
@@ -73,11 +64,9 @@ export const FieldDataService = {
   },
 
   async getUserFieldData(userId: number, limit: number = 50): Promise<SyncedFieldData[]> {
-    const db = await getDb();
+    const db = await requireDb();
 
-    if (!db) {
-      return listOfflineFieldData(userId, limit);
-    }
+
 
     const result = await db.execute(sql`
       SELECT * FROM field_data
@@ -90,11 +79,9 @@ export const FieldDataService = {
   },
 
   async getFieldDataByParcel(parcelNumber: string): Promise<SyncedFieldData[]> {
-    const db = await getDb();
+    const db = await requireDb();
 
-    if (!db) {
-      return listOfflineFieldDataByParcel(parcelNumber);
-    }
+
 
     const result = await db.execute(sql`
       SELECT * FROM field_data
@@ -110,11 +97,9 @@ export const FieldDataService = {
     totalParcels: number;
     lastSync: Date | null;
   }> {
-    const db = await getDb();
+    const db = await requireDb();
 
-    if (!db) {
-      return getOfflineFieldDataStats(userId);
-    }
+
 
     const result = await db.execute(sql`
       SELECT
@@ -139,11 +124,9 @@ export const FieldDataService = {
   },
 
   async deleteFieldData(id: number, userId: number): Promise<boolean> {
-    const db = await getDb();
+    const db = await requireDb();
 
-    if (!db) {
-      return deleteOfflineFieldData(id, userId);
-    }
+
 
     const result = await db.execute(sql`
       DELETE FROM field_data

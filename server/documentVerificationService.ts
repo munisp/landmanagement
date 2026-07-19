@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import { documentVerifications, verificationAuditLog } from '../drizzle/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { invokeLLM } from './_core/llm';
@@ -393,8 +393,7 @@ export async function processDocumentVerification(params: {
   extractedData: ExtractedData;
   fraudDetection: FraudDetectionResult;
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const verificationId = `DOC-VER-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
   
@@ -478,8 +477,7 @@ export async function processDocumentVerification(params: {
  * Get verification details
  */
 export async function getVerificationDetails(verificationId: string): Promise<any> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [verification] = await db
     .select()
@@ -515,8 +513,7 @@ export async function updateVerificationStatus(params: {
   rejectionReason?: string;
   reviewerId: number;
 }): Promise<{ success: boolean }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [verification] = await db
     .select()
@@ -559,8 +556,7 @@ export async function updateVerificationStatus(params: {
  * Get verifications for application
  */
 export async function getApplicationVerifications(applicationId: number): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const verifications = await db
     .select()
@@ -579,8 +575,7 @@ export async function getApplicationVerifications(applicationId: number): Promis
  * Get verifications requiring review
  */
 export async function getVerificationsRequiringReview(): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const verifications = await db
     .select()

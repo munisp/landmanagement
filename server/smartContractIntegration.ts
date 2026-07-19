@@ -6,7 +6,7 @@
  */
 
 import { ethers } from 'ethers';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { mojaloopTransactions, blockchainTransactions } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 import { reconcilePaymentWithEscrow } from './mojaloopPaymentService';
@@ -197,8 +197,7 @@ export async function createEscrowForPayment(params: {
   });
 
   // Update Mojaloop transaction with escrow details
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   await db
     .update(mojaloopTransactions)
@@ -252,8 +251,7 @@ export async function releaseEscrowOnPaymentComplete(params: {
   const transactionHash = await integration.releaseEscrow(params.escrowId);
 
   // Update Mojaloop transaction
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   await db
     .update(mojaloopTransactions)
@@ -305,8 +303,7 @@ export async function refundEscrowOnPaymentFailure(params: {
   const transactionHash = await integration.refundEscrow(params.escrowId);
 
   // Update Mojaloop transaction
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   await db
     .update(mojaloopTransactions)

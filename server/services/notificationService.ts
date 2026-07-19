@@ -1,4 +1,4 @@
-import { getDb } from "../db";
+import { requireDb } from "../db";
 import { emailQueue, emailLogs } from "../../drizzle/schema";
 import { eq, and, lt, desc } from "drizzle-orm";
 import fs from "fs";
@@ -55,8 +55,7 @@ export async function queueEmailNotification(
   priority: "high" | "normal" | "low" = "normal",
   scheduledAt?: Date
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  const db = await requireDb();
   
   const htmlBody = renderEmailTemplate(templateName, variables);
   
@@ -97,8 +96,7 @@ export async function queueSMSNotification(
 
 // Process email queue (called by scheduler)
 export async function processEmailQueue() {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  const db = await requireDb();
   
   // Get pending emails that are due to be sent
   const pendingEmails = await db
@@ -147,7 +145,6 @@ export async function processEmailQueue() {
       
       if (newRetryCount >= maxRetries) {
         // Mark as failed after max retries
-        if (!db) throw new Error("Database not available");
         await db
           .update(emailQueue)
         .set({
@@ -158,7 +155,6 @@ export async function processEmailQueue() {
           .where(eq(emailQueue.id, email.id));
         
         // Log failed delivery
-        if (!db) throw new Error("Database not available");
         await db.insert(emailLogs).values({
           recipientEmail: email.recipientEmail,
           subject: email.subject,
@@ -173,7 +169,6 @@ export async function processEmailQueue() {
         const retryDelay = Math.pow(2, newRetryCount) * 60 * 1000; // 2min, 4min, 8min
         const nextRetry = new Date(Date.now() + retryDelay);
         
-        if (!db) throw new Error("Database not available");
         await db
           .update(emailQueue)
           .set({
@@ -234,8 +229,7 @@ async function sendEmail(email: { recipientEmail: string; subject: string; body:
 
 // Get notification delivery statistics
 export async function getNotificationStats(userId?: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  const db = await requireDb();
   
   const stats = await db
     .select()

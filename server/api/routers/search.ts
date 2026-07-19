@@ -299,9 +299,8 @@ export const searchRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       // Fetch parcel from database
-      const { getDb } = await import('../../db');
-      const db = await getDb();
-      if (!db) throw new Error('Database not available');
+      const { requireDb } = await import('../../db');
+      const db = await requireDb();
       
       const { parcels } = await import('../../../drizzle/schema');
       const { eq } = await import('drizzle-orm');
@@ -323,9 +322,8 @@ export const searchRouter = router({
    * Bulk reindex all parcels (admin only)
    */
   reindexParcels: protectedProcedure.mutation(async () => {
-    const { getDb } = await import('../../db');
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const { requireDb } = await import('../../db');
+    const db = await requireDb();
     
     const allParcels = await db.select().from((await import('../../../drizzle/schema')).parcels);
     const es = getElasticsearchService();
@@ -339,11 +337,10 @@ export const searchRouter = router({
    * Bulk reindex all transactions (admin only)
    */
   reindexTransactions: protectedProcedure.mutation(async () => {
-    const { getDb } = await import('../../db');
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const { requireDb } = await import('../../db');
+    const db = await requireDb();
     
-    const allTransactions = await db.select().from((await import('../../../drizzle/schema')).transactions);
+    const allTransactions = await db.select().from((await import('../../../drizzle/schema')).registryTransactions);
     const es = getElasticsearchService();
 
     await es.bulkIndex('idlr-transactions', allTransactions);

@@ -3,13 +3,12 @@
  * Handle CSV/Excel parsing and batch database operations
  */
 
-import { getDb, getUserByOpenId, upsertUser } from './db';
-import { parcels, transactions, legalDocuments } from '../drizzle/schema';
+import { requireDb, getUserByOpenId, upsertUser } from './db';
+import { parcels, legalDocuments, mortgageApplications, taxClearances, insurancePolicies } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 import { createParcel, getParcelByNumber, searchParcels, verifyParcel } from './parcelRepository';
 import { listAllDocuments, uploadDocumentRecord } from './documentRepository';
 import { createImportedTransaction, listTransactions } from './transactionRepository';
-import { listAdminInsurancePolicies, listAdminMortgageApplications, listAdminTaxClearances } from './phase4AdminRepository';
 
 export interface ImportResult {
   total: number;
@@ -166,7 +165,7 @@ export async function importParcels(data: ParcelImportRow[]): Promise<ImportResu
     errors: [],
   };
 
-  const db = await getDb();
+  const db = await requireDb();
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
@@ -179,27 +178,7 @@ export async function importParcels(data: ParcelImportRow[]): Promise<ImportResu
     }
 
     try {
-      if (!db) {
-        const createdParcel = await createParcel({
-          surveyPlanNumber: row.coordinates.includes('SP/') ? row.coordinates : `IMP-${row.parcel_id}`,
-          state: row.parcel_id.split('-')[0] === 'LG' ? 'Lagos' : row.parcel_id.split('-')[0] === 'AB' ? 'Abuja' : 'Imported State',
-          lga: 'Imported LGA',
-          ward: 'Imported Ward',
-          streetAddress: `Imported parcel for ${row.owner_name}`,
-          areaSquareMeters: Math.round(parseFloat(row.area.toString())),
-          geometryGeoJSON: JSON.stringify({ type: 'Polygon', coordinates: [] }),
-          landUseType: row.land_use.toLowerCase(),
-          notes: `Bulk imported parcel source ${row.parcel_id} for ${row.owner_name}. Coordinates: ${row.coordinates}`,
-          surveyorId: 'bulk-import',
-        });
 
-        if (row.status === 'Active') {
-          await verifyParcel(createdParcel.id, 'bulk-import');
-        }
-
-        result.success++;
-        continue;
-      }
 
       const ownerId = await resolveImportedOwnerId(row.owner_name);
 
@@ -233,7 +212,7 @@ export async function importDocuments(data: DocumentImportRow[]): Promise<Import
     errors: [],
   };
 
-  const db = await getDb();
+  const db = await requireDb();
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
@@ -246,29 +225,7 @@ export async function importDocuments(data: DocumentImportRow[]): Promise<Import
     }
 
     try {
-      if (!db) {
-        const parcel = await getParcelByNumber(row.parcel_id);
-        if (!parcel) {
-          throw new Error(`Parcel ${row.parcel_id} not found`);
-        }
 
-        uploadDocumentRecord({
-          parcelId: parcel.id,
-          transactionId: undefined,
-          titleId: undefined,
-          type: row.document_type.toLowerCase().replace(/\s+/g, '_'),
-          title: `Imported ${row.document_type}`,
-          description: `Bulk imported document ${row.document_id}`,
-          fileKey: row.document_id,
-          fileUrl: row.file_url,
-          fileName: row.file_url.split('/').pop() || `${row.document_id}.pdf`,
-          mimeType: 'application/pdf',
-          uploadedBy: 1,
-        });
-
-        result.success++;
-        continue;
-      }
 
       const parcel = await db.select().from(parcels).where(eq(parcels.parcelId, row.parcel_id)).limit(1);
       if (parcel.length === 0) {
@@ -306,7 +263,7 @@ export async function importTransactions(data: TransactionImportRow[]): Promise<
     errors: [],
   };
 
-  const db = await getDb();
+  const db = await requireDb();
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
@@ -319,57 +276,25 @@ export async function importTransactions(data: TransactionImportRow[]): Promise<
     }
 
     try {
-      if (!db) {
-        const parcel = await getParcelByNumber(row.parcel_id);
-        if (!parcel) {
-          throw new Error(`Parcel ${row.parcel_id} not found`);
-        }
 
-        const normalizedStatus: {
-          status: 'completed' | 'pending_approval' | 'rejected';
-          workflowStage: string;
-          paymentStatus: 'paid' | 'pending' | 'unpaid';
-          documentStatus: 'verified' | 'submitted' | 'pending';
-        } = row.status === 'Completed'
-          ? { status: 'completed', workflowStage: 'completed', paymentStatus: 'paid', documentStatus: 'verified' }
-          : row.status === 'Pending'
-            ? { status: 'pending_approval', workflowStage: 'registry_review', paymentStatus: 'pending', documentStatus: 'submitted' }
-            : { status: 'rejected', workflowStage: 'closed', paymentStatus: 'unpaid', documentStatus: 'pending' };
-
-        await createImportedTransaction({
-          externalReference: row.transaction_id,
-          type: row.type.toLowerCase(),
-          parcelId: parcel.id,
-          initiatorId: 1,
-          initiatorName: 'Bulk Import',
-          counterpartyName: 'Imported Counterparty',
-          considerationAmount: row.amount,
-          status: normalizedStatus.status,
-          workflowStage: normalizedStatus.workflowStage,
-          paymentStatus: normalizedStatus.paymentStatus,
-          documentStatus: normalizedStatus.documentStatus,
-          notes: `Imported transaction ${row.transaction_id} with source status ${row.status} on ${row.date}`,
-          createdAt: new Date(row.date).toString() === 'Invalid Date' ? undefined : new Date(row.date).toISOString(),
-        });
-
-        result.success++;
-        continue;
-      }
 
       const parcel = await db.select().from(parcels).where(eq(parcels.parcelId, row.parcel_id)).limit(1);
       if (parcel.length === 0) {
         throw new Error(`Parcel ${row.parcel_id} not found`);
       }
 
-      await db.insert(transactions).values({
-        transactionId: row.transaction_id,
+      await createImportedTransaction({
+        externalReference: row.transaction_id,
+        type: row.type,
         parcelId: parcel[0].id,
-        fromUserId: 1,
-        toUserId: 1,
-        transactionType: row.type as any,
-        status: row.status as any,
-        amount: Math.round(row.amount * 100),
-        currency: 'NGN',
+        initiatorId: 1,
+        initiatorName: 'Bulk Import',
+        considerationAmount: Math.round(row.amount * 100),
+        status: (row.status || 'pending_approval') as any,
+        workflowStage: 'submission',
+        paymentStatus: 'unpaid',
+        documentStatus: 'pending',
+        notes: 'Imported via bulk import',
       });
 
       result.success++;
@@ -430,11 +355,17 @@ export async function exportBulkData(type: keyof BulkExportRowMap): Promise<Arra
     }));
   }
 
+  const db = await requireDb();
+  const [mortgageRows, taxRows, insuranceRows] = await Promise.all([
+    db.select({ applicantId: mortgageApplications.applicantId }).from(mortgageApplications),
+    db.select({ ownerId: taxClearances.ownerId }).from(taxClearances),
+    db.select({ policyHolderId: insurancePolicies.policyHolderId }).from(insurancePolicies),
+  ]);
   const dedupedUsers = new Map<number, Record<string, string | number | boolean | null>>();
   const userRows = [
-    ...(await listAdminMortgageApplications()).map((item) => ({ id: item.applicantId, name: `Borrower ${item.applicantId}`, role: 'borrower', source: 'mortgage' })),
-    ...(await listAdminTaxClearances()).map((item) => ({ id: item.ownerId, name: `Owner ${item.ownerId}`, role: 'owner', source: 'tax' })),
-    ...(await listAdminInsurancePolicies()).map((item) => ({ id: item.policyHolderId, name: `Policy Holder ${item.policyHolderId}`, role: 'user', source: 'insurance' })),
+    ...mortgageRows.map((item) => ({ id: item.applicantId, name: `Borrower ${item.applicantId}`, role: 'borrower', source: 'mortgage' })),
+    ...taxRows.map((item) => ({ id: item.ownerId, name: `Owner ${item.ownerId}`, role: 'owner', source: 'tax' })),
+    ...insuranceRows.map((item) => ({ id: item.policyHolderId, name: `Policy Holder ${item.policyHolderId}`, role: 'user', source: 'insurance' })),
     { id: 1, name: 'System Administrator', role: 'admin', source: 'system' },
   ];
 

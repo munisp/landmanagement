@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { getDb, upsertUser } from './db';
+import { requireDb, upsertUser } from './db';
 import * as verificationService from './verificationService';
 import { users } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
@@ -10,13 +10,9 @@ describe('Verification Workflow', () => {
   let testRequestId: number;
 
   beforeAll(async () => {
-    const db = await getDb();
+    const db = await requireDb();
 
-    if (!db) {
-      testRequesterId = 501;
-      testReviewerId = 601;
-      return;
-    }
+
 
     // Create test requester
     await upsertUser({

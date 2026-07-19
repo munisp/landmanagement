@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   loanPools,
   loanPoolLoans,
@@ -24,8 +24,7 @@ export async function createLoanPool(params: {
   riskTier: string;
   createdBy: number;
 }): Promise<{ poolId: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const poolId = `POOL-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
   
@@ -55,8 +54,7 @@ export async function addLoanToPool(params: {
   creditScore?: number;
   loanToValue?: number;
 }): Promise<{ success: boolean }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [pool] = await db
     .select()
@@ -141,8 +139,7 @@ export async function addLoanToPool(params: {
  * Close loan pool (make it available for investment)
  */
 export async function closeLoanPool(poolId: string): Promise<{ success: boolean }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [pool] = await db
     .select()
@@ -179,8 +176,7 @@ export async function closeLoanPool(poolId: string): Promise<{ success: boolean 
  * Get loan pool details
  */
 export async function getLoanPoolDetails(poolId: string): Promise<any> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [pool] = await db
     .select()
@@ -228,8 +224,7 @@ export async function getAvailableLoanPools(params?: {
   minAmount?: number;
   maxAmount?: number;
 }): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   let query = db
     .select()
@@ -266,8 +261,7 @@ export async function registerInvestor(params: {
   maxInvestmentAmount?: number;
   preferredRiskTiers?: string[];
 }): Promise<{ investorId: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const investorId = `INV-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
   
@@ -303,8 +297,7 @@ export async function registerInvestor(params: {
  * Get investor details
  */
 export async function getInvestorDetails(investorId: string): Promise<any> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [investor] = await db
     .select()
@@ -341,8 +334,7 @@ export async function getInvestorDetails(investorId: string): Promise<any> {
  * Get investor by user ID
  */
 export async function getInvestorByUserId(userId: number): Promise<any> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [investor] = await db
     .select()
@@ -371,8 +363,7 @@ export async function createInvestment(params: {
   expectedReturnRate: number;
   maturityMonths: number;
 }): Promise<{ investmentId: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [investor] = await db
     .select()
@@ -458,8 +449,7 @@ export async function createDistribution(params: {
   distributionDate: Date;
   paymentReference?: string;
 }): Promise<{ distributionId: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [investment] = await db
     .select()
@@ -519,8 +509,7 @@ export async function createDistribution(params: {
  * Get investment distributions
  */
 export async function getInvestmentDistributions(investmentId: string): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [investment] = await db
     .select()
@@ -551,8 +540,7 @@ export async function createServicingRightsTransfer(params: {
   transferFee: number;
   notes?: string;
 }): Promise<{ transferId: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [pool] = await db
     .select()
@@ -588,8 +576,7 @@ export async function approveServicingRightsTransfer(params: {
   transferId: string;
   approvedBy: number;
 }): Promise<{ success: boolean }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [transfer] = await db
     .select()
@@ -619,8 +606,7 @@ export async function approveServicingRightsTransfer(params: {
  * Complete servicing rights transfer
  */
 export async function completeServicingRightsTransfer(transferId: string): Promise<{ success: boolean }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [transfer] = await db
     .select()
@@ -653,8 +639,7 @@ export async function completeServicingRightsTransfer(transferId: string): Promi
  * Get investor performance report
  */
 export async function getInvestorPerformanceReport(investorId: string): Promise<any> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [investor] = await db
     .select()

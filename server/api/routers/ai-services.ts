@@ -62,17 +62,16 @@ export const aiServicesRouter = router({
     )
     .mutation(async ({ input }) => {
       try {
-        const { getDb } = await import('../../db');
-        const { transactions } = await import('../../../drizzle/schema');
+        const { requireDb } = await import('../../db');
+        const { registryTransactions } = await import('../../../drizzle/schema');
         const { eq } = await import('drizzle-orm');
 
-        const db = await getDb();
-        if (!db) throw new Error('Database not available');
+        const db = await requireDb();
 
         const [transaction] = await db
           .select()
-          .from(transactions)
-          .where(eq(transactions.id, input.transactionId))
+          .from(registryTransactions)
+          .where(eq(registryTransactions.id, input.transactionId))
           .limit(1);
 
         if (!transaction) {
@@ -87,13 +86,14 @@ export const aiServicesRouter = router({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            transaction_id: transaction.id,
-            amount: transaction.amount,
-            transaction_type: transaction.transactionType,
-            timestamp: transaction.createdAt,
-            from_user_id: transaction.fromUserId,
-            to_user_id: transaction.toUserId,
-            parcel_id: transaction.parcelId,
+            // Python fraud service reads camelCase feature keys
+            transactionId: transaction.id,
+            amount: transaction.considerationAmount,
+            transactionType: transaction.type,
+            createdAt: transaction.createdAt,
+            fromUserId: transaction.initiatorId,
+            toUserId: 0, // registry transactions track counterparty by name, not user id
+            parcelId: transaction.parcelId,
           }),
         });
 
@@ -134,33 +134,32 @@ export const aiServicesRouter = router({
     )
     .query(async ({ input }) => {
       try {
-        const { getDb } = await import('../../db');
-        const { transactions } = await import('../../../drizzle/schema');
+        const { requireDb } = await import('../../db');
+        const { registryTransactions } = await import('../../../drizzle/schema');
         const { and, gte, lte, eq, desc } = await import('drizzle-orm');
 
-        const db = await getDb();
-        if (!db) throw new Error('Database not available');
+        const db = await requireDb();
 
         // Build query conditions
         const conditions: any[] = [];
         if (input.startDate) {
-          conditions.push(gte(transactions.createdAt, new Date(input.startDate)));
+          conditions.push(gte(registryTransactions.createdAt, new Date(input.startDate)));
         }
         if (input.endDate) {
-          conditions.push(lte(transactions.createdAt, new Date(input.endDate)));
+          conditions.push(lte(registryTransactions.createdAt, new Date(input.endDate)));
         }
         if (input.minAmount) {
-          conditions.push(gte(transactions.amount, input.minAmount));
+          conditions.push(gte(registryTransactions.considerationAmount, input.minAmount));
         }
         if (input.userId) {
-          conditions.push(eq(transactions.fromUserId, input.userId));
+          conditions.push(eq(registryTransactions.initiatorId, input.userId));
         }
 
         const txList = await db
           .select()
-          .from(transactions)
+          .from(registryTransactions)
           .where(conditions.length > 0 ? and(...conditions) : undefined)
-          .orderBy(desc(transactions.createdAt))
+          .orderBy(desc(registryTransactions.createdAt))
           .limit(input.limit);
 
         // Call Python fraud detection service for batch analysis
@@ -169,13 +168,14 @@ export const aiServicesRouter = router({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             transactions: txList.map(tx => ({
-              transaction_id: tx.id,
-              amount: tx.amount,
-              transaction_type: tx.transactionType,
-              timestamp: tx.createdAt,
-              from_user_id: tx.fromUserId,
-              to_user_id: tx.toUserId,
-              parcel_id: tx.parcelId,
+              // Python fraud service reads camelCase feature keys
+              transactionId: tx.id,
+              amount: tx.considerationAmount,
+              transactionType: tx.type,
+              createdAt: tx.createdAt,
+              fromUserId: tx.initiatorId,
+              toUserId: 0, // registry transactions track counterparty by name, not user id
+              parcelId: tx.parcelId,
             })),
           }),
         });

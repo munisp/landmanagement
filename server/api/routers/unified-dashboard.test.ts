@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { appRouter } from '../../routers';
-import { getDb } from '../../db';
+import { requireDb } from '../../db';
 import { transactions, parcels, users } from '../../../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -11,13 +11,8 @@ describe('Unified Dashboard Router', () => {
 
   beforeAll(async () => {
     // Setup test data
-    const db = await getDb();
-    if (!db) {
-      testUserId = '1501' as any;
-      testParcelId = 601;
-      testTransactionId = 'TXN-UNIFIED-OFFLINE-001';
-      return;
-    }
+    const db = await requireDb();
+
 
     // Create test user with unique openId
     const uniqueOpenId = `test-user-unified-${Date.now()}`;
@@ -74,8 +69,7 @@ describe('Unified Dashboard Router', () => {
 
   afterAll(async () => {
     // Cleanup test data
-    const db = await getDb();
-    if (!db) return;
+    const db = await requireDb();
 
     // Only cleanup if test data was created
     if (testTransactionId) {

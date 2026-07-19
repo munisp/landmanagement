@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   mortgageApplications,
   brokerCommissions,
@@ -81,8 +81,7 @@ export interface ComplianceScore {
  * Get mortgage pipeline metrics
  */
 export async function getPipelineMetrics(dateRange?: DateRange): Promise<PipelineMetrics> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   let query = db.select().from(mortgageApplications);
 
@@ -159,8 +158,7 @@ export async function getPipelineMetrics(dateRange?: DateRange): Promise<Pipelin
  * Get broker performance comparison
  */
 export async function getBrokerPerformance(dateRange?: DateRange): Promise<BrokerPerformance[]> {
-  const db = await getDb();
-  if (!db) return [];
+  const db = await requireDb();
 
   const brokers = await db.select().from(mortgageBrokers);
 
@@ -232,8 +230,7 @@ export async function getBrokerPerformance(dateRange?: DateRange): Promise<Broke
  * Get investor ROI tracking
  */
 export async function getInvestorROI(dateRange?: DateRange): Promise<InvestorROI[]> {
-  const db = await getDb();
-  if (!db) return [];
+  const db = await requireDb();
 
   const allInvestors = await db.select().from(investors);
 
@@ -271,8 +268,7 @@ export async function getInvestorROI(dateRange?: DateRange): Promise<InvestorROI
  * Calculate regulatory compliance score
  */
 export async function getComplianceScore(dateRange?: DateRange): Promise<ComplianceScore> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   let query = db.select().from(mortgageApplications);
 
@@ -343,8 +339,7 @@ export async function getTimeSeriesData(
   metric: 'applications' | 'loan_volume' | 'commissions',
   dateRange: DateRange
 ): Promise<Array<{ date: string; value: number }>> {
-  const db = await getDb();
-  if (!db) return [];
+  const db = await requireDb();
 
   const data: Array<{ date: string; value: number }> = [];
 

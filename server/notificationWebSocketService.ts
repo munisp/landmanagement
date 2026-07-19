@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { adminNotifications } from '../drizzle/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { authenticateWebSocketUpgrade } from './webSocketAuth';
@@ -125,8 +125,7 @@ export class NotificationWebSocketService {
 
   private async markAsRead(notificationId: number, userId: number) {
     try {
-      const db = await getDb();
-      if (!db) throw new Error('Database not available');
+      const db = await requireDb();
       
       await db
         .update(adminNotifications)
@@ -147,8 +146,7 @@ export class NotificationWebSocketService {
 
   private async markAllAsRead(userId: number) {
     try {
-      const db = await getDb();
-      if (!db) throw new Error('Database not available');
+      const db = await requireDb();
       
       await db
         .update(adminNotifications)
@@ -169,8 +167,7 @@ export class NotificationWebSocketService {
 
   private async sendUnreadCount(userId: number) {
     try {
-      const db = await getDb();
-      if (!db) return;
+      const db = await requireDb();
       
       const unreadNotifications = await db
         .select()
@@ -204,8 +201,7 @@ export class NotificationWebSocketService {
     metadata?: any;
   }) {
     try {
-      const db = await getDb();
-      if (!db) throw new Error('Database not available');
+      const db = await requireDb();
       
       // Save to database
       const [saved] = await db
@@ -247,8 +243,7 @@ export class NotificationWebSocketService {
     metadata?: any;
   }) {
     try {
-      const db = await getDb();
-      if (!db) throw new Error('Database not available');
+      const db = await requireDb();
       
       // Get all admin users
       const { users } = await import('../drizzle/schema');

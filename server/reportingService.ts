@@ -1,4 +1,4 @@
-import { getDb, parcelService, transactionService } from './db';
+import { requireDb, parcelService, transactionService } from './db';
 import { scheduled_reports, report_history, report_templates, verificationRequests, users } from '../drizzle/schema';
 import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
 import { storagePut } from './storage';
@@ -36,8 +36,7 @@ interface GenerateReportInput {
  * Create a new scheduled report
  */
 export async function createScheduledReport(input: CreateScheduledReportInput) {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const nextRunAt = calculateNextRunTime(input.frequency, input.cronExpression);
 
@@ -71,8 +70,7 @@ export async function generateReport(
   input: GenerateReportInput,
   scheduledReportId?: number
 ): Promise<{ success: boolean; historyId?: number; fileUrl?: string; error?: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Create history record
   const [history] = await db
@@ -159,8 +157,7 @@ export async function generateReport(
  * Fetch data for report based on type and filters
  */
 async function fetchReportData(reportType: string, filters?: Record<string, any>): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   switch (reportType) {
     case 'parcel_registry':
@@ -308,8 +305,7 @@ async function generateCSVReport(
  * List scheduled reports for a user
  */
 export async function listScheduledReports(userId: number, includeInactive = false) {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   let conditions = [eq(scheduled_reports.userId, userId)];
   if (!includeInactive) {
@@ -335,8 +331,7 @@ export async function listScheduledReports(userId: number, includeInactive = fal
  * Get report history for a user
  */
 export async function getReportHistory(userId: number, limit = 50) {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   return await db
     .select()
@@ -350,8 +345,7 @@ export async function getReportHistory(userId: number, limit = 50) {
  * Delete scheduled report
  */
 export async function deleteScheduledReport(reportId: number, userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const result = await db
     .delete(scheduled_reports)
@@ -374,8 +368,7 @@ export async function updateScheduledReport(
   userId: number,
   updates: Partial<CreateScheduledReportInput>
 ) {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const updateData: any = {
     ...updates,
@@ -416,8 +409,7 @@ export async function updateScheduledReport(
  * Get available report templates
  */
 export async function getReportTemplates() {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const templates = await db.select().from(report_templates).orderBy(report_templates.name);
 
@@ -496,8 +488,7 @@ async function sendReportEmailIfEnabled(
   mimeType: string
 ): Promise<void> {
   try {
-    const db = await getDb();
-    if (!db) return;
+    const db = await requireDb();
 
     // Get scheduled report details
     const [scheduledReport] = await db

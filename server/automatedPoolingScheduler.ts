@@ -1,6 +1,6 @@
 import { runAutomatedPooling, monitorPoolPerformance } from './loanPoolingEngine';
 import { sendEmail } from './notificationDelivery';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { users } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -325,8 +325,7 @@ export async function triggerManualPooling(
  */
 async function loadAdminEmails(): Promise<void> {
   try {
-    const db = await getDb();
-    if (!db) return;
+    const db = await requireDb();
     
     const admins = await db
       .select()

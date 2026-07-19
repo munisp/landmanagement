@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { router, protectedProcedure } from '../../_core/trpc';
-import { getDb } from '../../db';
+import { requireDb } from '../../db';
 import { transactions, parcels } from '../../../drizzle/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -36,28 +36,8 @@ export const unifiedDashboardRouter = router({
    */
   getUnifiedTransactionStatus: protectedProcedure.query(async ({ ctx }) => {
     try {
-      const db = await getDb();
-      if (!db) {
-        const createdAt = new Date();
-        const systems: SystemStatus[] = [
-          { system: 'payment', status: 'initiated', progress: 10, lastUpdated: createdAt, details: 'Amount: ₦100,000.00' },
-          { system: 'mortgage', status: 'pending', progress: 25, lastUpdated: createdAt, details: 'Mortgage application pending' },
-          { system: 'tax', status: 'in_progress', progress: 50, lastUpdated: createdAt, details: 'Tax clearance pending' },
-        ];
-        return [{
-          transactionId: 'TXN-UNIFIED-OFFLINE-001',
-          parcelId: 601,
-          parcelAddress: 'Offline Parcel 601',
-          transactionType: 'transfer',
-          overallStatus: determineOverallStatus(systems),
-          overallProgress: Math.round(systems.reduce((sum, s) => sum + s.progress, 0) / systems.length),
-          createdAt,
-          estimatedCompletion: new Date(createdAt.getTime() + 30 * 24 * 60 * 60 * 1000),
-          systems,
-          paymentStatus: 'initiated',
-          paymentAmount: '₦100,000.00',
-        } satisfies TransactionOverview];
-      }
+      const db = await requireDb();
+
       
       // Fetch all transactions for the user
       const userTransactions = await db
@@ -236,31 +216,8 @@ export const unifiedDashboardRouter = router({
     )
     .query(async ({ ctx, input }) => {
       try {
-        const db = await getDb();
-        if (!db) {
-          if (input.transactionId !== 'TXN-UNIFIED-OFFLINE-001' || String(ctx.user.id) !== '1501') {
-            throw new TRPCError({ code: 'NOT_FOUND', message: 'Transaction not found' });
-          }
-          const createdAt = new Date();
-          const systems: SystemStatus[] = [
-            { system: 'payment', status: 'initiated', progress: 10, lastUpdated: createdAt, details: 'Amount: ₦100,000.00, Payment Method: Mojaloop' },
-            { system: 'mortgage', status: 'pending', progress: 25, lastUpdated: createdAt, details: 'Mortgage application pending' },
-            { system: 'tax', status: 'in_progress', progress: 50, lastUpdated: createdAt, details: 'Tax clearance pending' },
-          ];
-          return {
-            transactionId: 'TXN-UNIFIED-OFFLINE-001',
-            parcelId: 601,
-            parcelAddress: 'Offline Parcel 601',
-            transactionType: 'transfer',
-            overallStatus: determineOverallStatus(systems),
-            overallProgress: Math.round(systems.reduce((sum, s) => sum + s.progress, 0) / systems.length),
-            createdAt,
-            estimatedCompletion: new Date(createdAt.getTime() + 30 * 24 * 60 * 60 * 1000),
-            systems,
-            paymentStatus: 'initiated',
-            paymentAmount: '₦100,000.00',
-          };
-        }
+        const db = await requireDb();
+
         
         // Fetch transaction
         const transaction = await db
@@ -442,16 +399,8 @@ export const unifiedDashboardRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const db = await getDb();
-        if (!db) {
-          if (input.transactionId !== 'TXN-UNIFIED-OFFLINE-001' || String(ctx.user.id) !== '1501') {
-            throw new TRPCError({ code: 'NOT_FOUND', message: 'Transaction not found' });
-          }
-          return {
-            url: `/exports/transaction_${input.transactionId}.${input.format}`,
-            filename: `transaction_${input.transactionId}.${input.format}`,
-          };
-        }
+        const db = await requireDb();
+
 
         // Fetch transaction details
         const txResult = await db

@@ -4,7 +4,7 @@
  */
 
 import sgMail from '@sendgrid/mail';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { sql } from 'drizzle-orm';
 
 // Initialize SendGrid (API key from environment)
@@ -195,8 +195,7 @@ async function logEmailDelivery(log: {
   error?: string;
 }): Promise<void> {
   try {
-    const db = await getDb();
-    if (!db) return;
+    const db = await requireDb();
 
     await db.execute(sql`
       INSERT INTO email_logs (recipient, subject, status, message_id, error, created_at)

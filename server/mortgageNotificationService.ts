@@ -1,6 +1,6 @@
 import { sendEmail, sendSMS } from './notificationDelivery';
 import { notificationWS } from './notificationWebSocketService';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { users, userPreferences } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -25,10 +25,10 @@ export async function notifyMortgageStatusChange(
   previousStatus: string
 ): Promise<void> {
   try {
-    const db = await getDb();
+    const db = await requireDb();
 
     // Get applicant details
-    const [applicant] = await db!
+    const [applicant] = await db
       .select({
         name: users.name,
         email: users.email,
@@ -43,7 +43,7 @@ export async function notifyMortgageStatusChange(
     }
 
     // Get notification preferences
-    const [preferences] = await db!
+    const [preferences] = await db
       .select()
       .from(userPreferences)
       .where(eq(userPreferences.userId, application.applicantId));
@@ -262,9 +262,9 @@ export async function notifyPaymentReminder(
   amountDue: number
 ): Promise<void> {
   try {
-    const db = await getDb();
+    const db = await requireDb();
 
-    const [applicant] = await db!
+    const [applicant] = await db
       .select({
         name: users.name,
         email: users.email,

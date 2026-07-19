@@ -45,7 +45,7 @@ import { notificationService } from "./notifications";
 import { notificationWS } from "./notificationWebSocketService";
 import { adminNotifications } from "../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { getDb } from "./db";
+import { requireDb } from "./db";
 import * as odmService from './odm';
 import {
   cancelDroneProcessingTask,
@@ -1488,22 +1488,10 @@ export const appRouter = router({
         entityId: z.string(),
       }))
       .query(async ({ input, ctx }) => {
-        const { getDb } = await import('./db');
-        const db = await getDb();
+        const { requireDb } = await import('./db');
+        const db = await requireDb();
 
-        if (!db) {
-          const { listComments } = await import('./commentRepository');
-          return listComments(input).map((r) => ({
-            id: String(r.id),
-            userId: r.userId,
-            userName: r.userName,
-            userAvatar: undefined,
-            content: r.content,
-            createdAt: new Date(r.createdAt),
-            updatedAt: new Date(r.updatedAt),
-            isEdited: r.updatedAt > r.createdAt,
-          }));
-        }
+
 
         const { comments, users } = await import('../drizzle/schema');
         const { eq, and } = await import('drizzle-orm');
@@ -1546,30 +1534,10 @@ export const appRouter = router({
         content: z.string().min(1),
       }))
       .mutation(async ({ input, ctx }) => {
-        const { getDb } = await import('./db');
-        const db = await getDb();
+        const { requireDb } = await import('./db');
+        const db = await requireDb();
 
-        if (!db) {
-          const { addComment } = await import('./commentRepository');
-          const result = addComment({
-            entityType: input.entityType,
-            entityId: input.entityId,
-            userId: ctx.user.id,
-            userName: ctx.user.name ?? 'Unknown User',
-            content: input.content,
-          });
 
-          const { notificationService } = await import('./notifications');
-          notificationService.broadcastCommentAdded(input.entityType, input.entityId, {
-            id: String(result.id),
-            userId: ctx.user.id,
-            userName: result.userName,
-            content: input.content,
-            createdAt: new Date(result.createdAt),
-          });
-
-          return { id: String(result.id) };
-        }
 
         const { comments } = await import('../drizzle/schema');
 
@@ -1602,19 +1570,10 @@ export const appRouter = router({
         content: z.string().min(1),
       }))
       .mutation(async ({ input, ctx }) => {
-        const { getDb } = await import('./db');
-        const db = await getDb();
+        const { requireDb } = await import('./db');
+        const db = await requireDb();
 
-        if (!db) {
-          const { editComment, getCommentById } = await import('./commentRepository');
-          const target = getCommentById(parseInt(input.id));
-          editComment({ id: parseInt(input.id), userId: ctx.user.id, content: input.content });
-          if (target) {
-            const { notificationService } = await import('./notifications');
-            notificationService.broadcastCommentEdited(target.entityType, target.entityId, input.id, input.content);
-          }
-          return { success: true };
-        }
+
 
         const { comments } = await import('../drizzle/schema');
         const { eq, and } = await import('drizzle-orm');
@@ -1652,19 +1611,10 @@ export const appRouter = router({
         id: z.string(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const { getDb } = await import('./db');
-        const db = await getDb();
+        const { requireDb } = await import('./db');
+        const db = await requireDb();
 
-        if (!db) {
-          const { deleteComment, getCommentById } = await import('./commentRepository');
-          const target = getCommentById(parseInt(input.id));
-          deleteComment({ id: parseInt(input.id), userId: ctx.user.id });
-          if (target) {
-            const { notificationService } = await import('./notifications');
-            notificationService.broadcastCommentDeleted(target.entityType, target.entityId, input.id);
-          }
-          return { success: true };
-        }
+
 
         const { comments } = await import('../drizzle/schema');
         const { eq, and } = await import('drizzle-orm');
@@ -1703,22 +1653,10 @@ export const appRouter = router({
         limit: z.number().optional().default(10),
       }))
       .query(async ({ input, ctx }) => {
-        const { getDb } = await import('./db');
-        const db = await getDb();
+        const { requireDb } = await import('./db');
+        const db = await requireDb();
 
-        if (!db) {
-          const { listActivityLogs } = await import('./activityLogRepository');
-          return (await listActivityLogs({ limit: input.limit })).map((r) => ({
-            id: String(r.id),
-            userId: r.userId,
-            userName: r.userName,
-            userAvatar: undefined,
-            type: r.type,
-            description: r.description,
-            metadata: r.metadata,
-            createdAt: new Date(r.createdAt),
-          }));
-        }
+
 
         const { activityLogs, users } = await import('../drizzle/schema');
         const { eq, desc } = await import('drizzle-orm');
@@ -1755,19 +1693,10 @@ export const appRouter = router({
   savedSearches: router({
     list: protectedProcedure
       .query(async ({ ctx }) => {
-        const { getDb } = await import('./db');
-        const db = await getDb();
+        const { requireDb } = await import('./db');
+        const db = await requireDb();
 
-        if (!db) {
-          const { listSavedSearches } = await import('./savedSearchRepository');
-          return (await listSavedSearches(ctx.user.id)).map((r) => ({
-            id: String(r.id),
-            name: r.name,
-            query: r.query,
-            isFavorite: r.isFavorite,
-            createdAt: new Date(r.createdAt),
-          }));
-        }
+
 
         const { savedSearches } = await import('../drizzle/schema');
         const { eq, desc } = await import('drizzle-orm');
@@ -1793,18 +1722,10 @@ export const appRouter = router({
         query: z.record(z.string(), z.any()),
       }))
       .mutation(async ({ input, ctx }) => {
-        const { getDb } = await import('./db');
-        const db = await getDb();
+        const { requireDb } = await import('./db');
+        const db = await requireDb();
 
-        if (!db) {
-          const { createSavedSearch } = await import('./savedSearchRepository');
-          const result = await createSavedSearch({
-            userId: ctx.user.id,
-            name: input.name,
-            query: input.query,
-          });
-          return { id: String(result.id) };
-        }
+
 
         const { savedSearches } = await import('../drizzle/schema');
 
@@ -1823,13 +1744,10 @@ export const appRouter = router({
         id: z.string(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const { getDb } = await import('./db');
-        const db = await getDb();
+        const { requireDb } = await import('./db');
+        const db = await requireDb();
 
-        if (!db) {
-          const { deleteSavedSearch } = await import('./savedSearchRepository');
-          return await deleteSavedSearch({ id: parseInt(input.id), userId: ctx.user.id });
-        }
+
 
         const { savedSearches } = await import('../drizzle/schema');
         const { eq, and } = await import('drizzle-orm');
@@ -1851,14 +1769,10 @@ export const appRouter = router({
         id: z.string(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const { getDb } = await import('./db');
-        const db = await getDb();
+        const { requireDb } = await import('./db');
+        const db = await requireDb();
 
-        if (!db) {
-          const { toggleSavedSearchFavorite } = await import('./savedSearchRepository');
-          await toggleSavedSearchFavorite({ id: parseInt(input.id), userId: ctx.user.id });
-          return { success: true };
-        }
+
 
         const { savedSearches } = await import('../drizzle/schema');
         const { eq, and } = await import('drizzle-orm');
@@ -2285,8 +2199,7 @@ export const appRouter = router({
         unreadOnly: z.boolean().default(false),
       }))
       .query(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) return [];
+        const db = await requireDb();
 
         const conditions = [eq(adminNotifications.recipientId, ctx.user.id)];
         if (input.unreadOnly) {
@@ -2305,8 +2218,7 @@ export const appRouter = router({
 
     getUnreadCount: protectedProcedure
       .query(async ({ ctx }) => {
-        const db = await getDb();
-        if (!db) return 0;
+        const db = await requireDb();
 
         const unread = await db
           .select()
@@ -2326,8 +2238,7 @@ export const appRouter = router({
         notificationId: z.number(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+        const db = await requireDb();
 
         await db
           .update(adminNotifications)
@@ -2344,8 +2255,7 @@ export const appRouter = router({
 
     markAllAsRead: protectedProcedure
       .mutation(async ({ ctx }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+        const db = await requireDb();
 
         await db
           .update(adminNotifications)

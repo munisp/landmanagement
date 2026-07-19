@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   email_templates,
   EmailTemplate,
@@ -40,8 +40,7 @@ export async function createEmailTemplate(data: {
   footerText?: string;
   isDefault?: boolean;
 }): Promise<EmailTemplate> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // If setting as default, unset other defaults for this user
   if (data.isDefault) {
@@ -91,8 +90,7 @@ export async function updateEmailTemplate(
     isDefault?: boolean;
   }
 ): Promise<EmailTemplate | null> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // If setting as default, unset other defaults for this user
   if (data.isDefault) {
@@ -138,8 +136,7 @@ export async function deleteEmailTemplate(
   templateId: number,
   userId: number
 ): Promise<boolean> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   await db
     .delete(email_templates)
@@ -157,8 +154,7 @@ export async function deleteEmailTemplate(
  * Get all email templates for a user
  */
 export async function getEmailTemplates(userId: number): Promise<EmailTemplate[]> {
-  const db = await getDb();
-  if (!db) return [];
+  const db = await requireDb();
 
   return await db
     .select()
@@ -173,8 +169,7 @@ export async function getEmailTemplate(
   templateId: number,
   userId: number
 ): Promise<EmailTemplate | null> {
-  const db = await getDb();
-  if (!db) return null;
+  const db = await requireDb();
 
   const [template] = await db
     .select()
@@ -195,8 +190,7 @@ export async function getEmailTemplate(
 export async function getDefaultEmailTemplate(
   userId: number
 ): Promise<EmailTemplate | null> {
-  const db = await getDb();
-  if (!db) return null;
+  const db = await requireDb();
 
   const [template] = await db
     .select()

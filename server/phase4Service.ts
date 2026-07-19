@@ -4,13 +4,7 @@
  */
 
 import { eq, and, desc, sql } from 'drizzle-orm';
-import { getDb } from './db';
-import {
-  createMortgageApplication as createMortgageApplicationFromRepository,
-  getMortgageApplicationById as getMortgageApplicationByIdFromRepository,
-  listMortgageApplicationsForUser as listMortgageApplicationsForUserFromRepository,
-  transitionMortgageApplicationStatus as transitionMortgageApplicationStatusFromRepository,
-} from './mortgageApplicationRepository';
+import { requireDb } from './db';
 import {
   mortgageApplications,
   taxClearances,
@@ -29,16 +23,6 @@ import {
   type InsertPublicNotice,
   type InsertLandUsePlan,
 } from '../drizzle/schema';
-import {
-  createAdminInsurancePolicy,
-  createAdminMortgageApplication,
-  createAdminTaxClearance,
-  listAdminInsurancePolicies,
-  listAdminMortgageApplications,
-  listAdminTaxClearances,
-  updateAdminInsurancePolicyStatus,
-  updateAdminTaxClearanceStatus,
-} from './phase4AdminRepository';
 
 /**
  * ========================================
@@ -47,25 +31,8 @@ import {
  */
 
 export async function createMortgageApplication(data: InsertMortgageApplication) {
-  const db = await getDb();
-  if (!db) {
-    return await createAdminMortgageApplication({
-      applicationId: data.applicationId,
-      transactionId: data.transactionId,
-      lenderName: data.bankName,
-      loanAmount: data.loanAmount,
-      interestRate: String(data.interestRate),
-      loanTerm: data.loanTerm,
-      monthlyPayment: data.monthlyPayment,
-      applicantId: data.applicantId,
-      status: data.status ?? 'pending',
-      approvedAt: null,
-      reviewedAt: null,
-      rejectedAt: null,
-      disbursedAt: null,
-      rejectionReason: null,
-    });
-  }
+  const db = await requireDb();
+
 
   const [application] = await db
     .insert(mortgageApplications)
@@ -76,12 +43,9 @@ export async function createMortgageApplication(data: InsertMortgageApplication)
 }
 
 export async function getMortgageApplicationById(applicationId: string) {
-  try {
-    const db = await getDb();
-    if (!db) {
-      return (await listAdminMortgageApplications()).find((application) => application.applicationId === applicationId)
-        ?? await getMortgageApplicationByIdFromRepository(applicationId);
-    }
+
+    const db = await requireDb();
+
 
     const [application] = await db
       .select()
@@ -90,16 +54,11 @@ export async function getMortgageApplicationById(applicationId: string) {
       .limit(1);
 
     return application;
-  } catch (error) {
-    console.warn('[phase4Service.getMortgageApplicationById] Falling back to repository:', error);
-    return (await listAdminMortgageApplications()).find((application) => application.applicationId === applicationId)
-      ?? await getMortgageApplicationByIdFromRepository(applicationId);
-  }
+  
 }
 
 export async function getMortgageApplicationsByTransaction(transactionId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const applications = await db
     .select()
@@ -111,12 +70,9 @@ export async function getMortgageApplicationsByTransaction(transactionId: string
 }
 
 export async function getMortgageApplicationsByApplicant(applicantId: number) {
-  try {
-    const db = await getDb();
-    if (!db) {
-      const adminMatches = (await listAdminMortgageApplications()).filter((application) => application.applicantId === applicantId);
-      return adminMatches.length > 0 ? adminMatches : await listMortgageApplicationsForUserFromRepository(applicantId);
-    }
+
+    const db = await requireDb();
+
 
     const applications = await db
       .select()
@@ -125,11 +81,7 @@ export async function getMortgageApplicationsByApplicant(applicantId: number) {
       .orderBy(desc(mortgageApplications.createdAt));
 
     return applications;
-  } catch (error) {
-    console.warn('[phase4Service.getMortgageApplicationsByApplicant] Falling back to repository:', error);
-    const adminMatches = (await listAdminMortgageApplications()).filter((application) => application.applicantId === applicantId);
-    return adminMatches.length > 0 ? adminMatches : await listMortgageApplicationsForUserFromRepository(applicantId);
-  }
+  
 }
 
 export async function updateMortgageApplicationStatus(
@@ -137,16 +89,9 @@ export async function updateMortgageApplicationStatus(
   status: 'pending' | 'under_review' | 'approved' | 'rejected' | 'disbursed' | 'cancelled',
   additionalData?: { rejectionReason?: string; actorId?: number }
 ) {
-  try {
-    const db = await getDb();
-    if (!db) {
-      return await transitionMortgageApplicationStatusFromRepository({
-        applicationId,
-        actorId: additionalData?.actorId ?? 0,
-        nextStatus: status,
-        rejectionReason: additionalData?.rejectionReason,
-      });
-    }
+
+    const db = await requireDb();
+
 
     const updateData: any = {
       status,
@@ -171,15 +116,7 @@ export async function updateMortgageApplicationStatus(
       .returning();
 
     return updated;
-  } catch (error) {
-    console.warn('[phase4Service.updateMortgageApplicationStatus] Falling back to repository:', error);
-    return await transitionMortgageApplicationStatusFromRepository({
-      applicationId,
-      actorId: additionalData?.actorId ?? 0,
-      nextStatus: status,
-      rejectionReason: additionalData?.rejectionReason,
-    });
-  }
+  
 }
 
 /**
@@ -189,29 +126,8 @@ export async function updateMortgageApplicationStatus(
  */
 
 export async function createTaxClearance(data: InsertTaxClearance) {
-  const db = await getDb();
-  if (!db) {
-    const created = await createAdminTaxClearance({
-      clearanceId: data.clearanceId,
-      transactionId: data.transactionId,
-      taxAuthority: 'Federal Inland Revenue Service',
-      amountDue: data.taxAmount,
-      amountPaid: data.paidAmount,
-      certificateNumber: null,
-      firsReferenceNumber: data.firsReferenceNumber ?? null,
-      certificateUrl: data.certificateUrl ?? null,
-      ownerId: data.ownerId,
-      status: data.status ?? 'pending',
-      issuedAt: null,
-      verifiedAt: null,
-    });
-    return {
-      ...created,
-      status: created.status,
-      taxAmount: created.amountDue,
-      paidAmount: created.amountPaid,
-    };
-  }
+  const db = await requireDb();
+
 
   const [clearance] = await db
     .insert(taxClearances)
@@ -222,10 +138,8 @@ export async function createTaxClearance(data: InsertTaxClearance) {
 }
 
 export async function getTaxClearanceById(clearanceId: string) {
-  const db = await getDb();
-  if (!db) {
-    return (await listAdminTaxClearances()).find((clearance) => clearance.clearanceId === clearanceId);
-  }
+  const db = await requireDb();
+
 
   const [clearance] = await db
     .select()
@@ -237,8 +151,7 @@ export async function getTaxClearanceById(clearanceId: string) {
 }
 
 export async function getTaxClearancesByTransaction(transactionId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const clearances = await db
     .select()
@@ -250,10 +163,8 @@ export async function getTaxClearancesByTransaction(transactionId: string) {
 }
 
 export async function getTaxClearancesByOwner(ownerId: number) {
-  const db = await getDb();
-  if (!db) {
-    return (await listAdminTaxClearances()).filter((clearance) => clearance.ownerId === ownerId);
-  }
+  const db = await requireDb();
+
 
   const clearances = await db
     .select()
@@ -269,10 +180,8 @@ export async function updateTaxClearanceStatus(
   status: 'pending' | 'in_progress' | 'verified' | 'issued' | 'rejected' | 'expired',
   additionalData?: { certificateUrl?: string; firsReferenceNumber?: string }
 ) {
-  const db = await getDb();
-  if (!db) {
-    return await updateAdminTaxClearanceStatus(clearanceId, status, additionalData);
-  }
+  const db = await requireDb();
+
 
   const updateData: any = {
     status,
@@ -309,29 +218,8 @@ export async function updateTaxClearanceStatus(
  */
 
 export async function createInsurancePolicy(data: InsertInsurancePolicy) {
-  const db = await getDb();
-  if (!db) {
-    const created = await createAdminInsurancePolicy({
-      policyId: data.policyId,
-      transactionId: data.transactionId ?? data.policyId,
-      providerName: data.providerName,
-      policyNumber: `${data.providerName.replace(/\s+/g, '-').toUpperCase()}-${data.policyId}`,
-      premiumAmount: data.premiumAmount,
-      startDate: (data.effectiveDate ?? new Date()).toISOString(),
-      endDate: (data.expiryDate ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)).toISOString(),
-      policyHolderId: data.policyHolderId,
-      status: data.status ?? 'pending',
-    });
-    return {
-      ...created,
-      parcelId: data.parcelId,
-      policyType: data.policyType,
-      coverageAmount: data.coverageAmount,
-      effectiveDate: new Date(created.startDate),
-      expiryDate: new Date(created.endDate),
-      status: created.status,
-    };
-  }
+  const db = await requireDb();
+
 
   const [policy] = await db
     .insert(insurancePolicies)
@@ -342,10 +230,8 @@ export async function createInsurancePolicy(data: InsertInsurancePolicy) {
 }
 
 export async function getInsurancePolicyById(policyId: string) {
-  const db = await getDb();
-  if (!db) {
-    return (await listAdminInsurancePolicies()).find((policy) => policy.policyId === policyId);
-  }
+  const db = await requireDb();
+
 
   const [policy] = await db
     .select()
@@ -357,8 +243,7 @@ export async function getInsurancePolicyById(policyId: string) {
 }
 
 export async function getInsurancePoliciesByTransaction(transactionId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const policies = await db
     .select()
@@ -370,13 +255,8 @@ export async function getInsurancePoliciesByTransaction(transactionId: string) {
 }
 
 export async function getInsurancePoliciesByParcel(parcelId: number) {
-  const db = await getDb();
-  if (!db) {
-    const matches = (await listAdminInsurancePolicies()).filter((policy) => Number((policy as any).parcelId) === Number(parcelId) || Number(policy.id) === Number(parcelId) || policy.transactionId.includes(String(parcelId)));
-    return matches.length > 0
-      ? matches.map((policy) => ({ ...policy, parcelId: (policy as any).parcelId ?? parcelId }))
-      : (await listAdminInsurancePolicies()).slice(0, 1).map((policy) => ({ ...policy, parcelId }));
-  }
+  const db = await requireDb();
+
 
   const policies = await db
     .select()
@@ -391,10 +271,8 @@ export async function updateInsurancePolicyStatus(
   policyId: string,
   status: 'pending' | 'active' | 'expired' | 'cancelled' | 'suspended'
 ) {
-  const db = await getDb();
-  if (!db) {
-    return await updateAdminInsurancePolicyStatus(policyId, status);
-  }
+  const db = await requireDb();
+
 
   const [updated] = await db
     .update(insurancePolicies)
@@ -415,8 +293,7 @@ export async function updateInsurancePolicyStatus(
  */
 
 export async function createLegalDocument(data: InsertLegalDocument) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const [document] = await db
     .insert(legalDocuments)
@@ -427,8 +304,7 @@ export async function createLegalDocument(data: InsertLegalDocument) {
 }
 
 export async function getLegalDocumentById(documentId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const [document] = await db
     .select()
@@ -440,8 +316,7 @@ export async function getLegalDocumentById(documentId: string) {
 }
 
 export async function getLegalDocumentsByTransaction(transactionId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const documents = await db
     .select()
@@ -457,8 +332,7 @@ export async function updateLegalDocumentStatus(
   status: 'draft' | 'pending_review' | 'approved' | 'signed' | 'registered' | 'rejected',
   additionalData?: { registrationNumber?: string }
 ) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const updateData: any = {
     status,
@@ -494,8 +368,7 @@ export async function updateLegalDocumentStatus(
  */
 
 export async function createCadastralSurvey(data: InsertCadastralSurvey) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const [survey] = await db
     .insert(cadastralSurveys)
@@ -506,8 +379,7 @@ export async function createCadastralSurvey(data: InsertCadastralSurvey) {
 }
 
 export async function getCadastralSurveyById(surveyId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const [survey] = await db
     .select()
@@ -519,8 +391,7 @@ export async function getCadastralSurveyById(surveyId: string) {
 }
 
 export async function getCadastralSurveysByTransaction(transactionId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const surveys = await db
     .select()
@@ -536,8 +407,7 @@ export async function updateCadastralSurveyStatus(
   status: 'pending' | 'in_progress' | 'completed' | 'approved' | 'rejected' | 'expired',
   additionalData?: { approvedBy?: string; rejectionReason?: string }
 ) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const updateData: any = {
     status,
@@ -573,8 +443,7 @@ export async function updateCadastralSurveyStatus(
  */
 
 export async function createEnvironmentalAssessment(data: InsertEnvironmentalAssessment) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const [assessment] = await db
     .insert(environmentalAssessments)
@@ -585,8 +454,7 @@ export async function createEnvironmentalAssessment(data: InsertEnvironmentalAss
 }
 
 export async function getEnvironmentalAssessmentById(assessmentId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const [assessment] = await db
     .select()
@@ -598,8 +466,7 @@ export async function getEnvironmentalAssessmentById(assessmentId: string) {
 }
 
 export async function getEnvironmentalAssessmentsByTransaction(transactionId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const assessments = await db
     .select()
@@ -615,8 +482,7 @@ export async function updateEnvironmentalAssessmentStatus(
   status: 'pending' | 'under_review' | 'approved' | 'conditional_approval' | 'rejected' | 'expired',
   additionalData?: { conditions?: string; rejectionReason?: string; certificateUrl?: string }
 ) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const updateData: any = {
     status,
@@ -657,8 +523,7 @@ export async function updateEnvironmentalAssessmentStatus(
  */
 
 export async function createPublicNotice(data: InsertPublicNotice) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const [notice] = await db
     .insert(publicNotices)
@@ -669,8 +534,7 @@ export async function createPublicNotice(data: InsertPublicNotice) {
 }
 
 export async function getPublicNoticeById(noticeId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const [notice] = await db
     .select()
@@ -682,8 +546,7 @@ export async function getPublicNoticeById(noticeId: string) {
 }
 
 export async function getPublicNoticesByTransaction(transactionId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const notices = await db
     .select()
@@ -698,8 +561,7 @@ export async function updatePublicNoticeStatus(
   noticeId: string,
   status: 'pending' | 'published' | 'objection_filed' | 'objection_resolved' | 'completed' | 'cancelled'
 ) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const updateData: any = {
     status,
@@ -730,8 +592,7 @@ export async function addPublicNoticeObjection(
     filedAt: Date;
   }
 ) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const notice = await getPublicNoticeById(noticeId);
   if (!notice) throw new Error('Public notice not found');
@@ -761,8 +622,7 @@ export async function addPublicNoticeObjection(
  */
 
 export async function createLandUsePlan(data: InsertLandUsePlan) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const [plan] = await db
     .insert(landUsePlans)
@@ -773,8 +633,7 @@ export async function createLandUsePlan(data: InsertLandUsePlan) {
 }
 
 export async function getLandUsePlanById(planId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const [plan] = await db
     .select()
@@ -786,8 +645,7 @@ export async function getLandUsePlanById(planId: string) {
 }
 
 export async function getLandUsePlansByTransaction(transactionId: string) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const plans = await db
     .select()
@@ -803,8 +661,7 @@ export async function updateLandUsePlanStatus(
   status: 'pending' | 'under_review' | 'approved' | 'conditional_approval' | 'rejected' | 'expired',
   additionalData?: { conditions?: string; rejectionReason?: string; isCompliant?: boolean }
 ) {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const updateData: any = {
     status,
@@ -848,26 +705,8 @@ export async function updateLandUsePlanStatus(
  * Get all Phase 4 system statuses for a transaction
  */
 export async function getTransactionPhase4Status(transactionId: string) {
-  const db = await getDb();
-  if (!db) {
-    const mortgage = (await listAdminMortgageApplications()).find((item) => item.transactionId === transactionId) ?? null;
-    const tax = (await listAdminTaxClearances()).find((item) => item.transactionId === transactionId) ?? null;
-    const insurance = (await listAdminInsurancePolicies()).find((item) => item.transactionId === transactionId) ?? null;
-    return {
-      mortgage,
-      tax,
-      insurance,
-      legal: null,
-      survey: null,
-      environmental: null,
-      publicNotice: null,
-      landUse: null,
-      completedSystems: [mortgage, tax, insurance].filter(Boolean).length,
-      totalSystems: 8,
-      completionPercentage: Math.round(([mortgage, tax, insurance].filter(Boolean).length / 8) * 100),
-      overallStatus: 'in_progress',
-    };
-  }
+  const db = await requireDb();
+
 
   const [
     mortgageApps,

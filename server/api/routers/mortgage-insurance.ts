@@ -12,7 +12,7 @@ import {
   getEscrowAccountSummary,
   processAutomaticInsurancePayments,
 } from '../../mortgageInsuranceService';
-import { getDb } from '../../db';
+import { requireDb } from '../../db';
 import {
   mortgageInsurancePolicies,
   escrowAccounts,
@@ -79,8 +79,7 @@ export const mortgageInsuranceRouter = router({
   getPolicies: protectedProcedure
     .input(z.object({ applicationId: z.number() }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database not available');
+      const db = await requireDb();
 
       const policies = await db
         .select()
@@ -113,8 +112,7 @@ export const mortgageInsuranceRouter = router({
   getEscrowAccount: protectedProcedure
     .input(z.object({ applicationId: z.number() }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database not available');
+      const db = await requireDb();
 
       const [account] = await db
         .select()
@@ -178,8 +176,7 @@ export const mortgageInsuranceRouter = router({
       })
     )
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database not available');
+      const db = await requireDb();
 
       const transactions = await db
         .select()

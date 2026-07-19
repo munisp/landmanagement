@@ -3,7 +3,7 @@
  * Tracks security events, detects threats, and manages IP blocking
  */
 
-import { getDb } from './db';
+import { requireDb } from './db';
 import { users } from '../drizzle/schema';
 import { eq, and, gte, sql, desc } from 'drizzle-orm';
 
@@ -61,8 +61,7 @@ export async function logSecurityEvent(
   }
 ): Promise<{ success: boolean; eventId?: number }> {
   try {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
 
     const result = await db.execute(sql`
       INSERT INTO security_events (event_type, severity, user_id, ip_address, user_agent, details, created_at)
@@ -102,8 +101,7 @@ export async function recordLoginAttempt(
   }
 ): Promise<{ success: boolean; shouldLockAccount: boolean }> {
   try {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
 
     // Record the attempt
     await db.execute(sql`
@@ -182,8 +180,7 @@ export async function recordLoginAttempt(
  */
 export async function isIPBlocked(ipAddress: string): Promise<boolean> {
   try {
-    const db = await getDb();
-    if (!db) return false;
+    const db = await requireDb();
 
     const result = await db.execute(sql`
       SELECT id
@@ -214,8 +211,7 @@ export async function blockIP(
   }
 ): Promise<{ success: boolean }> {
   try {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
 
     const expiresAt = options?.isPermanent
       ? null
@@ -263,8 +259,7 @@ export async function unblockIP(
   unblockedBy?: number
 ): Promise<{ success: boolean }> {
   try {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
 
     await db.execute(sql`
       UPDATE blocked_ips
@@ -293,8 +288,7 @@ export async function unblockIP(
  */
 async function considerIPBlock(ipAddress: string, reason: string): Promise<void> {
   // Check recent failed attempts from this IP
-  const db = await getDb();
-  if (!db) return;
+  const db = await requireDb();
 
   const result = await db.execute(sql`
     SELECT COUNT(*) as count
@@ -322,8 +316,7 @@ export async function detectUnusualAccess(
   ipAddress: string
 ): Promise<{ isUnusual: boolean; reason?: string }> {
   try {
-    const db = await getDb();
-    if (!db) return { isUnusual: false };
+    const db = await requireDb();
 
     // Check for multiple IPs in short time
     const result = await db.execute(sql`
@@ -385,8 +378,7 @@ export async function getSecurityEvents(
   limit = 100
 ): Promise<SecurityEvent[]> {
   try {
-    const db = await getDb();
-    if (!db) return [];
+    const db = await requireDb();
 
     let query = sql`
       SELECT *
@@ -439,8 +431,7 @@ export async function getSecurityEvents(
  */
 export async function getBlockedIPs(includeUnblocked = false): Promise<BlockedIP[]> {
   try {
-    const db = await getDb();
-    if (!db) return [];
+    const db = await requireDb();
 
     const result = await db.execute(sql`
       SELECT *
@@ -480,16 +471,8 @@ export async function getSecurityStats(
   accountLockouts: number;
 }> {
   try {
-    const db = await getDb();
-    if (!db) {
-      return {
-        totalEvents: 0,
-        criticalEvents: 0,
-        blockedIPs: 0,
-        failedLogins: 0,
-        accountLockouts: 0,
-      };
-    }
+    const db = await requireDb();
+
 
     const start = startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const end = endDate || new Date();

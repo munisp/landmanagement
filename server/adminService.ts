@@ -3,17 +3,9 @@
  * Handles admin-only operations for user management
  */
 
-import { getDb } from './db';
+import { requireDb } from './db';
 import { loginAttempts, users } from '../drizzle/schema';
 import { eq, desc, sql } from 'drizzle-orm';
-import {
-  activateOfflineUser,
-  getOfflineUserStats,
-  listOfflineAdminUsers,
-  listOfflineUserActivityLogs,
-  suspendOfflineUser,
-  updateOfflineUserRole,
-} from './adminRepository';
 
 export interface AdminUserListItem {
   id: number;
@@ -45,10 +37,8 @@ export async function getAllUsers(page: number = 1, limit: number = 50): Promise
 }> {
   const offset = (page - 1) * limit;
   
-  const db = await getDb();
-  if (!db) {
-    return listOfflineAdminUsers(page, limit);
-  }
+  const db = await requireDb();
+
 
   const [userList, totalResult] = await Promise.all([
     db
@@ -85,10 +75,8 @@ export async function updateUserRole(
   newRole: 'user' | 'surveyor' | 'registrar' | 'admin',
   adminId: number
 ): Promise<{ success: boolean; user?: any }> {
-  const db = await getDb();
-  if (!db) {
-    return updateOfflineUserRole(userId, newRole, adminId);
-  }
+  const db = await requireDb();
+
 
   const [updated] = await db
     .update(users)
@@ -120,10 +108,8 @@ export async function suspendUser(
   reason: string,
   adminId: number
 ): Promise<{ success: boolean; user?: any }> {
-  const db = await getDb();
-  if (!db) {
-    return suspendOfflineUser(userId, reason, adminId);
-  }
+  const db = await requireDb();
+
 
   const [updated] = await db
     .update(users)
@@ -156,10 +142,8 @@ export async function activateUser(
   userId: number,
   adminId: number
 ): Promise<{ success: boolean; user?: any }> {
-  const db = await getDb();
-  if (!db) {
-    return activateOfflineUser(userId, adminId);
-  }
+  const db = await requireDb();
+
 
   const [updated] = await db
     .update(users)
@@ -189,10 +173,8 @@ export async function getUserActivityLogs(
   userId?: number,
   limit: number = 50
 ): Promise<UserActivityLog[]> {
-  const db = await getDb();
-  if (!db) {
-    return listOfflineUserActivityLogs(userId, limit);
-  }
+  const db = await requireDb();
+
 
   let query = db
     .select({
@@ -237,10 +219,8 @@ export async function getUserStats(): Promise<{
   suspended: number;
   byRole: Record<string, number>;
 }> {
-  const db = await getDb();
-  if (!db) {
-    return getOfflineUserStats();
-  }
+  const db = await requireDb();
+
 
   const [totalResult, suspendedResult, roleStats] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(users),

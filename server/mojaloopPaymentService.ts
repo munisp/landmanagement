@@ -5,15 +5,9 @@
  * Orchestrates the complete payment flow: quote → transfer → reconciliation.
  */
 
-import { getDb } from './db';
+import { requireDb } from './db';
 import { mojaloopTransactions, users } from '../drizzle/schema';
 import { eq, and, desc } from 'drizzle-orm';
-import {
-  createOfflineMojaloopTransaction,
-  getOfflineMojaloopTransaction,
-  listOfflineMojaloopTransactions,
-  updateOfflineMojaloopTransaction,
-} from './mojaloopPaymentRepository';
 import {
   MojaloopClient,
   getMojaloopClient,
@@ -59,8 +53,7 @@ export async function initiatePropertyPayment(params: InitiatePaymentParams): Pr
   fees: string;
   expiration: string;
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   // Generate unique IDs
   const transactionId = generateTransactionId();
@@ -156,8 +149,7 @@ export async function executePayment(transactionId: string): Promise<{
   transferId: string;
   status: string;
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   // Get transaction details
   const transactions = await db
@@ -252,21 +244,8 @@ export async function executePayment(transactionId: string): Promise<{
  * Get payment status
  */
 export async function getPaymentStatus(transactionId: string): Promise<PaymentStatus | null> {
-  const db = await getDb();
-  if (!db) {
-    const transaction = await getOfflineMojaloopTransaction(transactionId);
-    if (!transaction) return null;
-    return {
-      transactionId: transaction.transactionId,
-      status: transaction.status,
-      amount: transaction.amount.toString(),
-      currency: transaction.currency,
-      createdAt: transaction.createdAt,
-      completedAt: transaction.completedAt ?? undefined,
-      errorCode: transaction.errorCode ?? undefined,
-      errorDescription: transaction.errorDescription ?? undefined,
-    };
-  }
+  const db = await requireDb();
+
 
   const transactions = await db
     .select()
@@ -296,19 +275,8 @@ export async function getPaymentStatus(transactionId: string): Promise<PaymentSt
  * Get user's payment history
  */
 export async function getUserPaymentHistory(userId: number, limit: number = 10): Promise<PaymentStatus[]> {
-  const db = await getDb();
-  if (!db) {
-    return (await listOfflineMojaloopTransactions(userId, limit)).map((tx) => ({
-      transactionId: tx.transactionId,
-      status: tx.status,
-      amount: tx.amount.toString(),
-      currency: tx.currency,
-      createdAt: tx.createdAt,
-      completedAt: tx.completedAt ?? undefined,
-      errorCode: tx.errorCode ?? undefined,
-      errorDescription: tx.errorDescription ?? undefined,
-    }));
-  }
+  const db = await requireDb();
+
 
   const transactions = await db
     .select()
@@ -333,19 +301,8 @@ export async function getUserPaymentHistory(userId: number, limit: number = 10):
  * Cancel a pending payment
  */
 export async function cancelPayment(transactionId: string, reason: string): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    const transaction = await getOfflineMojaloopTransaction(transactionId);
-    if (!transaction) throw new Error('Transaction not found');
-    if (!['pending', 'quote_received'].includes(transaction.status)) {
-      throw new Error(`Cannot cancel payment in status: ${transaction.status}`);
-    }
-    await updateOfflineMojaloopTransaction(transactionId, {
-      status: 'rejected',
-      errorDescription: `Cancelled by user: ${reason}`,
-    });
-    return;
-  }
+  const db = await requireDb();
+
 
   const transactions = await db
     .select()
@@ -381,14 +338,8 @@ export async function reconcilePaymentWithEscrow(
   transactionId: string,
   blockchainTxHash: string
 ): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    await updateOfflineMojaloopTransaction(transactionId, {
-      blockchainTxHash,
-      reconciledAt: new Date(),
-    });
-    return;
-  }
+  const db = await requireDb();
+
 
   await db
     .update(mojaloopTransactions)

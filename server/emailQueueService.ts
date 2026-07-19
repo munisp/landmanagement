@@ -3,7 +3,7 @@
  * Handles email queue processing with retry logic and delivery tracking
  */
 
-import { getDb } from './db';
+import { requireDb } from './db';
 import { sql } from 'drizzle-orm';
 import { sendEmail, type SendEmailOptions, type EmailAttachment } from './emailService';
 
@@ -37,8 +37,7 @@ export async function queueEmail(options: {
   maxRetries?: number;
 }): Promise<{ success: boolean; queueId?: number }> {
   try {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
 
     const result = await db.execute(sql`
       INSERT INTO email_queue (
@@ -78,10 +77,8 @@ export async function processEmailQueue(): Promise<{
   sent: number;
   failed: number;
 }> {
-  const db = await getDb();
-  if (!db) {
-    return { processed: 0, sent: 0, failed: 0 };
-  }
+  const db = await requireDb();
+
 
   let processed = 0;
   let sent = 0;
@@ -196,10 +193,8 @@ export async function getEmailQueueStats(): Promise<{
   total: number;
 }> {
   try {
-    const db = await getDb();
-    if (!db) {
-      return { pending: 0, sent: 0, failed: 0, total: 0 };
-    }
+    const db = await requireDb();
+
 
     const result = await db.execute(sql`
       SELECT
@@ -229,10 +224,8 @@ export async function getEmailQueueStats(): Promise<{
  */
 export async function retryFailedEmails(): Promise<{ retriedCount: number }> {
   try {
-    const db = await getDb();
-    if (!db) {
-      return { retriedCount: 0 };
-    }
+    const db = await requireDb();
+
 
     const result = await db.execute(sql`
       UPDATE email_queue
@@ -263,10 +256,8 @@ export async function retryFailedEmails(): Promise<{ retriedCount: number }> {
  */
 export async function cleanupOldEmails(): Promise<{ deletedCount: number }> {
   try {
-    const db = await getDb();
-    if (!db) {
-      return { deletedCount: 0 };
-    }
+    const db = await requireDb();
+
 
     const result = await db.execute(sql`
       DELETE FROM email_queue

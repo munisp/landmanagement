@@ -8,7 +8,7 @@ import { TRPCError } from '@trpc/server';
 import { protectedProcedure, router } from '../../_core/trpc';
 import * as phase4Service from '../../phase4Service';
 import { dashboardWS } from '../../dashboardWebSocketService';
-import { getDb } from '../../db';
+import { requireDb } from '../../db';
 import {
   mortgageApplications,
   taxClearances,
@@ -19,24 +19,6 @@ import {
   publicNotices,
   landUsePlans,
 } from '../../../drizzle/schema';
-import {
-  listAdminCadastralSurveys,
-  listAdminEnvironmentalAssessments,
-  listAdminInsurancePolicies,
-  listAdminLandUsePlans,
-  listAdminLegalDocuments,
-  listAdminMortgageApplications,
-  listAdminPublicNotices,
-  listAdminTaxClearances,
-  updateAdminCadastralSurveyStatus,
-  updateAdminEnvironmentalAssessmentStatus,
-  updateAdminInsurancePolicyStatus,
-  updateAdminLandUsePlanStatus,
-  updateAdminLegalDocumentStatus,
-  updateAdminMortgageApplicationStatus,
-  updateAdminPublicNoticeStatus,
-  updateAdminTaxClearanceStatus,
-} from '../../phase4AdminRepository';
 
 // Admin procedure - requires admin role
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -129,9 +111,8 @@ export const phase4Router = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only admins can update application status' });
       }
 
-      const updated = !(await getDb())
-        ? await updateAdminMortgageApplicationStatus(input.applicationId, input.status, input.rejectionReason)
-        : await phase4Service.updateMortgageApplicationStatus(
+      await requireDb();
+      const updated = await phase4Service.updateMortgageApplicationStatus(
             input.applicationId,
             input.status,
             { rejectionReason: input.rejectionReason }
@@ -222,12 +203,8 @@ export const phase4Router = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only admins can update clearance status' });
       }
 
-      const updated = !(await getDb())
-        ? await updateAdminTaxClearanceStatus(input.clearanceId, input.status, {
-            certificateUrl: input.certificateUrl,
-            firsReferenceNumber: input.firsReferenceNumber,
-          })
-        : await phase4Service.updateTaxClearanceStatus(
+      await requireDb();
+      const updated = await phase4Service.updateTaxClearanceStatus(
             input.clearanceId,
             input.status,
             { certificateUrl: input.certificateUrl, firsReferenceNumber: input.firsReferenceNumber }
@@ -331,9 +308,8 @@ export const phase4Router = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only admins can update policy status' });
       }
 
-      const updated = !(await getDb())
-        ? await updateAdminInsurancePolicyStatus(input.policyId, input.status)
-        : await phase4Service.updateInsurancePolicyStatus(input.policyId, input.status);
+      await requireDb();
+      const updated = await phase4Service.updateInsurancePolicyStatus(input.policyId, input.status);
 
       // Emit WebSocket event
       if (updated.transactionId) {
@@ -431,9 +407,8 @@ export const phase4Router = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only admins can update document status' });
       }
 
-      const updated = !(await getDb())
-        ? await updateAdminLegalDocumentStatus(input.documentId, input.status, input.registrationNumber)
-        : await phase4Service.updateLegalDocumentStatus(
+      await requireDb();
+      const updated = await phase4Service.updateLegalDocumentStatus(
             input.documentId,
             input.status,
             { registrationNumber: input.registrationNumber }
@@ -531,9 +506,8 @@ export const phase4Router = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only admins can update survey status' });
       }
 
-      const updated = !(await getDb())
-        ? await updateAdminCadastralSurveyStatus(input.surveyId, input.status)
-        : await phase4Service.updateCadastralSurveyStatus(
+      await requireDb();
+      const updated = await phase4Service.updateCadastralSurveyStatus(
             input.surveyId,
             input.status,
             { approvedBy: input.approvedBy, rejectionReason: input.rejectionReason }
@@ -638,13 +612,8 @@ export const phase4Router = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only admins can update assessment status' });
       }
 
-      const updated = !(await getDb())
-        ? await updateAdminEnvironmentalAssessmentStatus(input.assessmentId, input.status, {
-            conditions: input.conditions,
-            rejectionReason: input.rejectionReason,
-            certificateUrl: input.certificateUrl,
-          })
-        : await phase4Service.updateEnvironmentalAssessmentStatus(
+      await requireDb();
+      const updated = await phase4Service.updateEnvironmentalAssessmentStatus(
             input.assessmentId,
             input.status,
             {
@@ -742,9 +711,8 @@ export const phase4Router = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only admins can update notice status' });
       }
 
-      const updated = !(await getDb())
-        ? await updateAdminPublicNoticeStatus(input.noticeId, input.status)
-        : await phase4Service.updatePublicNoticeStatus(input.noticeId, input.status);
+      await requireDb();
+      const updated = await phase4Service.updatePublicNoticeStatus(input.noticeId, input.status);
 
       // Emit WebSocket event
       const progress = input.status === 'completed' ? 100 : input.status === 'cancelled' ? 0 : 50;
@@ -855,13 +823,8 @@ export const phase4Router = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only admins can update land use plan status' });
       }
 
-      const updated = !(await getDb())
-        ? await updateAdminLandUsePlanStatus(input.planId, input.status, {
-            conditions: input.conditions,
-            rejectionReason: input.rejectionReason,
-            isCompliant: input.isCompliant,
-          })
-        : await phase4Service.updateLandUsePlanStatus(
+      await requireDb();
+      const updated = await phase4Service.updateLandUsePlanStatus(
             input.planId,
             input.status,
             {
@@ -905,57 +868,49 @@ export const phase4Router = router({
 
   getAllMortgageApplications: adminProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return await listAdminMortgageApplications();
+      const db = await requireDb();
       return await db.select().from(mortgageApplications);
     }),
 
   getAllTaxClearances: adminProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return await listAdminTaxClearances();
+      const db = await requireDb();
       return await db.select().from(taxClearances);
     }),
 
   getAllInsurancePolicies: adminProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return await listAdminInsurancePolicies();
+      const db = await requireDb();
       return await db.select().from(insurancePolicies);
     }),
 
   getAllLegalDocuments: adminProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return await listAdminLegalDocuments();
+      const db = await requireDb();
       return await db.select().from(legalDocuments);
     }),
 
   getAllCadastralSurveys: adminProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return await listAdminCadastralSurveys();
+      const db = await requireDb();
       return await db.select().from(cadastralSurveys);
     }),
 
   getAllEnvironmentalAssessments: adminProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return await listAdminEnvironmentalAssessments();
+      const db = await requireDb();
       return await db.select().from(environmentalAssessments);
     }),
 
   getAllPublicNotices: adminProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return await listAdminPublicNotices();
+      const db = await requireDb();
       return await db.select().from(publicNotices);
     }),
 
   getAllLandUsePlans: adminProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return await listAdminLandUsePlans();
+      const db = await requireDb();
       return await db.select().from(landUsePlans);
     }),
 });

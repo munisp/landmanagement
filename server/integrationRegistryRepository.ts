@@ -7,7 +7,7 @@ import {
   type IntegrationRegistryRecord,
   type IntegrationSyncRun,
 } from '../drizzle/schema';
-import { getDb } from './db';
+import { requireDb } from './db';
 
 const DEFAULT_INTEGRATIONS: Array<Pick<InsertIntegrationRegistryRecord, 'integrationKey' | 'displayName' | 'status' | 'notes'>> = [
   { integrationKey: 'postgres', displayName: 'PostgreSQL', status: 'configured', notes: 'Primary OLTP datastore' },
@@ -24,26 +24,8 @@ const DEFAULT_INTEGRATIONS: Array<Pick<InsertIntegrationRegistryRecord, 'integra
 ];
 
 export async function seedIntegrationRegistry(): Promise<IntegrationRegistryRecord[]> {
-  const db = await getDb();
-  if (!db) {
-    return DEFAULT_INTEGRATIONS.map((item, index) => ({
-      id: index + 1,
-      integrationKey: item.integrationKey,
-      displayName: item.displayName,
-      status: item.status,
-      endpoint: null,
-      namespace: null,
-      version: null,
-      healthStatus: null,
-      configuration: null,
-      capabilities: null,
-      lastCheckedAt: null,
-      lastHealthyAt: null,
-      notes: item.notes ?? null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })) as IntegrationRegistryRecord[];
-  }
+  const db = await requireDb();
+
 
   for (const item of DEFAULT_INTEGRATIONS) {
     const existing = await db
@@ -61,10 +43,8 @@ export async function seedIntegrationRegistry(): Promise<IntegrationRegistryReco
 }
 
 export async function listIntegrationRegistry(): Promise<IntegrationRegistryRecord[]> {
-  const db = await getDb();
-  if (!db) {
-    return seedIntegrationRegistry();
-  }
+  const db = await requireDb();
+
 
   const records = await db.select().from(integrationRegistry).orderBy(integrationRegistry.displayName);
   if (records.length === 0) {
@@ -77,11 +57,8 @@ export async function updateIntegrationRegistryStatus(
   integrationKey: IntegrationRegistryRecord['integrationKey'],
   patch: Partial<Pick<IntegrationRegistryRecord, 'status' | 'endpoint' | 'namespace' | 'version' | 'healthStatus' | 'configuration' | 'capabilities' | 'notes' | 'lastCheckedAt' | 'lastHealthyAt'>>,
 ): Promise<IntegrationRegistryRecord | null> {
-  const db = await getDb();
-  if (!db) {
-    const existing = (await seedIntegrationRegistry()).find((item) => item.integrationKey === integrationKey);
-    return existing ? { ...existing, ...patch, updatedAt: new Date() } as IntegrationRegistryRecord : null;
-  }
+  const db = await requireDb();
+
 
   const updated = await db
     .update(integrationRegistry)
@@ -98,24 +75,16 @@ export async function updateIntegrationRegistryStatus(
 export async function recordIntegrationSyncRun(
   input: InsertIntegrationSyncRun,
 ): Promise<IntegrationSyncRun | (InsertIntegrationSyncRun & { id: number; createdAt: Date })> {
-  const db = await getDb();
-  if (!db) {
-    return {
-      id: Date.now(),
-      createdAt: new Date(),
-      ...input,
-    };
-  }
+  const db = await requireDb();
+
 
   const inserted = await db.insert(integrationSyncRuns).values(input).returning();
   return inserted[0];
 }
 
 export async function listIntegrationSyncRuns(limit = 50): Promise<IntegrationSyncRun[]> {
-  const db = await getDb();
-  if (!db) {
-    return [];
-  }
+  const db = await requireDb();
+
 
   return db
     .select()

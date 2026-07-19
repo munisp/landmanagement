@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { appRouter } from '../../routers';
-import { getDb } from '../../db';
+import { requireDb } from '../../db';
 import { 
   mortgageApplications, 
   taxClearances, 
@@ -26,13 +26,8 @@ describe('Phase 4 Router', () => {
 
   beforeAll(async () => {
     // Setup test data
-    const db = await getDb();
-    if (!db) {
-      testUserId = 1401;
-      testParcelId = 501;
-      testTransactionId = 'TXN-PHASE4-OFFLINE-001';
-      return;
-    }
+    const db = await requireDb();
+
 
     // Create test user
     const uniqueOpenId = `test-user-phase4-${Date.now()}`;
@@ -82,8 +77,7 @@ describe('Phase 4 Router', () => {
 
   afterAll(async () => {
     // Cleanup test data
-    const db = await getDb();
-    if (!db) return;
+    const db = await requireDb();
 
     // Clean up in reverse order of dependencies
     if (testMortgageId) {

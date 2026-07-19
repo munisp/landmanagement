@@ -12,11 +12,10 @@
  */
 
 import { and, eq, lt } from 'drizzle-orm';
-import { getDb } from './db';
-import { agencyClearances } from '../drizzle/schema';
+import { requireDb } from './db';
+import { agencyClearances, verificationRequests } from '../drizzle/schema';
 import * as transactionRepository from './transactionRepository';
 import * as disputeRepository from './disputeRepository';
-import * as verificationRepository from './verificationRepository';
 import { checkAllIntegrations } from './_core/integrations';
 
 export interface ForecastSignal {
@@ -57,16 +56,12 @@ function severityPenalty(severity: ForecastSignal['severity']): number {
 export async function getOperationalForecast(): Promise<OperationalForecast> {
   const signals: ForecastSignal[] = [];
 
-  // ---- Load operational data (offline-capable repositories) ----------------
+  // ---- Load operational data (relational stores) ----------------------------
   const allTransactions = (await transactionRepository.listTransactions({ limit: 10000 })).transactions as any[];
   const disputeStats = (await disputeRepository.getDisputeStats()) as any;
   const allDisputes = (await disputeRepository.listDisputes({ limit: 10000 })).disputes as any[];
-  let verificationBacklog: any[] = [];
-  try {
-    verificationBacklog = (await verificationRepository.listVerificationRequestsOffline({}, 1, 10000)).requests as any[];
-  } catch {
-    verificationBacklog = [];
-  }
+  const db = await requireDb();
+  const verificationBacklog = await db.select().from(verificationRequests);
 
   // ---- 1) Backlog formation -------------------------------------------------
   const pendingTx = allTransactions.filter((t) => !['completed', 'registered', 'cancelled'].includes(String(t.status)));
@@ -93,9 +88,7 @@ export async function getOperationalForecast(): Promise<OperationalForecast> {
 
   // ---- 2) SLA breach risk (agency clearances) --------------------------------
   let atRiskClearances = 0;
-  const db = await getDb();
-  if (db) {
-    try {
+  try {
       const overdue = await db
         .select()
         .from(agencyClearances)
@@ -115,7 +108,6 @@ export async function getOperationalForecast(): Promise<OperationalForecast> {
     } catch (error) {
       console.warn('[CommandCenter] Clearance SLA scan failed:', (error as Error).message);
     }
-  }
   if (atRiskClearances > 0) {
     signals.push({
       key: 'sla_breach',

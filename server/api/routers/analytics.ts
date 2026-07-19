@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { router, protectedProcedure } from '../../_core/trpc';
 import { TRPCError } from '@trpc/server';
-import { getDb } from '../../db';
+import { requireDb } from '../../db';
 import { parcels, securityEvents, transactions, users, verificationRequests } from '../../../drizzle/schema';
 import { sql, eq, gte, lte, and, desc } from 'drizzle-orm';
 import * as analyticsService from '../../analytics';
@@ -68,8 +68,7 @@ export const analyticsRouter = router({
   getTransactionMetrics: adminProcedure
     .input(timeRangeSchema)
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+      const db = await requireDb();
       const startDate = getDateFromTimeRange(input.timeRange);
 
       const totalResult = await db
@@ -133,8 +132,7 @@ export const analyticsRouter = router({
   getPropertyValuationTrends: adminProcedure
     .input(timeRangeSchema)
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+      const db = await requireDb();
       const startDate = getDateFromTimeRange(input.timeRange);
 
       const byTypeResult = await db
@@ -167,8 +165,7 @@ export const analyticsRouter = router({
   getUserBehaviorAnalytics: adminProcedure
     .input(timeRangeSchema)
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+      const db = await requireDb();
       const startDate = getDateFromTimeRange(input.timeRange);
 
       const activeUsersResult = await db
@@ -190,8 +187,7 @@ export const analyticsRouter = router({
   getSystemPerformance: adminProcedure
     .input(timeRangeSchema)
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+      const db = await requireDb();
       const startDate = getDateFromTimeRange(input.timeRange);
       const rangeDays = Math.max(1, Math.ceil((Date.now() - startDate.getTime()) / (24 * 60 * 60 * 1000)));
 
@@ -230,8 +226,7 @@ export const analyticsRouter = router({
   getRevenueForecasts: adminProcedure
     .input(timeRangeSchema)
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+      const db = await requireDb();
       const startDate = getDateFromTimeRange(input.timeRange);
 
       const historicalResult = await db
@@ -261,8 +256,7 @@ export const analyticsRouter = router({
   getGeospatialHeatmap: adminProcedure
     .input(timeRangeSchema)
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+      const db = await requireDb();
       const startDate = getDateFromTimeRange(input.timeRange);
 
       const hotspotsResult = await db
@@ -285,8 +279,7 @@ export const analyticsRouter = router({
   getMLModelPerformance: adminProcedure
     .input(timeRangeSchema)
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+      const db = await requireDb();
       const startDate = getDateFromTimeRange(input.timeRange);
       const fraudAlerts = await analyticsService.getFraudAlerts(50);
 
@@ -373,8 +366,7 @@ export const analyticsRouter = router({
       previousEnd: z.string(),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+      const db = await requireDb();
 
       const currentStart = new Date(input.currentStart);
       const currentEnd = new Date(input.currentEnd);
@@ -454,8 +446,7 @@ export const analyticsRouter = router({
       endDate: z.string(),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+      const db = await requireDb();
 
       const startDate = new Date(input.startDate);
       const endDate = new Date(input.endDate);
@@ -483,8 +474,7 @@ export const analyticsRouter = router({
       daysToPredict: z.number().optional().default(30),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+      const db = await requireDb();
 
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const historicalData = await db
@@ -517,8 +507,7 @@ export const analyticsRouter = router({
       endDate: z.string(),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not available' });
+      const db = await requireDb();
 
       const startDate = new Date(input.startDate);
       const endDate = new Date(input.endDate);

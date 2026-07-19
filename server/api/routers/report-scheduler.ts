@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { protectedProcedure, router } from '../../_core/trpc';
-import { getDb } from '../../db';
+import { requireDb } from '../../db';
 import {
   scheduled_reports,
   report_history,
@@ -44,8 +44,7 @@ export const reportSchedulerRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database connection failed');
+      const db = await requireDb();
 
       // Calculate next run time
       const nextRunAt = calculateNextRunTime(input.frequency, input.cronExpression || null);
@@ -79,8 +78,7 @@ export const reportSchedulerRouter = router({
    * Get all scheduled reports for current user
    */
   list: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (!db) throw new Error('Database connection failed');
+    const db = await requireDb();
 
     const schedules = await db
       .select()
@@ -103,8 +101,7 @@ export const reportSchedulerRouter = router({
   get: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database connection failed');
+      const db = await requireDb();
 
       const schedules = await db
         .select()
@@ -160,8 +157,7 @@ export const reportSchedulerRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database connection failed');
+      const db = await requireDb();
 
       const { id, ...updates } = input;
 
@@ -203,8 +199,7 @@ export const reportSchedulerRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database connection failed');
+      const db = await requireDb();
 
       const result = await db
         .delete(scheduled_reports)
@@ -229,8 +224,7 @@ export const reportSchedulerRouter = router({
   toggleActive: protectedProcedure
     .input(z.object({ id: z.number(), isActive: z.boolean() }))
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database connection failed');
+      const db = await requireDb();
 
       const result = await db
         .update(scheduled_reports)
@@ -259,8 +253,7 @@ export const reportSchedulerRouter = router({
   runNow: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database connection failed');
+      const db = await requireDb();
 
       // Verify ownership
       const schedules = await db
@@ -304,8 +297,7 @@ export const reportSchedulerRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database connection failed');
+      const db = await requireDb();
 
       const conditions = [eq(report_history.userId, ctx.user.id)];
 
@@ -333,8 +325,7 @@ export const reportSchedulerRouter = router({
    * Get report statistics
    */
   getStatistics: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (!db) throw new Error('Database connection failed');
+    const db = await requireDb();
 
     const schedules = await db
       .select()
@@ -395,8 +386,7 @@ export const reportSchedulerRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database connection failed');
+      const db = await requireDb();
 
       const template = getTemplateById(input.templateId);
       if (!template) {

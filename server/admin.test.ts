@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { getDb, upsertUser } from './db';
+import { requireDb, upsertUser } from './db';
 import * as adminService from './adminService';
-import { getOfflineAdminUser } from './adminRepository';
 import { users } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -10,12 +9,7 @@ describe('Admin User Management', () => {
   let testUserId: number;
 
   beforeAll(async () => {
-    const db = await getDb();
-    if (!db) {
-      testAdminId = 901;
-      testUserId = 902;
-      return;
-    }
+    const db = await requireDb();
 
     // Create test admin user
     await upsertUser({
@@ -125,10 +119,8 @@ describe('Admin User Management', () => {
     });
 
     it('should record suspension details correctly', async () => {
-      const db = await getDb();
-      const user = db
-        ? (await db.select().from(users).where(eq(users.id, testUserId)).limit(1))[0]
-        : getOfflineAdminUser(testUserId);
+      const db = await requireDb();
+      const user = (await db.select().from(users).where(eq(users.id, testUserId)).limit(1))[0];
 
       expect(user?.suspended).toBe(true);
       expect(user?.suspensionReason).toBe('Violation of terms of service');
@@ -149,10 +141,8 @@ describe('Admin User Management', () => {
     });
 
     it('should clear all suspension fields', async () => {
-      const db = await getDb();
-      const user = db
-        ? (await db.select().from(users).where(eq(users.id, testUserId)).limit(1))[0]
-        : getOfflineAdminUser(testUserId);
+      const db = await requireDb();
+      const user = (await db.select().from(users).where(eq(users.id, testUserId)).limit(1))[0];
 
       expect(user?.suspended).toBe(false);
       expect(user?.suspensionReason).toBeNull();

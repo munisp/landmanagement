@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   mortgageApplications,
   mortgagePaymentSchedule,
@@ -16,8 +16,7 @@ export async function calculateEarlyPayoff(applicationId: number): Promise<{
   totalPayoffAmount: number;
   savingsFromEarlyPayoff: number;
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Get application details
   const [application] = await db
@@ -90,8 +89,7 @@ export async function processEarlyPayoff(params: {
   paymentGateway?: string;
   gatewayReference?: string;
 }): Promise<{ success: boolean; transactionId: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Calculate payoff amount
   const payoffDetails = await calculateEarlyPayoff(params.applicationId);
@@ -178,8 +176,7 @@ export async function makeExtraPrincipalPayment(params: {
   newPayoffDate: Date;
   interestSaved: number;
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Get application details
   const [application] = await db
@@ -252,8 +249,7 @@ async function recalculateScheduleAfterExtraPayment(
   applicationId: number,
   extraPayment: number
 ): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Get application details
   const [application] = await db
@@ -345,8 +341,7 @@ export async function calculateRefinancingOptions(applicationId: number): Promis
     closingCosts: number;
   }>;
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Get application details
   const [application] = await db
@@ -491,8 +486,7 @@ export async function submitRefinancingApplication(params: {
   newTerm: number;
   reason: string;
 }): Promise<{ applicationId: string; message: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Get original application
   const [originalApp] = await db

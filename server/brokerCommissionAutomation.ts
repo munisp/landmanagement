@@ -6,7 +6,7 @@ import {
   mortgageApplications,
 } from '../drizzle/schema';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { sendEmail } from './notificationDelivery';
 import fs from 'fs';
 import path from 'path';
@@ -69,8 +69,7 @@ export async function calculateBrokerCommission(
   startDate: Date,
   endDate: Date
 ): Promise<CommissionCalculation | null> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   // Get broker details
   const broker = await db
@@ -214,8 +213,7 @@ export async function calculateAllBrokerCommissions(
   startDate: Date,
   endDate: Date
 ): Promise<CommissionCalculation[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   // Get all active brokers
   const allBrokers = await db
@@ -245,8 +243,7 @@ export async function calculateAllBrokerCommissions(
 export async function saveCommissionCalculations(
   calculation: CommissionCalculation
 ): Promise<string[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const commissionIds: string[] = [];
 
@@ -358,8 +355,7 @@ export async function generateTaxDocumentation(
     pdfUrl?: string;
   };
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   // Get broker details
   const broker = await db
@@ -464,8 +460,7 @@ export async function approveCommissions(
   commissionIds: string[],
   approvedBy: number
 ): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   for (const commissionId of commissionIds) {
     await db
@@ -490,8 +485,7 @@ export async function processCommissionPayment(
   transactionId?: string;
   error?: string;
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   // Get broker details
   const broker = await db
@@ -645,8 +639,7 @@ export async function getBrokerCommissionHistory(
   brokerId: number,
   limit: number = 12
 ): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   const history = await db
     .select()
@@ -664,8 +657,7 @@ export async function disputeCommission(
   commissionId: string,
   reason: string
 ): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  const db = await requireDb();
 
   await db
     .update(brokerCommissions)

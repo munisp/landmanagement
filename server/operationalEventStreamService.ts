@@ -13,7 +13,7 @@
  */
 
 import { and, desc, eq, gte, inArray } from 'drizzle-orm';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { eventOutbox, streamConsumerCheckpoints } from '../drizzle/schema';
 
 export const OPERATIONAL_TOPICS = [
@@ -58,7 +58,7 @@ export async function publishEvent(params: {
     throw new Error(`Unknown operational topic "${params.topic}"`);
   }
   const occurredAt = new Date().toISOString();
-  const db = await getDb();
+  const db = await requireDb();
 
   if (db) {
     try {
@@ -112,7 +112,7 @@ export async function getStream(filter: {
   limit?: number;
 } = {}): Promise<OperationalEvent[]> {
   const limit = filter.limit ?? 100;
-  const db = await getDb();
+  const db = await requireDb();
 
   if (db) {
     try {
@@ -173,7 +173,7 @@ export async function getStreamStats() {
 
 /** Read the durable checkpoint for a consumer group. */
 export async function getConsumerCheckpoint(consumerGroup: string, topic: string) {
-  const db = await getDb();
+  const db = await requireDb();
   if (db) {
     try {
       const rows = await db
@@ -198,8 +198,7 @@ export async function advanceConsumerCheckpoint(params: {
   topic: string;
   lastEventId: number;
 }): Promise<{ success: boolean }> {
-  const db = await getDb();
-  if (!db) return { success: false };
+  const db = await requireDb();
   const existing = await getConsumerCheckpoint(params.consumerGroup, params.topic);
   try {
     if (existing) {

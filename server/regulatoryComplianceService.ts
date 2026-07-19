@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   mortgageApplications,
   loanPools,
@@ -65,8 +65,7 @@ export async function generateCBNReport(
   startDate: Date,
   endDate: Date
 ): Promise<CBNComplianceReport> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const reportId = `CBN-${reportType.toUpperCase()}-${Date.now()}`;
   
@@ -176,8 +175,7 @@ export async function generateSECReport(
   startDate: Date,
   endDate: Date
 ): Promise<SECDisclosureReport> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const reportId = `SEC-${reportType.toUpperCase()}-${Date.now()}`;
   
@@ -304,8 +302,7 @@ export async function generateLoanPerformanceReport(
   startDate: Date,
   endDate: Date
 ): Promise<any> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const loans = await db
     .select()
@@ -338,8 +335,7 @@ export async function generateLoanPerformanceReport(
 export async function generateInvestorDisclosureReport(
   investorId: string
 ): Promise<any> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const investor = await db
     .select()
@@ -385,8 +381,7 @@ export async function generateInvestorDisclosureReport(
 export async function generateServicingTransferNotification(
   transferId: string
 ): Promise<any> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const transfer = await db
     .select()
@@ -420,8 +415,7 @@ export async function exportAuditTrail(
   startDate: Date,
   endDate: Date
 ): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   // Collect all relevant activities
   const auditTrail = [];

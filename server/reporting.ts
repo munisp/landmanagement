@@ -7,7 +7,7 @@ import { format as formatDate } from 'date-fns';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { sql } from 'drizzle-orm';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { sendEmail } from './emailService';
 import { storagePut } from './storage';
 
@@ -157,10 +157,8 @@ export class ReportBuilder {
   private async executeQuery(query: string): Promise<any[]> {
     console.log('Executing query:', query);
 
-    const db = await getDb();
-    if (!db) {
-      throw new Error('Database not available');
-    }
+    const db = await requireDb();
+
 
     switch (this.config.type) {
       case 'transaction': {

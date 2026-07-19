@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   mortgageBrokers,
   brokerClients,
@@ -27,8 +27,7 @@ export async function registerBroker(params: {
   businessAddress: string;
   defaultCommissionRate: number;
 }): Promise<{ brokerId: string; status: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const brokerId = `BRK-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
   
@@ -96,8 +95,7 @@ export async function approveBroker(params: {
   brokerId: string;
   approvedBy: number;
 }): Promise<{ success: boolean }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [broker] = await db
     .select()
@@ -127,8 +125,7 @@ export async function approveBroker(params: {
  * Get broker details
  */
 export async function getBrokerDetails(brokerId: string): Promise<any> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [broker] = await db
     .select()
@@ -156,8 +153,7 @@ export async function getBrokerDetails(brokerId: string): Promise<any> {
  * Get broker by user ID
  */
 export async function getBrokerByUserId(userId: number): Promise<any> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [broker] = await db
     .select()
@@ -192,8 +188,7 @@ export async function addClient(params: {
   clientNIN?: string;
   notes?: string;
 }): Promise<{ clientId: number }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [broker] = await db
     .select()
@@ -240,8 +235,7 @@ export async function addClient(params: {
  * Get broker clients
  */
 export async function getBrokerClients(brokerId: string): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [broker] = await db
     .select()
@@ -270,8 +264,7 @@ export async function submitApplicationForClient(params: {
   applicationId: number;
   submissionNotes?: string;
 }): Promise<{ success: boolean }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [broker] = await db
     .select()
@@ -331,8 +324,7 @@ export async function calculateCommission(params: {
   applicationId: number;
   loanAmount: number;
 }): Promise<{ commissionId: string; commissionAmount: number }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [broker] = await db
     .select()
@@ -391,8 +383,7 @@ export async function approveCommission(params: {
   commissionId: string;
   approvedBy: number;
 }): Promise<{ success: boolean }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [commission] = await db
     .select()
@@ -425,8 +416,7 @@ export async function markCommissionPaid(params: {
   commissionId: string;
   paymentReference: string;
 }): Promise<{ success: boolean }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [commission] = await db
     .select()
@@ -472,8 +462,7 @@ export async function getBrokerCommissions(params: {
   brokerId: string;
   status?: string;
 }): Promise<any[]> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [broker] = await db
     .select()
@@ -515,8 +504,7 @@ export async function getBrokerCommissions(params: {
  * Get broker performance analytics
  */
 export async function getBrokerPerformance(brokerId: string): Promise<any> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [broker] = await db
     .select()
@@ -596,8 +584,7 @@ export async function updateCommissionStructure(params: {
   maxLoanAmount?: number;
   effectiveFrom: Date;
 }): Promise<{ success: boolean }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
   
   const [broker] = await db
     .select()

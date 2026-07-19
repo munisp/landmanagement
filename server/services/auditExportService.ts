@@ -1,4 +1,4 @@
-import { getDb } from "../db";
+import { requireDb } from "../db";
 import { activityLogs } from "../../drizzle/schema";
 import { and, between, eq, sql } from "drizzle-orm";
 
@@ -14,8 +14,7 @@ export interface AuditExportOptions {
  * Export audit logs to CSV format
  */
 export async function exportAuditLogsToCSV(options: AuditExportOptions): Promise<string> {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed");
+  const db = await requireDb();
   
   // Build query with filters
   const conditions = [];
@@ -60,8 +59,7 @@ export async function exportAuditLogsToCSV(options: AuditExportOptions): Promise
  * Export audit logs to JSON format
  */
 export async function exportAuditLogsToJSON(options: AuditExportOptions): Promise<string> {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed");
+  const db = await requireDb();
   
   // Build query with filters
   const conditions = [];
@@ -104,8 +102,7 @@ export async function exportAuditLogsToJSON(options: AuditExportOptions): Promis
  * Get audit log statistics
  */
 export async function getAuditLogStats(startDate?: Date, endDate?: Date) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed");
+  const db = await requireDb();
   
   const conditions = [];
   if (startDate && endDate) {

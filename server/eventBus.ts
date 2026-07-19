@@ -1,9 +1,8 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { eventOutbox, type InsertEventOutboxRecord, type EventOutboxRecord } from '../drizzle/schema';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { externalClients } from './_core/externalClients';
 
-const inMemoryOutbox: EventOutboxRecord[] = [];
 
 async function publishViaKafka(record: EventOutboxRecord) {
   const producer = externalClients.kafka?.getProducer();
@@ -68,25 +67,8 @@ async function publishViaFluvio(record: EventOutboxRecord) {
 }
 
 export async function queueEvent(input: InsertEventOutboxRecord): Promise<EventOutboxRecord> {
-  const db = await getDb();
-  if (!db) {
-    const record = {
-      id: Date.now(),
-      createdAt: new Date(),
-      publishedAt: null,
-      errorMessage: null,
-      attemptCount: input.attemptCount ?? 0,
-      availableAt: input.availableAt ?? new Date(),
-      deliveryStatus: input.deliveryStatus ?? 'pending',
-      aggregateType: input.aggregateType ?? null,
-      aggregateId: input.aggregateId ?? null,
-      partitionKey: input.partitionKey ?? null,
-      headers: input.headers ?? null,
-      ...input,
-    } as EventOutboxRecord;
-    inMemoryOutbox.push(record);
-    return record;
-  }
+  const db = await requireDb();
+
 
   const inserted = await db.insert(eventOutbox).values(input).returning();
   return inserted[0];
@@ -94,7 +76,7 @@ export async function queueEvent(input: InsertEventOutboxRecord): Promise<EventO
 
 export async function publishQueuedEvent(record: EventOutboxRecord): Promise<EventOutboxRecord> {
   const backend = record.backend;
-  const db = await getDb();
+  const db = await requireDb();
 
   try {
     if (backend === 'kafka') {
@@ -105,12 +87,7 @@ export async function publishQueuedEvent(record: EventOutboxRecord): Promise<Eve
       await publishViaFluvio(record);
     }
 
-    if (!db) {
-      record.deliveryStatus = 'published';
-      record.publishedAt = new Date();
-      record.attemptCount = (record.attemptCount ?? 0) + 1;
-      return record;
-    }
+
 
     const updated = await db
       .update(eventOutbox)
@@ -126,12 +103,7 @@ export async function publishQueuedEvent(record: EventOutboxRecord): Promise<Eve
     return updated[0];
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Event publish failed';
-    if (!db) {
-      record.deliveryStatus = 'failed';
-      record.errorMessage = message;
-      record.attemptCount = (record.attemptCount ?? 0) + 1;
-      return record;
-    }
+
 
     const updated = await db
       .update(eventOutbox)
@@ -148,15 +120,13 @@ export async function publishQueuedEvent(record: EventOutboxRecord): Promise<Eve
 }
 
 export async function processPendingOutbox(limit = 100): Promise<EventOutboxRecord[]> {
-  const db = await getDb();
-  const pending = db
-    ? await db
-        .select()
-        .from(eventOutbox)
-        .where(and(eq(eventOutbox.deliveryStatus, 'pending')))
-        .orderBy(asc(eventOutbox.availableAt))
-        .limit(limit)
-    : inMemoryOutbox.filter((record) => record.deliveryStatus === 'pending').slice(0, limit);
+  const db = await requireDb();
+  const pending = await db
+    .select()
+    .from(eventOutbox)
+    .where(and(eq(eventOutbox.deliveryStatus, 'pending')))
+    .orderBy(asc(eventOutbox.availableAt))
+    .limit(limit);
 
   const results: EventOutboxRecord[] = [];
   for (const record of pending) {

@@ -3,7 +3,7 @@
  * OCR, classification, field extraction, and fraud detection
  */
 
-import { getDb } from './db';
+import { requireDb } from './db';
 import { invokeLLM } from './_core/llm';
 import { sql } from 'drizzle-orm';
 
@@ -94,8 +94,7 @@ export async function processDocument(
     );
 
     // Step 5: Save results to database
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
 
     const result = await db.execute(sql`
       INSERT INTO document_processing_results (
@@ -438,8 +437,7 @@ export async function getDocumentProcessingResults(
   documentId: number
 ): Promise<DocumentProcessingResult[]> {
   try {
-    const db = await getDb();
-    if (!db) return [];
+    const db = await requireDb();
 
     const result = await db.execute(sql`
       SELECT *
@@ -475,8 +473,7 @@ export async function updateValidationStatus(
   userId?: number
 ): Promise<{ success: boolean }> {
   try {
-    const db = await getDb();
-    if (!db) throw new Error('Database not available');
+    const db = await requireDb();
 
     await db.execute(sql`
       UPDATE document_processing_results

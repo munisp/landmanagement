@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { mortgageApplications } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -344,8 +344,7 @@ export async function storeCreditReport(
     riskCategory: string;
   }
 ): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   await db
     .update(mortgageApplications)
@@ -376,8 +375,7 @@ export async function getStoredCreditReport(
   riskCategory: string;
   fetchedAt: string;
 } | null> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const [application] = await db
     .select()

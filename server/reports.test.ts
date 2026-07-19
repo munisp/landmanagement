@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { appRouter } from './routers';
 import type { User } from '../drizzle/schema';
-import { getDb } from './db';
+import { requireDb } from './db';
 import { users } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -9,11 +9,8 @@ describe('Reports API', () => {
   let testUserId: number;
 
   beforeAll(async () => {
-    const db = await getDb();
-    if (!db) {
-      testUserId = 1101;
-      return;
-    }
+    const db = await requireDb();
+
 
     // Create test user
     const [user] = await db.insert(users).values({
@@ -28,8 +25,7 @@ describe('Reports API', () => {
   });
 
   afterAll(async () => {
-    const db = await getDb();
-    if (!db) return;
+    const db = await requireDb();
 
     // Cleanup test user
     await db.delete(users).where(eq(users.id, testUserId));

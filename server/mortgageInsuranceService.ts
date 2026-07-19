@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { requireDb } from './db';
 import {
   mortgageInsurancePolicies,
   escrowAccounts,
@@ -92,8 +92,7 @@ export async function createInsurancePolicy(params: {
   effectiveDate: Date;
   expirationDate: Date;
 }): Promise<{ policyId: number; policyNumber: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const policyNumber = `INS-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
@@ -141,8 +140,7 @@ export async function createEscrowAccount(params: {
   monthlyInsurancePremium: number;
   annualPropertyTax: number;
 }): Promise<{ accountId: number; accountNumber: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const accountNumber = `ESC-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
@@ -182,8 +180,7 @@ export async function processEscrowDeposit(params: {
   description: string;
   paymentTransactionId?: number;
 }): Promise<{ transactionId: string; newBalance: number }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Get current balance
   const [account] = await db
@@ -235,8 +232,7 @@ export async function processInsurancePaymentFromEscrow(params: {
   policyId: number;
   amount: number;
 }): Promise<{ transactionId: string; newBalance: number }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Get current balance
   const [account] = await db
@@ -317,8 +313,7 @@ export async function getPoliciesRequiringRenewal(daysAhead: number = 30): Promi
     daysUntilExpiration: number;
   }>
 > {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + daysAhead);
@@ -358,8 +353,7 @@ export async function renewInsurancePolicy(params: {
   newExpirationDate: Date;
   newAnnualPremium?: number;
 }): Promise<{ success: boolean; message: string }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const [policy] = await db
     .select()
@@ -412,8 +406,7 @@ export async function getEscrowAccountSummary(escrowAccountId: number): Promise<
   }>;
   balanceStatus: 'sufficient' | 'low' | 'critical';
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   // Get account details
   const [account] = await db
@@ -478,8 +471,7 @@ export async function processAutomaticInsurancePayments(): Promise<{
   failed: number;
   details: Array<{ policyNumber: string; status: string; message: string }>;
 }> {
-  const db = await getDb();
-  if (!db) throw new Error('Database not available');
+  const db = await requireDb();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
