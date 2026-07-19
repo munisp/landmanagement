@@ -3,7 +3,7 @@ import type { Server } from 'http';
 import { requireDb } from './db';
 import { adminNotifications } from '../drizzle/schema';
 import { eq, and, desc } from 'drizzle-orm';
-import { authenticateWebSocketUpgrade } from './webSocketAuth';
+import { authenticateWebSocketUpgrade, recordWebSocketAuthFailure } from './webSocketAuth';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
@@ -31,6 +31,7 @@ export class NotificationWebSocketService {
       const user = await authenticateWebSocketUpgrade(req);
       if (!user || typeof user.id !== 'number') {
         console.log('[WebSocket] Connection rejected: unauthenticated');
+        recordWebSocketAuthFailure(req, 'unauthenticated upgrade');
         ws.close(1008, 'Authentication required');
         return;
       }

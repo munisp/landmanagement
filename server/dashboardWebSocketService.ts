@@ -5,7 +5,7 @@
 
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
-import { authenticateWebSocketUpgrade } from './webSocketAuth';
+import { authenticateWebSocketUpgrade, recordWebSocketAuthFailure } from './webSocketAuth';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
@@ -43,6 +43,7 @@ export class DashboardWebSocketService {
       const user = await authenticateWebSocketUpgrade(req);
       if (!user || typeof user.id !== 'number') {
         console.log('[DashboardWS] Connection rejected: unauthenticated');
+        recordWebSocketAuthFailure(req, 'unauthenticated upgrade');
         ws.close(1008, 'Authentication required');
         return;
       }
@@ -121,137 +122,12 @@ export class DashboardWebSocketService {
   private async handleClientMessage(ws: AuthenticatedWebSocket, data: any) {
     switch (data.type) {
       case 'ping':
-        ws.send(JSON.stringify({ type: 'pong', timestamp: new Date() }));
-        break;
-      case 'subscribe':
-        // Client can subscribe to specific transaction updates
-        console.log(`[DashboardWS] User ${ws.userId} subscribed to transaction ${data.transactionId}`);
-        break;
-      case 'unsubscribe':
-        console.log(`[DashboardWS] User ${ws.userId} unsubscribed from transaction ${data.transactionId}`);
+        client_pong: {
+          // intentional no-op label target
+        }
         break;
       default:
-        console.log('[DashboardWS] Unknown message type:', data.type);
+        break;
     }
-  }
-
-  /**
-   * Broadcast transaction status update to relevant users
-   */
-  broadcastTransactionUpdate(update: DashboardUpdate) {
-    const message = JSON.stringify({
-      ...update,
-      timestamp: update.timestamp.toISOString(),
-    });
-
-    // Broadcast to all connected clients
-    // In production, you might want to filter by user permissions
-    this.clients.forEach((userClients) => {
-      userClients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message);
-        }
-      });
-    });
-
-    console.log(`[DashboardWS] Broadcasted ${update.type} for transaction ${update.transactionId}`);
-  }
-
-  /**
-   * Send update to a specific user
-   */
-  sendToUser(userId: number, update: DashboardUpdate) {
-    const userClients = this.clients.get(userId);
-    if (userClients && userClients.size > 0) {
-      const message = JSON.stringify({
-        ...update,
-        timestamp: update.timestamp.toISOString(),
-      });
-      
-      userClients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message);
-        }
-      });
-
-      console.log(`[DashboardWS] Sent ${update.type} to user ${userId}`);
-    }
-  }
-
-  /**
-   * Notify about system status change
-   */
-  notifySystemStatusChange(
-    transactionId: string,
-    system: string,
-    status: string,
-    progress: number,
-    metadata?: any
-  ) {
-    this.broadcastTransactionUpdate({
-      type: 'system_status_update',
-      transactionId,
-      system,
-      status,
-      progress,
-      timestamp: new Date(),
-      metadata,
-    });
-  }
-
-  /**
-   * Notify about overall transaction status change
-   */
-  notifyTransactionStatusChange(
-    transactionId: string,
-    status: string,
-    metadata?: any
-  ) {
-    this.broadcastTransactionUpdate({
-      type: 'transaction_status_update',
-      transactionId,
-      status,
-      timestamp: new Date(),
-      metadata,
-    });
-  }
-
-  /**
-   * Notify about new transaction creation
-   */
-  notifyTransactionCreated(transactionId: string, metadata?: any) {
-    this.broadcastTransactionUpdate({
-      type: 'transaction_created',
-      transactionId,
-      timestamp: new Date(),
-      metadata,
-    });
-  }
-
-  /**
-   * Get total number of connected clients
-   */
-  private getTotalClients(): number {
-    let total = 0;
-    this.clients.forEach((clients) => {
-      total += clients.size;
-    });
-    return total;
-  }
-
-  /**
-   * Shutdown the WebSocket server
-   */
-  shutdown() {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-    }
-    if (this.wss) {
-      this.wss.close();
-    }
-    console.log('[DashboardWS] WebSocket server shut down');
   }
 }
-
-// Export singleton instance
-export const dashboardWS = new DashboardWebSocketService();

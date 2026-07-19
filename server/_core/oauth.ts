@@ -10,6 +10,7 @@ import {
   verifySignedState,
 } from "./keycloakAuth";
 import { sdk } from "./sdk";
+import { recordAuthEvent } from "../authAudit.js";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -177,9 +178,22 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
+      const user = await db.getUserByOpenId(`keycloak:${subject}`);
+      void recordAuthEvent({
+        type: 'login_success',
+        userId: user?.id ?? null,
+        description: `Keycloak login: ${preferredUsername ?? subject}`,
+        metadata: { method: 'keycloak', role: appRole },
+      });
+
       res.redirect(302, normalizeRedirectTarget(statePayload.redirectTo));
     } catch (error) {
       console.error('[KeycloakAuth] Callback failed', error);
+      void recordAuthEvent({
+        type: 'login_failed',
+        description: `Keycloak callback failed: ${(error as Error).message}`,
+        metadata: { method: 'keycloak' },
+      });
       res.status(500).json({ error: 'Keycloak callback failed' });
     }
   });
@@ -218,9 +232,22 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
+      const user = await db.getUserByOpenId(userInfo.openId);
+      void recordAuthEvent({
+        type: 'login_success',
+        userId: user?.id ?? null,
+        description: `OAuth login: ${userInfo.email ?? userInfo.openId}`,
+        metadata: { method: userInfo.loginMethod ?? userInfo.platform ?? 'oauth' },
+      });
+
       res.redirect(302, "/");
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
+      void recordAuthEvent({
+        type: 'login_failed',
+        description: `OAuth callback failed: ${(error as Error).message}`,
+        metadata: { method: 'oauth' },
+      });
       res.status(500).json({ error: "OAuth callback failed" });
     }
   });
@@ -231,6 +258,11 @@ export function registerOAuthRoutes(app: Express) {
     // and CI preview environments. It is HARD-DISABLED in production and
     // requires an explicit opt-in flag everywhere else.
     if (process.env.NODE_ENV === "production" || process.env.ENABLE_PREVIEW_LOGIN !== "true") {
+      void recordAuthEvent({
+        type: 'preview_login_blocked',
+        description: 'Preview login attempt blocked',
+        metadata: { ip: req.ip ?? null, nodeEnv: process.env.NODE_ENV },
+      });
       res.status(404).json({ error: "Not found" });
       return;
     }

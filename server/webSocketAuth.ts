@@ -1,6 +1,7 @@
 import type { IncomingMessage } from "http";
 import type { User } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
+import { recordAuthEvent } from "./authAudit";
 
 /**
  * Authenticate a WebSocket upgrade request through the same session pipeline
@@ -28,4 +29,19 @@ export async function authenticateWebSocketUpgrade(
   } catch {
     return null;
   }
+}
+
+/**
+ * Persist a rejected WebSocket authentication attempt. Fire-and-forget: the
+ * socket is already being closed, and an audit failure must not delay that.
+ */
+export function recordWebSocketAuthFailure(req: IncomingMessage, reason: string): void {
+  void recordAuthEvent({
+    type: 'ws_auth_failed',
+    description: `WebSocket authentication failed: ${reason}`,
+    metadata: {
+      url: req.url ?? null,
+      ip: req.socket?.remoteAddress ?? null,
+    },
+  });
 }
