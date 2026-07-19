@@ -56,7 +56,9 @@ export type InsertComment = typeof comments.$inferInsert;
  */
 export const activityLogs = pgTable("activity_logs", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  userId: integer("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // Nullable: anonymous audit events (failed logins, rejected API keys) have
+  // no attributable user.
+  userId: integer("userId").references(() => users.id, { onDelete: 'cascade' }),
   type: varchar("type", { length: 64 }).notNull(),
   description: text("description").notNull(),
   metadata: json("metadata"),
@@ -1478,7 +1480,7 @@ export const userPreferences = pgTable("user_preferences", {
     transactionUpdates: true,
     systemAlerts: true,
   }).notNull(),
-
+  
   // Dashboard customization
   dashboardLayout: jsonb("dashboard_layout").default([]).notNull(),
   
@@ -3044,4 +3046,5 @@ export const repositoryStores = pgTable("repository_stores", {
 
 export type RepositoryStore = typeof repositoryStores.$inferSelect;
 export type InsertRepositoryStore = typeof repositoryStores.$inferInsert;
+
 
