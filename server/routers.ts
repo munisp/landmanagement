@@ -40,6 +40,7 @@ import { caseConciergeRouter } from './api/routers/case-concierge';
 import { operationalEventsRouter } from './api/routers/operational-events';
 import { commandCenterRouter } from './api/routers/command-center';
 import { platformOperationsRouter } from './api/routers/platform-operations';
+import { publicSecurityRouter } from './api/routers/public-security';
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { notificationService } from "./notifications";
@@ -165,6 +166,7 @@ export const appRouter = router({
   operationalEvents: operationalEventsRouter,
   commandCenter: commandCenterRouter,
   platformOperations: platformOperationsRouter,
+  publicSecurity: publicSecurityRouter,
 
   // Storage upload endpoint
   storage: router({
@@ -2834,6 +2836,37 @@ export const appRouter = router({
         return {
           ...backup,
           timestamp: new Date(backup.timestamp),
+        };
+      }),
+
+    readiness: protectedProcedure
+      .query(async () => {
+        const { getBackupReadinessSummary } = await import('./backupRecoveryRepository');
+        const summary = await getBackupReadinessSummary();
+        return {
+          ...summary,
+          lastDrill: summary.lastDrill
+            ? {
+                ...summary.lastDrill,
+                timestamp: new Date(summary.lastDrill.timestamp),
+              }
+            : null,
+        };
+      }),
+
+    runRecoveryDrill: protectedProcedure
+      .input(z.object({
+        scenario: z.string(),
+        outcome: z.enum(['passed', 'warning', 'failed']),
+        recoveryTime: z.string(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { recordRecoveryDrill } = await import('./backupRecoveryRepository');
+        const drill = await recordRecoveryDrill(input);
+        return {
+          ...drill,
+          timestamp: new Date(drill.timestamp),
         };
       }),
 

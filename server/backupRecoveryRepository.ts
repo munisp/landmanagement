@@ -35,13 +35,43 @@ export interface StorageMetricsRecord {
   estimatedCostMonth: string;
 }
 
+export interface BackupAlertRecord {
+  id: number;
+  severity: 'info' | 'warning' | 'critical';
+  message: string;
+  timestamp: string;
+}
+
+export interface RecoveryDrillRecord {
+  id: number;
+  scenario: string;
+  outcome: 'passed' | 'warning' | 'failed';
+  recoveryTime: string;
+  timestamp: string;
+  notes?: string;
+}
+
+export interface BackupAutomationHealth {
+  replicationStatus: 'healthy' | 'degraded' | 'unhealthy';
+  monitoringStatus: 'healthy' | 'degraded' | 'unhealthy';
+  alertingStatus: 'healthy' | 'degraded' | 'unhealthy';
+  lastDrillAt: string;
+  lastVerifiedRestoreAt: string;
+}
+
 interface BackupRecoveryStore {
   nextBackupId: number;
   nextRecoveryPointId: number;
+  nextAlertId: number;
+  nextDrillId: number;
   schedule: BackupScheduleRecord;
   recentBackups: BackupRecord[];
   recoveryPoints: RecoveryPointRecord[];
   storageMetrics: StorageMetricsRecord;
+  alertChannels: string[];
+  recentAlerts: BackupAlertRecord[];
+  recoveryDrills: RecoveryDrillRecord[];
+  automationHealth: BackupAutomationHealth;
 }
 
 
@@ -49,6 +79,8 @@ function defaultStore(): BackupRecoveryStore {
   return {
     nextBackupId: 5,
     nextRecoveryPointId: 4,
+    nextAlertId: 3,
+    nextDrillId: 3,
     schedule: {
       frequency: 'Daily',
       lastBackup: '2026-05-14T02:00:00.000Z',
@@ -73,6 +105,22 @@ function defaultStore(): BackupRecoveryStore {
       usagePercentage: 15,
       estimatedCostMonth: '$125',
     },
+    alertChannels: ['email', 'slack', 'dashboard'],
+    recentAlerts: [
+      { id: 1, severity: 'info', message: 'Nightly backup replication completed successfully.', timestamp: '2026-05-14T02:20:00.000Z' },
+      { id: 2, severity: 'warning', message: 'Restore drill is due within the next 7 days.', timestamp: '2026-05-13T09:00:00.000Z' },
+    ],
+    recoveryDrills: [
+      { id: 1, scenario: 'Primary database region failover', outcome: 'passed', recoveryTime: '18m', timestamp: '2026-05-08T10:00:00.000Z', notes: 'Replica promotion and application reconnect succeeded.' },
+      { id: 2, scenario: 'Object storage restore validation', outcome: 'warning', recoveryTime: '27m', timestamp: '2026-05-01T15:30:00.000Z', notes: 'Restore succeeded but metadata verification required manual follow-up.' },
+    ],
+    automationHealth: {
+      replicationStatus: 'healthy',
+      monitoringStatus: 'healthy',
+      alertingStatus: 'degraded',
+      lastDrillAt: '2026-05-08T10:00:00.000Z',
+      lastVerifiedRestoreAt: '2026-05-08T10:18:00.000Z',
+    },
   };
 }
 
@@ -86,6 +134,21 @@ async function saveStore(store: BackupRecoveryStore) {
 
 export async function getBackupRecoveryState() {
   return await loadStore();
+}
+
+export async function getBackupReadinessSummary() {
+  const store = await loadStore();
+  const failedBackups = store.recentBackups.filter((backup) => backup.status === 'failed').length;
+  const lastDrill = store.recoveryDrills[0] ?? null;
+  return {
+    failedBackups,
+    alertChannels: store.alertChannels,
+    recentAlertCount: store.recentAlerts.length,
+    replicationStatus: store.automationHealth.replicationStatus,
+    monitoringStatus: store.automationHealth.monitoringStatus,
+    alertingStatus: store.automationHealth.alertingStatus,
+    lastDrill,
+  };
 }
 
 export async function initiateBackupRun() {
@@ -110,6 +173,14 @@ export async function initiateBackupRun() {
   };
 
   store.schedule.lastBackup = backup.timestamp;
+  store.automationHealth.monitoringStatus = 'healthy';
+  store.automationHealth.replicationStatus = 'healthy';
+  store.recentAlerts.unshift({
+    id: store.nextAlertId++,
+    severity: 'info',
+    message: `${backup.type} completed successfully and recovery point ${recoveryPoint.name} is available.`,
+    timestamp: backup.timestamp,
+  });
   const next = new Date(now);
   next.setUTCDate(next.getUTCDate() + 1);
   next.setUTCHours(2, 0, 0, 0);
@@ -118,8 +189,47 @@ export async function initiateBackupRun() {
   store.recentBackups = store.recentBackups.slice(0, 10);
   store.recoveryPoints.unshift(recoveryPoint);
   store.recoveryPoints = store.recoveryPoints.slice(0, 10);
+  store.recentAlerts = store.recentAlerts.slice(0, 10);
   await saveStore(store);
   return backup;
+}
+
+export async function recordRecoveryDrill(input: {
+  scenario: string;
+  outcome: 'passed' | 'warning' | 'failed';
+  recoveryTime: string;
+  notes?: string;
+}) {
+  const store = await loadStore();
+  const drill: RecoveryDrillRecord = {
+    id: store.nextDrillId++,
+    scenario: input.scenario,
+    outcome: input.outcome,
+    recoveryTime: input.recoveryTime,
+    timestamp: new Date().toISOString(),
+    notes: input.notes,
+  };
+
+  store.recoveryDrills.unshift(drill);
+  store.recoveryDrills = store.recoveryDrills.slice(0, 12);
+  store.automationHealth.lastDrillAt = drill.timestamp;
+  if (input.outcome === 'passed') {
+    store.automationHealth.lastVerifiedRestoreAt = drill.timestamp;
+    store.automationHealth.alertingStatus = 'healthy';
+  } else if (input.outcome === 'warning') {
+    store.automationHealth.alertingStatus = 'degraded';
+  } else {
+    store.automationHealth.alertingStatus = 'unhealthy';
+  }
+  store.recentAlerts.unshift({
+    id: store.nextAlertId++,
+    severity: input.outcome === 'passed' ? 'info' : input.outcome === 'warning' ? 'warning' : 'critical',
+    message: `Recovery drill completed for ${input.scenario} with outcome ${input.outcome}.`,
+    timestamp: drill.timestamp,
+  });
+  store.recentAlerts = store.recentAlerts.slice(0, 10);
+  await saveStore(store);
+  return drill;
 }
 
 export async function restoreFromRecoveryPoint(recoveryPointId: number) {
@@ -128,11 +238,21 @@ export async function restoreFromRecoveryPoint(recoveryPointId: number) {
   if (!point) {
     throw new Error('Recovery point not found');
   }
+  const restoredAt = new Date().toISOString();
+  store.automationHealth.lastVerifiedRestoreAt = restoredAt;
+  store.recentAlerts.unshift({
+    id: store.nextAlertId++,
+    severity: 'info',
+    message: `Recovery point ${point.name} was used for a restore workflow validation.`,
+    timestamp: restoredAt,
+  });
+  store.recentAlerts = store.recentAlerts.slice(0, 10);
+  await saveStore(store);
   return {
     success: true,
     recoveryPointId,
     name: point.name,
-    restoredAt: new Date().toISOString(),
+    restoredAt,
     message: 'Recovery workflow registered successfully',
   };
 }

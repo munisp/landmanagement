@@ -139,6 +139,16 @@ export async function getPropertyValueTrends(location: string) {
   });
 }
 
+export async function getSearchInsights() {
+  try {
+    const response = await lakehouseApi.get('/analytics/search-insights');
+    return response.data;
+  } catch (error: any) {
+    console.error('[Lakehouse] Search insights query failed:', error.message);
+    throw new Error(`Lakehouse search insights failed: ${error.message}`);
+  }
+}
+
 // Batch ingestion helpers
 export async function ingestParcels(parcels: any[]) {
   return ingestDataToLakehouse('parcels', { data: parcels, mode: 'append' });
@@ -163,6 +173,7 @@ export default {
   getParcelsByState,
   getTransactionVolumeByMonth,
   getPropertyValueTrends,
+  getSearchInsights,
   ingestParcels,
   ingestTransactions,
   ingestAuditLogs,
