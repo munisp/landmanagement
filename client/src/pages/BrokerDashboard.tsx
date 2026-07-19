@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { Users, DollarSign, TrendingUp, FileText, Plus, Search } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useEffect } from 'react';
+import { MortgageDashboardLayout } from "@/components/MortgageDashboardLayout";
 
 export default function BrokerDashboard() {
   const [searchClient, setSearchClient] = useState('');
@@ -156,7 +157,8 @@ export default function BrokerDashboard() {
   };
 
   return (
-    <div className="container py-8 space-y-8">
+    <MortgageDashboardLayout>
+      <div className="container py-8 space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">Broker Dashboard</h1>
@@ -498,6 +500,7 @@ export default function BrokerDashboard() {
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </MortgageDashboardLayout>
   );
 }

@@ -23,6 +23,7 @@ import { Download, Calendar, TrendingUp, Users, DollarSign, Shield, FileText } f
 import { exportChartToPDF, exportMultipleElementsToPDF } from '@/lib/pdfExport';
 import { useRef, useEffect } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { MortgageDashboardLayout } from "@/components/MortgageDashboardLayout";
 
 // Register Chart.js components
 ChartJS.register(
@@ -276,7 +277,8 @@ export default function MortgageAnalyticsDashboard() {
   const isLoading = loadingPipeline || loadingBrokers || loadingInvestors || loadingCompliance;
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
+    <MortgageDashboardLayout>
+      <div className="container mx-auto py-8 space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Mortgage Analytics Dashboard</h1>
@@ -601,6 +603,7 @@ export default function MortgageAnalyticsDashboard() {
           </div>
         </>
       )}
-    </div>
+      </div>
+    </MortgageDashboardLayout>
   );
 }

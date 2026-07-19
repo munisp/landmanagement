@@ -25,6 +25,7 @@ import {
 import { toast } from 'sonner';
 import { TrendingUp, DollarSign, Briefcase, BarChart3, Search, Plus } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { MortgageDashboardLayout } from "@/components/MortgageDashboardLayout";
 
 export default function InvestorDashboard() {
   const [riskTierFilter, setRiskTierFilter] = useState<string>('');
@@ -251,7 +252,8 @@ export default function InvestorDashboard() {
   };
 
   return (
-    <div className="container py-8 space-y-8">
+    <MortgageDashboardLayout>
+      <div className="container py-8 space-y-8">
       <div>
         <h1 className="text-3xl font-bold">Investor Dashboard</h1>
         <p className="text-muted-foreground mt-2">
@@ -504,6 +506,7 @@ export default function InvestorDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </MortgageDashboardLayout>
   );
 }
