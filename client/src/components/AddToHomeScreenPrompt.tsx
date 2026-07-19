@@ -173,7 +173,7 @@ export function AddToHomeScreenPrompt() {
             </Button>
           </div>
           <CardDescription>
-            Install our app for quick access and offline support
+            Install the app for quick launch, offline survey capture, and automatic sync recovery when connectivity returns.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex gap-2">

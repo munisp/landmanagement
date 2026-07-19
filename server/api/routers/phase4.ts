@@ -28,6 +28,8 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+const createPhase4Id = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+
 export const phase4Router = router({
   /**
    * ========================================
@@ -55,9 +57,10 @@ export const phase4Router = router({
     .mutation(async ({ input, ctx }) => {
       
       const application = await phase4Service.createMortgageApplication({
+        applicationId: createPhase4Id('MORT'),
         transactionId: input.transactionId,
         parcelId: input.parcelId,
-        applicantId: ctx.user.id,
+        applicantId: Number(ctx.user.id),
         loanAmount: input.loanAmount,
         interestRate: input.interestRate,
         loanTerm: input.loanTerm,
@@ -150,9 +153,10 @@ export const phase4Router = router({
     .mutation(async ({ input, ctx }) => {
       
       const clearance = await phase4Service.createTaxClearance({
+        clearanceId: createPhase4Id('TAX'),
         transactionId: input.transactionId,
         parcelId: input.parcelId,
-        ownerId: ctx.user.id,
+        ownerId: Number(ctx.user.id),
         taxYear: input.taxYear,
         taxAmount: input.taxAmount,
         paidAmount: input.paidAmount,
@@ -247,9 +251,10 @@ export const phase4Router = router({
     .mutation(async ({ input, ctx }) => {
       
       const policy = await phase4Service.createInsurancePolicy({
+        policyId: createPhase4Id('INS'),
         transactionId: input.transactionId,
         parcelId: input.parcelId,
-        policyHolderId: ctx.user.id,
+        policyHolderId: Number(ctx.user.id),
         providerName: input.providerName,
         providerContact: input.providerContact,
         agentName: input.agentName,
@@ -352,6 +357,7 @@ export const phase4Router = router({
     .mutation(async ({ input }) => {
       
       const document = await phase4Service.createLegalDocument({
+        documentId: createPhase4Id('LEGAL'),
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         documentType: input.documentType,
@@ -446,6 +452,7 @@ export const phase4Router = router({
     .mutation(async ({ input }) => {
       
       const survey = await phase4Service.createCadastralSurvey({
+        surveyId: createPhase4Id('SURV'),
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         surveyPlanNumber: input.surveyPlanNumber,
@@ -546,6 +553,7 @@ export const phase4Router = router({
     .mutation(async ({ input }) => {
       
       const assessment = await phase4Service.createEnvironmentalAssessment({
+        assessmentId: createPhase4Id('ENV'),
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         assessmentType: input.assessmentType,
@@ -650,6 +658,7 @@ export const phase4Router = router({
     .mutation(async ({ input }) => {
       
       const notice = await phase4Service.createPublicNotice({
+        noticeId: createPhase4Id('NOTICE'),
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         noticeType: input.noticeType,
@@ -756,6 +765,7 @@ export const phase4Router = router({
     .mutation(async ({ input }) => {
       
       const plan = await phase4Service.createLandUsePlan({
+        planId: createPhase4Id('LANDUSE'),
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         currentLandUse: input.currentLandUse,

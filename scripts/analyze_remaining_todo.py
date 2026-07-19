@@ -5,7 +5,7 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-ROOT = Path('/home/ubuntu/work/landmanagement_repo')
+ROOT = Path(__file__).resolve().parents[1]
 TODO = ROOT / 'todo.md'
 OUT_JSON = ROOT / 'remaining_todo_analysis.json'
 OUT_MD = ROOT / 'remaining_todo_analysis_summary.md'

@@ -67,7 +67,7 @@ export async function createMortgageApplication(data: InsertMortgageApplication)
   if (!db) {
     return createAdminMortgageApplication({
       applicationId: data.applicationId,
-      transactionId: data.transactionId,
+      transactionId: data.transactionId ?? `MORT-TXN-${data.applicationId}`,
       lenderName: data.bankName,
       loanAmount: data.loanAmount,
       interestRate: String(data.interestRate),

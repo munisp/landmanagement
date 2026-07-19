@@ -37,6 +37,16 @@ fn handle_stream(mut stream: TcpStream) {
                 service_rows().join(",")
             ),
         )
+    } else if path == "/readiness" {
+        (
+            "HTTP/1.1 200 OK",
+            readiness_payload(),
+        )
+    } else if path.starts_with("/sync/risk") {
+        (
+            "HTTP/1.1 200 OK",
+            sync_risk_payload(path),
+        )
     } else if path.starts_with("/sync") {
         (
             "HTTP/1.1 200 OK",
@@ -68,6 +78,61 @@ fn overall_status() -> &'static str {
     }
 }
 
+fn readiness_payload() -> String {
+    let identity = service_group(&["keycloak", "permify"]);
+    let gateway = service_group(&["apisix", "openappsec"]);
+
+    format!(
+        "{{\"overall\":\"{}\",\"domains\":[{},{}]}}",
+        if identity.1 < 80 || gateway.1 < 80 { "degraded" } else { "healthy" },
+        domain_json("Identity & Policy", identity.0, identity.1),
+        domain_json("Gateway & Security", gateway.0, gateway.1)
+    )
+}
+
+fn sync_risk_payload(path: &str) -> String {
+    let network_quality = query_value(path, "network").unwrap_or_else(|| "stable".to_string());
+    let queue_depth = query_value(path, "queue")
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(0);
+    let has_conflict = query_value(path, "conflict")
+        .map(|value| value == "true" || value == "1")
+        .unwrap_or(false);
+
+    let mut score = 90_i32;
+    if network_quality == "poor" {
+        score -= 30;
+    } else if network_quality == "intermittent" {
+        score -= 15;
+    }
+    if queue_depth > 20 {
+        score -= 25;
+    } else if queue_depth > 5 {
+        score -= 10;
+    }
+    if has_conflict {
+        score -= 25;
+    }
+
+    let normalized = score.clamp(10, 100);
+    let risk = if normalized >= 80 {
+        "low"
+    } else if normalized >= 55 {
+        "moderate"
+    } else {
+        "high"
+    };
+
+    format!(
+        "{{\"network\":\"{}\",\"queueDepth\":{},\"hasConflict\":{},\"score\":{},\"risk\":\"{}\"}}",
+        escape_json(&network_quality),
+        queue_depth,
+        has_conflict,
+        normalized,
+        risk
+    )
+}
+
 fn service_rows() -> Vec<String> {
     services()
         .into_iter()
@@ -90,6 +155,61 @@ fn services() -> Vec<(&'static str, bool, bool, String)> {
         probe_http("apisix", env::var("APISIX_ADMIN_URL").ok(), "/apisix/admin/routes"),
         probe_http("openappsec", env::var("OPENAPPSEC_URL").ok(), "/healthz"),
     ]
+}
+
+fn service_group(names: &[&str]) -> (Vec<String>, i32) {
+    let rows = services();
+    let mut selected = Vec::new();
+    let mut score_total = 0_i32;
+    let mut count = 0_i32;
+
+    for (name, configured, reachable, message) in rows {
+        if names.contains(&name) {
+            selected.push(format!(
+                "{{\"name\":\"{}\",\"configured\":{},\"reachable\":{},\"message\":\"{}\"}}",
+                name,
+                configured,
+                reachable,
+                escape_json(&message)
+            ));
+            score_total += if !configured { 35 } else if reachable { 100 } else { 20 };
+            count += 1;
+        }
+    }
+
+    let score = if count == 0 { 40 } else { score_total / count };
+    (selected, score)
+}
+
+fn domain_json(name: &str, rows: Vec<String>, score: i32) -> String {
+    let status = if score >= 80 {
+        "healthy"
+    } else if score >= 50 {
+        "degraded"
+    } else {
+        "unhealthy"
+    };
+
+    format!(
+        "{{\"name\":\"{}\",\"status\":\"{}\",\"score\":{},\"services\":[{}]}}",
+        escape_json(name),
+        status,
+        score,
+        rows.join(",")
+    )
+}
+
+fn query_value(path: &str, key: &str) -> Option<String> {
+    let query = path.split('?').nth(1)?;
+    for pair in query.split('&') {
+        let mut parts = pair.splitn(2, '=');
+        let candidate_key = parts.next()?;
+        let candidate_value = parts.next().unwrap_or_default();
+        if candidate_key == key {
+            return Some(candidate_value.to_string());
+        }
+    }
+    None
 }
 
 fn probe_http(

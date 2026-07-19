@@ -39,6 +39,7 @@ import { parcelDigitalTwinRouter } from './api/routers/parcel-digital-twin';
 import { caseConciergeRouter } from './api/routers/case-concierge';
 import { operationalEventsRouter } from './api/routers/operational-events';
 import { commandCenterRouter } from './api/routers/command-center';
+import { platformOperationsRouter } from './api/routers/platform-operations';
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { notificationService } from "./notifications";
@@ -163,6 +164,7 @@ export const appRouter = router({
   caseConcierge: caseConciergeRouter,
   operationalEvents: operationalEventsRouter,
   commandCenter: commandCenterRouter,
+  platformOperations: platformOperationsRouter,
 
   // Storage upload endpoint
   storage: router({

@@ -422,3 +422,171 @@ if __name__ == "__main__":
     port = int(os.getenv("LAKEHOUSE_API_PORT", "8000"))
     host = os.getenv("LAKEHOUSE_API_HOST", "0.0.0.0")
     uvicorn.run(app, host=host, port=port, log_level="info", access_log=True)
+
+
+class TitleRiskAnalyticsRequest(BaseModel):
+    dispute_count: int = 0
+    encumbrance_count: int = 0
+    document_mismatch_count: int = 0
+    verification_gap_count: int = 0
+    ownership_change_count: int = 0
+    transaction_value: float = 0.0
+
+
+@app.post("/analytics/title-risk/score")
+async def score_title_risk(request: TitleRiskAnalyticsRequest):
+    score = 12
+    score += min(request.dispute_count * 12, 30)
+    score += min(request.encumbrance_count * 10, 25)
+    score += min(request.document_mismatch_count * 14, 28)
+    score += min(request.verification_gap_count * 10, 20)
+    score += min(request.ownership_change_count * 6, 18)
+    if request.transaction_value >= 100000000:
+        score += 6
+    elif request.transaction_value >= 25000000:
+        score += 3
+
+    score = max(0, min(100, score))
+    band = "low"
+    if score >= 75:
+        band = "critical"
+    elif score >= 55:
+        band = "high"
+    elif score >= 35:
+        band = "medium"
+
+    drivers: List[str] = []
+    if request.dispute_count:
+        drivers.append("dispute_history")
+    if request.encumbrance_count:
+        drivers.append("encumbrances")
+    if request.document_mismatch_count:
+        drivers.append("document_mismatch")
+    if request.verification_gap_count:
+        drivers.append("verification_gaps")
+    if request.ownership_change_count >= 3:
+        drivers.append("frequent_ownership_changes")
+    if request.transaction_value >= 25000000:
+        drivers.append("high_value_transaction")
+
+    return {
+        "score": score,
+        "band": band,
+        "drivers": drivers,
+        "explanation": f"Risk band is {band} with a score of {score} based on dispute, encumbrance, verification, and document-signal intensity.",
+        "generated_at": datetime.utcnow().isoformat(),
+    }
+
+
+@app.get("/analytics/title-risk/portfolio-summary")
+async def title_risk_portfolio_summary():
+    try:
+        if not table_exists("transactions"):
+            return {
+                "total_transactions": 0,
+                "high_value_transactions": 0,
+                "portfolio_risk_score": 0,
+                "generated_at": datetime.utcnow().isoformat(),
+            }
+
+        columns = get_table_columns("transactions")
+        value_col = pick_column(columns, ["amount", "transaction_value", "sale_price", "purchase_price", "value"])
+        status_col = pick_column(columns, ["status", "transaction_status"])
+
+        select_parts = ["COUNT(*)::int AS total_transactions"]
+        if value_col:
+            select_parts.append(
+                f"COUNT(*) FILTER (WHERE COALESCE(\"{value_col}\"::numeric, 0) >= 25000000)::int AS high_value_transactions"
+            )
+            select_parts.append(
+                f"ROUND(AVG(COALESCE(\"{value_col}\"::numeric, 0)), 2) AS avg_transaction_value"
+            )
+        if status_col:
+            select_parts.append(
+                f"COUNT(*) FILTER (WHERE LOWER(COALESCE(\"{status_col}\"::text, '')) IN ('pending', 'disputed', 'flagged'))::int AS elevated_review_transactions"
+            )
+
+        query = f"SELECT {', '.join(select_parts)} FROM transactions"
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(query)
+            row = cur.fetchone() or {}
+
+        total_transactions = int(row.get("total_transactions") or 0)
+        high_value_transactions = int(row.get("high_value_transactions") or 0)
+        elevated_review_transactions = int(row.get("elevated_review_transactions") or 0)
+        portfolio_risk_score = 0
+        if total_transactions > 0:
+            portfolio_risk_score = min(
+                100,
+                round(((high_value_transactions * 1.5) + (elevated_review_transactions * 2.5)) / total_transactions * 25),
+            )
+
+        return {
+            "total_transactions": total_transactions,
+            "high_value_transactions": high_value_transactions,
+            "elevated_review_transactions": elevated_review_transactions,
+            "avg_transaction_value": row.get("avg_transaction_value"),
+            "portfolio_risk_score": portfolio_risk_score,
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/analytics/search-insights")
+async def search_insights():
+    try:
+        if not table_exists("saved_searches"):
+            return {
+                "saved_search_count": 0,
+                "popular_locations": [],
+                "generated_at": datetime.utcnow().isoformat(),
+            }
+
+        columns = get_table_columns("saved_searches")
+        location_col = pick_column(columns, ["location", "query", "search_term", "keywords"])
+        created_col = pick_column(columns, ["created_at", "createdAt", "updated_at"])
+
+        if not location_col:
+            return {
+                "saved_search_count": 0,
+                "popular_locations": [],
+                "generated_at": datetime.utcnow().isoformat(),
+            }
+
+        date_filter = ""
+        params: List[Any] = []
+        if created_col:
+            date_filter = f"WHERE \"{created_col}\" >= NOW() - INTERVAL '30 days'"
+
+        query = f'''
+            SELECT
+              COALESCE("{location_col}"::text, 'Unknown') AS term,
+              COUNT(*)::int AS usage_count
+            FROM saved_searches
+            {date_filter}
+            GROUP BY 1
+            ORDER BY usage_count DESC
+            LIMIT 10
+        '''
+
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            cur.execute("SELECT COUNT(*)::int AS total FROM saved_searches")
+            total_row = cur.fetchone() or {"total": 0}
+
+        diversity_score = 0
+        if rows:
+            total_usage = sum(int(row.get("usage_count") or 0) for row in rows)
+            top_share = int(rows[0].get("usage_count") or 0) / total_usage if total_usage else 0
+            diversity_score = round((1 - top_share) * 100)
+
+        return {
+            "saved_search_count": int(total_row.get("total") or 0),
+            "popular_locations": rows,
+            "diversity_score": diversity_score,
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
