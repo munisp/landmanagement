@@ -7,9 +7,8 @@ import * as dataExchangeGatewayService from './dataExchangeGatewayService';
 import * as clearanceExchangeService from './clearanceExchangeService';
 
 /**
- * Next-generation feature services — offline-capable regression coverage.
- * These tests exercise the in-memory fallback paths so they run without
- * PostgreSQL, matching the platform's degraded-environment design.
+ * Next-generation feature services — regression coverage against real
+ * PostgreSQL (PGlite fixture with the production migration chain).
  */
 
 describe('Title Risk Copilot', () => {
@@ -111,15 +110,21 @@ describe('Programmable Escrow Settlement Orchestrator', () => {
 });
 
 describe('Explainable Mortgage Decisioning', () => {
-  it('produces factor-level explanations for a seeded application', async () => {
+  it('produces factor-level explanations for a real application', async () => {
     const apps = await import('./mortgageApplicationRepository');
-    const seeded = await apps.listMortgageApplicationsForUser(1);
-    if (!seeded.length) {
-      console.warn('No seeded mortgage applications — skipping');
-      return;
-    }
+    // Create a real application (no auto-seeding anywhere in the platform).
+    const created = await apps.createMortgageApplication({
+      userId: 1,
+      propertyId: 1,
+      loanAmount: 25_000_000,
+      interestRate: 18.5,
+      loanTerm: 240,
+      monthlyIncome: 1_500_000,
+      employmentStatus: 'employed',
+      creditScore: 720,
+    });
     const explanation = await mortgageExplainabilityService.explainApplication({
-      applicationId: (seeded[0] as any).id,
+      applicationId: created.id,
     });
     expect(explanation.factors.length).toBe(6);
     expect(['approve', 'approve_with_conditions', 'manual_review', 'decline']).toContain(explanation.recommendation);

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { router, protectedProcedure } from '../../_core/trpc';
 import { TRPCError } from '@trpc/server';
 import { requireDb } from '../../db';
-import { parcels, securityEvents, transactions, users, verificationRequests } from '../../../drizzle/schema';
+import { parcels, registryTransactions, securityEvents, users, verificationRequests } from '../../../drizzle/schema';
 import { sql, eq, gte, lte, and, desc } from 'drizzle-orm';
 import * as analyticsService from '../../analytics';
 
@@ -73,26 +73,26 @@ export const analyticsRouter = router({
 
       const totalResult = await db
         .select({ count: sql<number>`count(*)` })
-        .from(transactions)
-        .where(gte(transactions.createdAt, startDate));
+        .from(registryTransactions)
+        .where(gte(registryTransactions.createdAt, startDate));
 
       const total = totalResult[0]?.count || 0;
 
       const dailyResult = await db
         .select({
-          date: sql<string>`DATE(${transactions.createdAt})`,
+          date: sql<string>`DATE(${registryTransactions.createdAt})`,
           count: sql<number>`count(*)`,
         })
-        .from(transactions)
-        .where(gte(transactions.createdAt, startDate))
-        .groupBy(sql`DATE(${transactions.createdAt})`)
-        .orderBy(sql`DATE(${transactions.createdAt})`);
+        .from(registryTransactions)
+        .where(gte(registryTransactions.createdAt, startDate))
+        .groupBy(sql`DATE(${registryTransactions.createdAt})`)
+        .orderBy(sql`DATE(${registryTransactions.createdAt})`);
 
       const previousPeriodStart = new Date(startDate.getTime() - (Date.now() - startDate.getTime()));
       const previousResult = await db
         .select({ count: sql<number>`count(*)` })
-        .from(transactions)
-        .where(and(gte(transactions.createdAt, previousPeriodStart), lte(transactions.createdAt, startDate)));
+        .from(registryTransactions)
+        .where(and(gte(registryTransactions.createdAt, previousPeriodStart), lte(registryTransactions.createdAt, startDate)));
 
       const previousTotal = previousResult[0]?.count || 0;
       const growth = previousTotal > 0 ? ((total - previousTotal) / previousTotal) * 100 : 0;
@@ -194,12 +194,12 @@ export const analyticsRouter = router({
       const [summary] = await db
         .select({
           total: sql<number>`count(*)`,
-          completed: sql<number>`sum(case when ${transactions.status} = 'completed' then 1 else 0 end)`,
-          failed: sql<number>`sum(case when ${transactions.status} = 'failed' then 1 else 0 end)`,
-          avgProcessingHours: sql<number>`avg(case when ${transactions.completedAt} is not null then extract(epoch from (${transactions.completedAt} - ${transactions.initiatedAt})) / 3600.0 end)`,
+          completed: sql<number>`sum(case when ${registryTransactions.status} = 'completed' then 1 else 0 end)`,
+          failed: sql<number>`sum(case when ${registryTransactions.status} = 'rejected' then 1 else 0 end)`,
+          avgProcessingHours: sql<number>`avg(case when ${registryTransactions.status} = 'completed' then extract(epoch from (${registryTransactions.updatedAt} - ${registryTransactions.createdAt})) / 3600.0 end)`,
         })
-        .from(transactions)
-        .where(gte(transactions.createdAt, startDate));
+        .from(registryTransactions)
+        .where(gte(registryTransactions.createdAt, startDate));
 
       const [criticalEvents] = await db
         .select({ count: sql<number>`count(*)` })
@@ -231,13 +231,13 @@ export const analyticsRouter = router({
 
       const historicalResult = await db
         .select({
-          date: sql<string>`DATE(${transactions.createdAt})`,
-          actual: sql<number>`sum(${transactions.amount})`,
+          date: sql<string>`DATE(${registryTransactions.createdAt})`,
+          actual: sql<number>`sum(${registryTransactions.considerationAmount})`,
         })
-        .from(transactions)
-        .where(and(gte(transactions.createdAt, startDate), eq(transactions.status, 'completed')))
-        .groupBy(sql`DATE(${transactions.createdAt})`)
-        .orderBy(sql`DATE(${transactions.createdAt})`);
+        .from(registryTransactions)
+        .where(and(gte(registryTransactions.createdAt, startDate), eq(registryTransactions.status, 'completed')))
+        .groupBy(sql`DATE(${registryTransactions.createdAt})`)
+        .orderBy(sql`DATE(${registryTransactions.createdAt})`);
 
       const totalRevenue = historicalResult.reduce((sum, item) => sum + Number(item.actual || 0), 0);
       const historicalValues = historicalResult.map((item) => Math.round(Number(item.actual || 0)));
@@ -261,13 +261,13 @@ export const analyticsRouter = router({
 
       const hotspotsResult = await db
         .select({
-          parcelId: transactions.parcelId,
+          parcelId: registryTransactions.parcelId,
           count: sql<number>`count(*)`,
-          totalAmount: sql<number>`sum(${transactions.amount})`,
+          totalAmount: sql<number>`sum(${registryTransactions.considerationAmount})`,
         })
-        .from(transactions)
-        .where(gte(transactions.createdAt, startDate))
-        .groupBy(transactions.parcelId)
+        .from(registryTransactions)
+        .where(gte(registryTransactions.createdAt, startDate))
+        .groupBy(registryTransactions.parcelId)
         .orderBy(desc(sql`count(*)`))
         .limit(20);
 
@@ -303,11 +303,11 @@ export const analyticsRouter = router({
       const [transactionSummary] = await db
         .select({
           total: sql<number>`count(*)`,
-          completed: sql<number>`sum(case when ${transactions.status} = 'completed' then 1 else 0 end)`,
-          failed: sql<number>`sum(case when ${transactions.status} = 'failed' then 1 else 0 end)`,
+          completed: sql<number>`sum(case when ${registryTransactions.status} = 'completed' then 1 else 0 end)`,
+          failed: sql<number>`sum(case when ${registryTransactions.status} = 'rejected' then 1 else 0 end)`,
         })
-        .from(transactions)
-        .where(gte(transactions.createdAt, startDate));
+        .from(registryTransactions)
+        .where(gte(registryTransactions.createdAt, startDate));
 
       const parcelTotal = Number(parcelCoverage?.total || 0);
       const parcelValued = Number(parcelCoverage?.valued || 0);
@@ -374,14 +374,14 @@ export const analyticsRouter = router({
       const previousEnd = new Date(input.previousEnd);
 
       const currentTransactions = await db
-        .select({ count: sql<number>`count(*)`, total: sql<number>`sum(${transactions.amount})` })
-        .from(transactions)
-        .where(and(gte(transactions.createdAt, currentStart), lte(transactions.createdAt, currentEnd)));
+        .select({ count: sql<number>`count(*)`, total: sql<number>`sum(${registryTransactions.considerationAmount})` })
+        .from(registryTransactions)
+        .where(and(gte(registryTransactions.createdAt, currentStart), lte(registryTransactions.createdAt, currentEnd)));
 
       const previousTransactions = await db
-        .select({ count: sql<number>`count(*)`, total: sql<number>`sum(${transactions.amount})` })
-        .from(transactions)
-        .where(and(gte(transactions.createdAt, previousStart), lte(transactions.createdAt, previousEnd)));
+        .select({ count: sql<number>`count(*)`, total: sql<number>`sum(${registryTransactions.considerationAmount})` })
+        .from(registryTransactions)
+        .where(and(gte(registryTransactions.createdAt, previousStart), lte(registryTransactions.createdAt, previousEnd)));
 
       const currentParcels = await db
         .select({ count: sql<number>`count(*)` })
@@ -453,14 +453,14 @@ export const analyticsRouter = router({
 
       const dailyData = await db
         .select({
-          date: sql<string>`DATE(${transactions.createdAt})`,
+          date: sql<string>`DATE(${registryTransactions.createdAt})`,
           transactions: sql<number>`count(*)`,
-          revenue: sql<number>`sum(${transactions.amount})`,
+          revenue: sql<number>`sum(${registryTransactions.considerationAmount})`,
         })
-        .from(transactions)
-        .where(and(gte(transactions.createdAt, startDate), lte(transactions.createdAt, endDate)))
-        .groupBy(sql`DATE(${transactions.createdAt})`)
-        .orderBy(sql`DATE(${transactions.createdAt})`);
+        .from(registryTransactions)
+        .where(and(gte(registryTransactions.createdAt, startDate), lte(registryTransactions.createdAt, endDate)))
+        .groupBy(sql`DATE(${registryTransactions.createdAt})`)
+        .orderBy(sql`DATE(${registryTransactions.createdAt})`);
 
       return dailyData.map((row) => ({
         date: row.date,
@@ -479,13 +479,13 @@ export const analyticsRouter = router({
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const historicalData = await db
         .select({
-          date: sql<string>`DATE(${transactions.createdAt})`,
+          date: sql<string>`DATE(${registryTransactions.createdAt})`,
           count: sql<number>`count(*)`,
         })
-        .from(transactions)
-        .where(gte(transactions.createdAt, thirtyDaysAgo))
-        .groupBy(sql`DATE(${transactions.createdAt})`)
-        .orderBy(sql`DATE(${transactions.createdAt})`);
+        .from(registryTransactions)
+        .where(gte(registryTransactions.createdAt, thirtyDaysAgo))
+        .groupBy(sql`DATE(${registryTransactions.createdAt})`)
+        .orderBy(sql`DATE(${registryTransactions.createdAt})`);
 
       const historyCounts = historicalData.map((item) => Number(item.count || 0));
       const predictionValues = buildForecast(historyCounts, input.daysToPredict);
@@ -514,13 +514,13 @@ export const analyticsRouter = router({
 
       const byType = await db
         .select({
-          type: transactions.transactionType,
-          total: sql<number>`sum(${transactions.amount})`,
+          type: registryTransactions.type,
+          total: sql<number>`sum(${registryTransactions.considerationAmount})`,
           count: sql<number>`count(*)`,
         })
-        .from(transactions)
-        .where(and(gte(transactions.createdAt, startDate), lte(transactions.createdAt, endDate), eq(transactions.status, 'completed')))
-        .groupBy(transactions.transactionType);
+        .from(registryTransactions)
+        .where(and(gte(registryTransactions.createdAt, startDate), lte(registryTransactions.createdAt, endDate), eq(registryTransactions.status, 'completed')))
+        .groupBy(registryTransactions.type);
 
       const totalRevenue = byType.reduce((sum, item) => sum + Number(item.total || 0), 0);
 

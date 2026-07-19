@@ -4,6 +4,7 @@
  */
 
 import { eq, and, desc, sql } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
 import { requireDb } from './db';
 import {
   mortgageApplications,
@@ -30,16 +31,47 @@ import {
  * ========================================
  */
 
-export async function createMortgageApplication(data: InsertMortgageApplication) {
+
+/**
+ * Insert a row with a unique placeholder code, then derive the final public
+ * code from the row identity inside the same transaction. Codes are unique
+ * across instances and restarts — unlike the Date.now()+random suffixes the
+ * routers previously generated (collision-prone, non-sequential).
+ */
+async function insertWithDerivedCode<T>(params: {
+  table: any;
+  codeKey: string;
+  prefix: string;
+  values: Record<string, unknown>;
+}): Promise<T> {
   const db = await requireDb();
+  const year = new Date().getUTCFullYear();
+  return db.transaction(async (tx) => {
+    const tempCode = `${params.prefix}-PENDING-${randomUUID()}`;
+    const [inserted] = await tx
+      .insert(params.table)
+      .values({ ...params.values, [params.codeKey]: tempCode } as any)
+      .returning();
+    const finalCode = `${params.prefix}-${year}-${String((inserted as any).id).padStart(6, '0')}`;
+    const [updated] = await tx
+      .update(params.table)
+      .set({ [params.codeKey]: finalCode } as any)
+      .where(eq(params.table.id, (inserted as any).id))
+      .returning();
+    return updated as T;
+  });
+}
 
-
-  const [application] = await db
-    .insert(mortgageApplications)
-    .values(data)
-    .returning();
-
-  return application;
+export async function createMortgageApplication(data: Omit<InsertMortgageApplication, 'applicationId'>) {
+  // Ignore any caller-supplied code; the final public code is
+  // derived from the row identity (unique across instances).
+  const { applicationId: _ignored, ...values } = data as any;
+  return insertWithDerivedCode<any>({
+    table: mortgageApplications,
+    codeKey: 'applicationId',
+    prefix: 'MORT',
+    values,
+  });
 }
 
 export async function getMortgageApplicationById(applicationId: string) {
@@ -125,16 +157,16 @@ export async function updateMortgageApplicationStatus(
  * ========================================
  */
 
-export async function createTaxClearance(data: InsertTaxClearance) {
-  const db = await requireDb();
-
-
-  const [clearance] = await db
-    .insert(taxClearances)
-    .values(data)
-    .returning();
-
-  return clearance;
+export async function createTaxClearance(data: Omit<InsertTaxClearance, 'clearanceId'>) {
+  // Ignore any caller-supplied code; the final public code is
+  // derived from the row identity (unique across instances).
+  const { clearanceId: _ignored, ...values } = data as any;
+  return insertWithDerivedCode<any>({
+    table: taxClearances,
+    codeKey: 'clearanceId',
+    prefix: 'TCC',
+    values,
+  });
 }
 
 export async function getTaxClearanceById(clearanceId: string) {
@@ -217,16 +249,16 @@ export async function updateTaxClearanceStatus(
  * ========================================
  */
 
-export async function createInsurancePolicy(data: InsertInsurancePolicy) {
-  const db = await requireDb();
-
-
-  const [policy] = await db
-    .insert(insurancePolicies)
-    .values(data)
-    .returning();
-
-  return policy;
+export async function createInsurancePolicy(data: Omit<InsertInsurancePolicy, 'policyId'>) {
+  // Ignore any caller-supplied code; the final public code is
+  // derived from the row identity (unique across instances).
+  const { policyId: _ignored, ...values } = data as any;
+  return insertWithDerivedCode<any>({
+    table: insurancePolicies,
+    codeKey: 'policyId',
+    prefix: 'INS',
+    values,
+  });
 }
 
 export async function getInsurancePolicyById(policyId: string) {
@@ -292,15 +324,16 @@ export async function updateInsurancePolicyStatus(
  * ========================================
  */
 
-export async function createLegalDocument(data: InsertLegalDocument) {
-  const db = await requireDb();
-
-  const [document] = await db
-    .insert(legalDocuments)
-    .values(data)
-    .returning();
-
-  return document;
+export async function createLegalDocument(data: Omit<InsertLegalDocument, 'documentId'>) {
+  // Ignore any caller-supplied code; the final public code is
+  // derived from the row identity (unique across instances).
+  const { documentId: _ignored, ...values } = data as any;
+  return insertWithDerivedCode<any>({
+    table: legalDocuments,
+    codeKey: 'documentId',
+    prefix: 'LEGAL',
+    values,
+  });
 }
 
 export async function getLegalDocumentById(documentId: string) {
@@ -367,15 +400,16 @@ export async function updateLegalDocumentStatus(
  * ========================================
  */
 
-export async function createCadastralSurvey(data: InsertCadastralSurvey) {
-  const db = await requireDb();
-
-  const [survey] = await db
-    .insert(cadastralSurveys)
-    .values(data)
-    .returning();
-
-  return survey;
+export async function createCadastralSurvey(data: Omit<InsertCadastralSurvey, 'surveyId'>) {
+  // Ignore any caller-supplied code; the final public code is
+  // derived from the row identity (unique across instances).
+  const { surveyId: _ignored, ...values } = data as any;
+  return insertWithDerivedCode<any>({
+    table: cadastralSurveys,
+    codeKey: 'surveyId',
+    prefix: 'SURVEY',
+    values,
+  });
 }
 
 export async function getCadastralSurveyById(surveyId: string) {
@@ -442,15 +476,16 @@ export async function updateCadastralSurveyStatus(
  * ========================================
  */
 
-export async function createEnvironmentalAssessment(data: InsertEnvironmentalAssessment) {
-  const db = await requireDb();
-
-  const [assessment] = await db
-    .insert(environmentalAssessments)
-    .values(data)
-    .returning();
-
-  return assessment;
+export async function createEnvironmentalAssessment(data: Omit<InsertEnvironmentalAssessment, 'assessmentId'>) {
+  // Ignore any caller-supplied code; the final public code is
+  // derived from the row identity (unique across instances).
+  const { assessmentId: _ignored, ...values } = data as any;
+  return insertWithDerivedCode<any>({
+    table: environmentalAssessments,
+    codeKey: 'assessmentId',
+    prefix: 'ENV',
+    values,
+  });
 }
 
 export async function getEnvironmentalAssessmentById(assessmentId: string) {
@@ -522,15 +557,16 @@ export async function updateEnvironmentalAssessmentStatus(
  * ========================================
  */
 
-export async function createPublicNotice(data: InsertPublicNotice) {
-  const db = await requireDb();
-
-  const [notice] = await db
-    .insert(publicNotices)
-    .values(data)
-    .returning();
-
-  return notice;
+export async function createPublicNotice(data: Omit<InsertPublicNotice, 'noticeId'>) {
+  // Ignore any caller-supplied code; the final public code is
+  // derived from the row identity (unique across instances).
+  const { noticeId: _ignored, ...values } = data as any;
+  return insertWithDerivedCode<any>({
+    table: publicNotices,
+    codeKey: 'noticeId',
+    prefix: 'NOTICE',
+    values,
+  });
 }
 
 export async function getPublicNoticeById(noticeId: string) {
@@ -621,15 +657,16 @@ export async function addPublicNoticeObjection(
  * ========================================
  */
 
-export async function createLandUsePlan(data: InsertLandUsePlan) {
-  const db = await requireDb();
-
-  const [plan] = await db
-    .insert(landUsePlans)
-    .values(data)
-    .returning();
-
-  return plan;
+export async function createLandUsePlan(data: Omit<InsertLandUsePlan, 'planId'>) {
+  // Ignore any caller-supplied code; the final public code is
+  // derived from the row identity (unique across instances).
+  const { planId: _ignored, ...values } = data as any;
+  return insertWithDerivedCode<any>({
+    table: landUsePlans,
+    codeKey: 'planId',
+    prefix: 'LANDUSE',
+    values,
+  });
 }
 
 export async function getLandUsePlanById(planId: string) {

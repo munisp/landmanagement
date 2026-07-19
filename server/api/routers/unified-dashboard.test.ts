@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { appRouter } from '../../routers';
 import { requireDb } from '../../db';
-import { transactions, parcels, users } from '../../../drizzle/schema';
+import { registryTransactions, parcels, users } from '../../../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
 describe('Unified Dashboard Router', () => {
@@ -42,29 +42,24 @@ describe('Unified Dashboard Router', () => {
       .returning();
     testParcelId = testParcel[0].id;
 
-    // Create test transaction
+    // Create test registry transaction (the dashboard reads registry_transactions)
+    const testCode = `TXN-UNIFIED-${Date.now()}`;
     const testTransaction = await db
-      .insert(transactions)
+      .insert(registryTransactions)
       .values({
-        transactionId: `TXN-UNIFIED-${Date.now()}`,
+        type: 'transfer',
         parcelId: testParcelId,
-        fromUserId: testUserId,
-        toUserId: testUserId,
-        transactionType: 'transfer',
-        status: 'initiated',
-        amount: 100000,
-        currency: 'NGN',
-        paymentMethod: 'mojaloop',
-        metadata: {
-          mortgageRequired: true,
-          mortgageStatus: 'pending',
-          taxClearanceRequired: true,
-          taxStatus: 'in_progress',
-          insuranceRequired: false,
-        },
+        initiatorId: testUserId,
+        initiatorName: 'Unified Test User',
+        status: 'submitted',
+        workflowStage: 'submission',
+        paymentStatus: 'unpaid',
+        documentStatus: 'pending',
+        considerationAmount: 100000,
+        externalReference: testCode,
       })
       .returning();
-    testTransactionId = testTransaction[0].transactionId;
+    testTransactionId = testCode;
   });
 
   afterAll(async () => {
@@ -74,7 +69,7 @@ describe('Unified Dashboard Router', () => {
     // Only cleanup if test data was created
     if (testTransactionId) {
       try {
-        await db.delete(transactions).where(eq(transactions.transactionId, testTransactionId));
+        await db.delete(registryTransactions).where(eq(registryTransactions.externalReference, testTransactionId));
       } catch (error) {
         console.error('Failed to cleanup test transaction:', error);
       }
@@ -118,20 +113,22 @@ describe('Unified Dashboard Router', () => {
       expect(transaction?.systems).toBeDefined();
       expect(Array.isArray(transaction?.systems)).toBe(true);
 
-      // Check that payment system is present
+      // Registry system is always present, derived from the real workflow state
+      const registrySystem = transaction?.systems.find((s) => s.system === 'registry');
+      expect(registrySystem).toBeDefined();
+      expect(registrySystem?.status).toBe('in_progress'); // status 'submitted'
+
+      // Payment system reflects the real payment rail (no payment rows yet —
+      // falls back to the transaction's paymentStatus: 'unpaid' -> 'pending')
       const paymentSystem = transaction?.systems.find((s) => s.system === 'payment');
       expect(paymentSystem).toBeDefined();
-      expect(paymentSystem?.status).toBe('initiated');
+      expect(paymentSystem?.status).toBe('pending');
 
-      // Check that mortgage system is present (from metadata)
-      const mortgageSystem = transaction?.systems.find((s) => s.system === 'mortgage');
-      expect(mortgageSystem).toBeDefined();
-      expect(mortgageSystem?.status).toBe('pending');
-
-      // Check that tax system is present (from metadata)
-      const taxSystem = transaction?.systems.find((s) => s.system === 'tax');
-      expect(taxSystem).toBeDefined();
-      expect(taxSystem?.status).toBe('in_progress');
+      // Sub-systems are only present when REAL rows exist in their domain
+      // tables — nothing is synthesized from metadata anymore. This test
+      // transaction has no mortgage/tax rows, so those systems are absent.
+      expect(transaction?.systems.find((s) => s.system === 'mortgage')).toBeUndefined();
+      expect(transaction?.systems.find((s) => s.system === 'tax')).toBeUndefined();
     });
 
     it('should calculate overall progress correctly', async () => {

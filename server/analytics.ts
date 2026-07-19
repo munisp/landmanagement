@@ -8,7 +8,7 @@ import {
   activityLogs,
   parcels,
   securityEvents,
-  transactions,
+  registryTransactions,
   users,
 } from '../drizzle/schema';
 import { and, desc, gte, lte, sql } from 'drizzle-orm';
@@ -59,11 +59,11 @@ export async function getKeyMetrics() {
   const [transactionSummary] = await db
     .select({
       totalTransactions: sql<number>`count(*)::int`,
-      totalValue: sql<number>`coalesce(sum(${transactions.amount}), 0)::int`,
-      pendingApprovals: sql<number>`coalesce(sum(case when ${transactions.status} in ('initiated', 'pending') then 1 else 0 end), 0)::int`,
-      avgProcessingTime: sql<number>`coalesce(avg(case when ${transactions.completedAt} is not null then extract(epoch from (${transactions.completedAt} - ${transactions.initiatedAt})) / 86400.0 end), 0)::float`,
+      totalValue: sql<number>`coalesce(sum(${registryTransactions.considerationAmount}), 0)::int`,
+      pendingApprovals: sql<number>`coalesce(sum(case when ${registryTransactions.status} in ('pending_approval', 'pending_payment') then 1 else 0 end), 0)::int`,
+      avgProcessingTime: sql<number>`coalesce(avg(case when ${registryTransactions.status} = 'completed' then extract(epoch from (${registryTransactions.updatedAt} - ${registryTransactions.createdAt})) / 86400.0 end), 0)::float`,
     })
-    .from(transactions);
+    .from(registryTransactions);
 
   const [userSummary] = await db
     .select({
@@ -97,13 +97,13 @@ export async function getTransactionTrend(startDate: Date, endDate: Date) {
 
   const rows = await db
     .select({
-      bucket: sql<string>`to_char(date_trunc('month', ${transactions.createdAt}), 'YYYY-MM')`,
+      bucket: sql<string>`to_char(date_trunc('month', ${registryTransactions.createdAt}), 'YYYY-MM')`,
       count: sql<number>`count(*)::int`,
     })
-    .from(transactions)
-    .where(and(gte(transactions.createdAt, startDate), lte(transactions.createdAt, endDate)))
-    .groupBy(sql`date_trunc('month', ${transactions.createdAt})`)
-    .orderBy(sql`date_trunc('month', ${transactions.createdAt})`);
+    .from(registryTransactions)
+    .where(and(gte(registryTransactions.createdAt, startDate), lte(registryTransactions.createdAt, endDate)))
+    .groupBy(sql`date_trunc('month', ${registryTransactions.createdAt})`)
+    .orderBy(sql`date_trunc('month', ${registryTransactions.createdAt})`);
 
   const filled = fillMonthlySeries(startDate, endDate, rows.map((row) => ({ label: row.bucket, value: row.count })));
   return {
@@ -151,11 +151,11 @@ export async function getTransactionTypeBreakdown() {
 
   const rows = await db
     .select({
-      type: transactions.transactionType,
+      type: registryTransactions.type,
       count: sql<number>`count(*)::int`,
     })
-    .from(transactions)
-    .groupBy(transactions.transactionType)
+    .from(registryTransactions)
+    .groupBy(registryTransactions.type)
     .orderBy(desc(sql`count(*)`));
 
   return {
@@ -173,13 +173,13 @@ export async function getRevenueTrend(startDate: Date, endDate: Date) {
 
   const rows = await db
     .select({
-      bucket: sql<string>`to_char(date_trunc('month', ${transactions.createdAt}), 'YYYY-MM')`,
-      revenue: sql<number>`coalesce(sum(case when ${transactions.status} = 'completed' then ${transactions.amount} else 0 end), 0)::int`,
+      bucket: sql<string>`to_char(date_trunc('month', ${registryTransactions.createdAt}), 'YYYY-MM')`,
+      revenue: sql<number>`coalesce(sum(case when ${registryTransactions.status} = 'completed' then ${registryTransactions.considerationAmount} else 0 end), 0)::int`,
     })
-    .from(transactions)
-    .where(and(gte(transactions.createdAt, startDate), lte(transactions.createdAt, endDate)))
-    .groupBy(sql`date_trunc('month', ${transactions.createdAt})`)
-    .orderBy(sql`date_trunc('month', ${transactions.createdAt})`);
+    .from(registryTransactions)
+    .where(and(gte(registryTransactions.createdAt, startDate), lte(registryTransactions.createdAt, endDate)))
+    .groupBy(sql`date_trunc('month', ${registryTransactions.createdAt})`)
+    .orderBy(sql`date_trunc('month', ${registryTransactions.createdAt})`);
 
   const filled = fillMonthlySeries(startDate, endDate, rows.map((row) => ({ label: row.bucket, value: row.revenue })));
   const revenue = filled.map((point) => point.value);
@@ -287,23 +287,23 @@ export async function getAIPredictions(limit: number = 10): Promise<AIPrediction
 
   const [fraudPrediction] = await db
     .select({
-      transactionId: transactions.transactionId,
-      amount: transactions.amount,
-      status: transactions.status,
-      createdAt: transactions.createdAt,
+      transactionId: registryTransactions.id,
+      amount: registryTransactions.considerationAmount,
+      status: registryTransactions.status,
+      createdAt: registryTransactions.createdAt,
     })
-    .from(transactions)
-    .orderBy(desc(transactions.createdAt))
+    .from(registryTransactions)
+    .orderBy(desc(registryTransactions.createdAt))
     .limit(1);
 
   const demandRows = await db
     .select({
-      bucket: sql<string>`to_char(date_trunc('month', ${transactions.createdAt}), 'YYYY-MM')`,
+      bucket: sql<string>`to_char(date_trunc('month', ${registryTransactions.createdAt}), 'YYYY-MM')`,
       count: sql<number>`count(*)::int`,
     })
-    .from(transactions)
-    .groupBy(sql`date_trunc('month', ${transactions.createdAt})`)
-    .orderBy(sql`date_trunc('month', ${transactions.createdAt}) desc`)
+    .from(registryTransactions)
+    .groupBy(sql`date_trunc('month', ${registryTransactions.createdAt})`)
+    .orderBy(sql`date_trunc('month', ${registryTransactions.createdAt}) desc`)
     .limit(6);
 
   const monthlyCounts = demandRows.map((row) => row.count).reverse();
@@ -330,10 +330,10 @@ export async function getAIPredictions(limit: number = 10): Promise<AIPrediction
     predictions.push({
       id: 2,
       type: 'Fraud Risk',
-      transactionId: fraudPrediction.transactionId,
+      transactionId: String(fraudPrediction.transactionId),
       riskScore,
       riskLevel: riskScore >= 0.85 ? 'critical' : riskScore >= 0.7 ? 'high' : riskScore >= 0.45 ? 'medium' : 'low',
-      trend: fraudPrediction.status === 'pending' ? 'up' : 'stable',
+      trend: fraudPrediction.status === 'pending_approval' ? 'up' : 'stable',
     });
   }
 
@@ -363,19 +363,19 @@ export async function exportAnalyticsData(
   if (dataType === 'transactions') {
     const rows = await db
       .select({
-        date: transactions.createdAt,
-        transactionId: transactions.transactionId,
-        type: transactions.transactionType,
-        amount: transactions.amount,
-        status: transactions.status,
+        date: registryTransactions.createdAt,
+        transactionId: registryTransactions.id,
+        type: registryTransactions.type,
+        amount: registryTransactions.considerationAmount,
+        status: registryTransactions.status,
       })
-      .from(transactions)
-      .where(and(gte(transactions.createdAt, startDate), lte(transactions.createdAt, endDate)))
-      .orderBy(desc(transactions.createdAt));
+      .from(registryTransactions)
+      .where(and(gte(registryTransactions.createdAt, startDate), lte(registryTransactions.createdAt, endDate)))
+      .orderBy(desc(registryTransactions.createdAt));
 
     return toCsv(
       ['Date', 'Transaction ID', 'Type', 'Amount', 'Status'],
-      rows.map((row) => [formatDateTime(row.date), row.transactionId, row.type, String(row.amount), row.status])
+      rows.map((row) => [formatDateTime(row.date), String(row.transactionId), row.type, String(row.amount), row.status])
     );
   }
 

@@ -1,24 +1,26 @@
 import { z } from 'zod';
 import { protectedProcedure, router } from '../../_core/trpc';
 import {
-  calculateEarlyPayoffOffline,
-  calculateRefinancingOptionsOffline,
-  createMandateForApplication,
-  generateScheduleForApplication,
-  getMandateForApplication,
-  getPaymentStatsForApplication,
+  generatePaymentSchedule,
+  createAutoDebitMandate,
+  processAutomaticDebits,
+  processManualPayment,
+  getPaymentHistory,
   getScheduleForApplication,
+  getMandateForApplication,
+  listMandates,
+  suspendMandate,
+  reactivateMandate,
+  getPaymentStatsForApplication,
   getUpcomingPaymentsForApplication,
-  listAllMandatesOffline,
-  listPaymentHistoryForApplication,
-  makeExtraPrincipalPaymentOffline,
-  makeManualPaymentRecord,
-  processAutomaticDebitsOffline,
-  processEarlyPayoffOffline,
-  reactivateMandateRecord,
-  submitRefinancingApplicationOffline,
-  suspendMandateRecord,
-} from '../../mortgagePaymentRepository';
+} from '../../mortgagePaymentService';
+import {
+  calculateEarlyPayoff,
+  processEarlyPayoff,
+  makeExtraPrincipalPayment,
+  calculateRefinancingOptions,
+  submitRefinancingApplication,
+} from '../../mortgageRefinancingService';
 
 export const mortgagePaymentRouter = router({
   /**
@@ -27,7 +29,8 @@ export const mortgagePaymentRouter = router({
   generateSchedule: protectedProcedure
     .input(z.object({ applicationId: z.number() }))
     .mutation(async ({ input }) => {
-      return generateScheduleForApplication(input.applicationId);
+      await generatePaymentSchedule(input.applicationId);
+      return { success: true, applicationId: input.applicationId };
     }),
 
   /**
@@ -54,7 +57,7 @@ export const mortgagePaymentRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return createMandateForApplication(input);
+      return createAutoDebitMandate(input);
     }),
 
   /**
@@ -72,7 +75,7 @@ export const mortgagePaymentRouter = router({
   suspendMandate: protectedProcedure
     .input(z.object({ mandateId: z.string(), reason: z.string() }))
     .mutation(async ({ input }) => {
-      return suspendMandateRecord(input.mandateId, input.reason);
+      return suspendMandate(input.mandateId, input.reason);
     }),
 
   /**
@@ -81,7 +84,7 @@ export const mortgagePaymentRouter = router({
   reactivateMandate: protectedProcedure
     .input(z.object({ mandateId: z.string() }))
     .mutation(async ({ input }) => {
-      return reactivateMandateRecord(input.mandateId);
+      return reactivateMandate(input.mandateId);
     }),
 
   /**
@@ -98,7 +101,7 @@ export const mortgagePaymentRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return makeManualPaymentRecord(input);
+      return processManualPayment(input);
     }),
 
   /**
@@ -107,7 +110,7 @@ export const mortgagePaymentRouter = router({
   getPaymentHistory: protectedProcedure
     .input(z.object({ applicationId: z.number() }))
     .query(async ({ input }) => {
-      return listPaymentHistoryForApplication(input.applicationId);
+      return getPaymentHistory(input.applicationId);
     }),
 
   /**
@@ -132,7 +135,7 @@ export const mortgagePaymentRouter = router({
    * Admin: Process automatic debits (scheduled job)
    */
   processAutoDebits: protectedProcedure.mutation(async () => {
-    return processAutomaticDebitsOffline();
+    return processAutomaticDebits();
   }),
 
   /**
@@ -146,7 +149,7 @@ export const mortgagePaymentRouter = router({
       })
     )
     .query(async ({ input }) => {
-      return listAllMandatesOffline({ status: input.status, limit: input.limit });
+      return listMandates({ status: input.status, limit: input.limit });
     }),
 
   /**
@@ -155,7 +158,7 @@ export const mortgagePaymentRouter = router({
   calculateEarlyPayoff: protectedProcedure
     .input(z.object({ applicationId: z.number() }))
     .query(async ({ input }) => {
-      return calculateEarlyPayoffOffline(input.applicationId);
+      return calculateEarlyPayoff(input.applicationId);
     }),
 
   /**
@@ -171,7 +174,7 @@ export const mortgagePaymentRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return processEarlyPayoffOffline(input);
+      return processEarlyPayoff(input);
     }),
 
   /**
@@ -188,7 +191,7 @@ export const mortgagePaymentRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return makeExtraPrincipalPaymentOffline(input);
+      return makeExtraPrincipalPayment(input);
     }),
 
   /**
@@ -197,7 +200,7 @@ export const mortgagePaymentRouter = router({
   calculateRefinancing: protectedProcedure
     .input(z.object({ applicationId: z.number() }))
     .query(async ({ input }) => {
-      return calculateRefinancingOptionsOffline(input.applicationId);
+      return calculateRefinancingOptions(input.applicationId);
     }),
 
   /**
@@ -213,6 +216,6 @@ export const mortgagePaymentRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return submitRefinancingApplicationOffline(input);
+      return submitRefinancingApplication(input);
     }),
 });

@@ -611,44 +611,6 @@ export type Parcel = typeof parcels.$inferSelect;
 export type InsertParcel = typeof parcels.$inferInsert;
 
 /**
- * Transactions table for property transfers
- */
-export const transactionStatusEnum = pgEnum("transaction_status", ["initiated", "pending", "completed", "failed", "cancelled"]);
-export const transactionTypeEnum = pgEnum("transaction_type", ["sale", "transfer", "lease", "mortgage", "gift"]);
-
-export const transactions = pgTable("transactions", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  transactionId: varchar("transaction_id", { length: 64 }).notNull().unique(),
-  parcelId: integer("parcel_id").notNull().references(() => parcels.id),
-  fromUserId: integer("from_user_id").notNull().references(() => users.id),
-  toUserId: integer("to_user_id").notNull().references(() => users.id),
-  transactionType: transactionTypeEnum("transaction_type").notNull(),
-  status: transactionStatusEnum("status").default("initiated").notNull(),
-  amount: integer("amount").notNull(), // in smallest currency unit (kobo for NGN)
-  currency: varchar("currency", { length: 3 }).default("NGN").notNull(),
-  paymentMethod: varchar("payment_method", { length: 64 }),
-  paymentReference: varchar("payment_reference", { length: 128 }),
-  blockchainTxHash: varchar("blockchain_tx_hash", { length: 128 }),
-  initiatedAt: timestamp("initiated_at").defaultNow().notNull(),
-  completedAt: timestamp("completed_at"),
-  failedAt: timestamp("failed_at"),
-  cancelledAt: timestamp("cancelled_at"),
-  failureReason: text("failure_reason"),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-}, (table) => ({
-  parcelIdx: index("transactions_parcel_idx").on(table.parcelId),
-  fromUserIdx: index("transactions_from_user_idx").on(table.fromUserId),
-  toUserIdx: index("transactions_to_user_idx").on(table.toUserId),
-  statusIdx: index("transactions_status_idx").on(table.status),
-  transactionIdIdx: index("transactions_transaction_id_idx").on(table.transactionId),
-}));
-
-export type Transaction = typeof transactions.$inferSelect;
-export type InsertTransaction = typeof transactions.$inferInsert;
-
-/**
  * API Keys table for programmatic access
  */
 export const apiKeys = pgTable("api_keys", {
@@ -874,7 +836,7 @@ export const mortgageStatusEnum = pgEnum("mortgage_status", [
 export const mortgageApplications = pgTable("mortgage_applications", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   applicationId: varchar("application_id", { length: 64 }).notNull().unique(),
-  transactionId: varchar("transaction_id", { length: 64 }).notNull().references(() => transactions.transactionId),
+  transactionId: varchar("transaction_id", { length: 64 }),
   parcelId: integer("parcel_id").notNull().references(() => parcels.id),
   applicantId: integer("applicant_id").notNull().references(() => users.id),
   
@@ -884,6 +846,11 @@ export const mortgageApplications = pgTable("mortgage_applications", {
   loanTerm: integer("loan_term").notNull(), // in months
   monthlyPayment: integer("monthly_payment").notNull(),
   downPayment: integer("down_payment").notNull(),
+  monthlyIncome: integer("monthly_income"),
+  employmentStatus: varchar("employment_status", { length: 32 }),
+  creditScore: integer("credit_score"),
+  affordabilityRatio: doublePrecision("affordability_ratio"),
+  outstandingBalance: integer("outstanding_balance"),
   
   // Bank/Lender information
   bankName: varchar("bank_name", { length: 255 }).notNull(),
@@ -913,6 +880,21 @@ export const mortgageApplications = pgTable("mortgage_applications", {
   applicantIdx: index("mortgage_applications_applicant_idx").on(table.applicantId),
   statusIdx: index("mortgage_applications_status_idx").on(table.status),
 }));
+
+/** Mortgage workflow events — lifecycle audit trail per application. */
+export const mortgageWorkflowEvents = pgTable("mortgage_workflow_events", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  applicationId: varchar("application_id", { length: 64 }).notNull(),
+  status: mortgageStatusEnum("status").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  actorId: integer("actor_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  applicationIdx: index("mortgage_workflow_events_application_idx").on(table.applicationId),
+}));
+
+export type MortgageWorkflowEventRow = typeof mortgageWorkflowEvents.$inferSelect;
 
 export type MortgageApplication = typeof mortgageApplications.$inferSelect;
 export type InsertMortgageApplication = typeof mortgageApplications.$inferInsert;
@@ -1072,7 +1054,7 @@ export const taxClearanceStatusEnum = pgEnum("tax_clearance_status", [
 export const taxClearances = pgTable("tax_clearances", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   clearanceId: varchar("clearance_id", { length: 64 }).notNull().unique(),
-  transactionId: varchar("transaction_id", { length: 64 }).notNull().references(() => transactions.transactionId),
+  transactionId: varchar("transaction_id", { length: 64 }).notNull(),
   parcelId: integer("parcel_id").notNull().references(() => parcels.id),
   ownerId: integer("owner_id").notNull().references(() => users.id),
   
@@ -1123,7 +1105,7 @@ export const insurancePolicyStatusEnum = pgEnum("insurance_policy_status", [
 export const insurancePolicies = pgTable("insurance_policies", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   policyId: varchar("policy_id", { length: 64 }).notNull().unique(),
-  transactionId: varchar("transaction_id", { length: 64 }).references(() => transactions.transactionId),
+  transactionId: varchar("transaction_id", { length: 64 }),
   parcelId: integer("parcel_id").notNull().references(() => parcels.id),
   policyHolderId: integer("policy_holder_id").notNull().references(() => users.id),
   
@@ -1191,7 +1173,7 @@ export const legalDocumentStatusEnum = pgEnum("legal_document_status", [
 export const legalDocuments = pgTable("legal_documents", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   documentId: varchar("document_id", { length: 64 }).notNull().unique(),
-  transactionId: varchar("transaction_id", { length: 64 }).notNull().references(() => transactions.transactionId),
+  transactionId: varchar("transaction_id", { length: 64 }).notNull(),
   parcelId: integer("parcel_id").notNull().references(() => parcels.id),
   
   // Document details
@@ -1248,7 +1230,7 @@ export const cadastralSurveyStatusEnum = pgEnum("cadastral_survey_status", [
 export const cadastralSurveys = pgTable("cadastral_surveys", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   surveyId: varchar("survey_id", { length: 64 }).notNull().unique(),
-  transactionId: varchar("transaction_id", { length: 64 }).references(() => transactions.transactionId),
+  transactionId: varchar("transaction_id", { length: 64 }),
   parcelId: integer("parcel_id").notNull().references(() => parcels.id),
   
   // Survey details
@@ -1307,7 +1289,7 @@ export const environmentalAssessmentStatusEnum = pgEnum("environmental_assessmen
 export const environmentalAssessments = pgTable("environmental_assessments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   assessmentId: varchar("assessment_id", { length: 64 }).notNull().unique(),
-  transactionId: varchar("transaction_id", { length: 64 }).references(() => transactions.transactionId),
+  transactionId: varchar("transaction_id", { length: 64 }),
   parcelId: integer("parcel_id").notNull().references(() => parcels.id),
   
   // Assessment details
@@ -1371,7 +1353,7 @@ export const publicNoticeStatusEnum = pgEnum("public_notice_status", [
 export const publicNotices = pgTable("public_notices", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   noticeId: varchar("notice_id", { length: 64 }).notNull().unique(),
-  transactionId: varchar("transaction_id", { length: 64 }).notNull().references(() => transactions.transactionId),
+  transactionId: varchar("transaction_id", { length: 64 }).notNull(),
   parcelId: integer("parcel_id").notNull().references(() => parcels.id),
   
   // Notice details
@@ -1427,7 +1409,7 @@ export const landUsePlanStatusEnum = pgEnum("land_use_plan_status", [
 export const landUsePlans = pgTable("land_use_plans", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   planId: varchar("plan_id", { length: 64 }).notNull().unique(),
-  transactionId: varchar("transaction_id", { length: 64 }).references(() => transactions.transactionId),
+  transactionId: varchar("transaction_id", { length: 64 }),
   parcelId: integer("parcel_id").notNull().references(() => parcels.id),
   
   // Land use details
@@ -2805,7 +2787,7 @@ export const exchangeDecisionEnum = pgEnum("exchange_decision", ["allowed", "den
 export const titleRiskAssessments = pgTable("title_risk_assessments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   parcelId: integer("parcel_id").references(() => parcels.id),
-  transactionId: integer("transaction_id").references(() => transactions.id),
+  transactionId: integer("transaction_id").references(() => registryTransactions.id),
   overallScore: integer("overall_score").notNull(),
   riskBand: riskBandEnum("risk_band").notNull(),
   factorScores: jsonb("factor_scores"),
@@ -2851,7 +2833,7 @@ export const registryIntegrityFindings = pgTable("registry_integrity_findings", 
 export const escrowSettlements = pgTable("escrow_settlements", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   settlementRef: varchar("settlement_ref", { length: 64 }).notNull().unique(),
-  transactionId: integer("transaction_id").references(() => transactions.id),
+  transactionId: integer("transaction_id").references(() => registryTransactions.id),
   amount: decimal("amount", { precision: 18, scale: 2 }),
   currency: varchar("currency", { length: 3 }).default("NGN").notNull(),
   status: settlementStatusEnum("status").default("draft").notNull(),
@@ -2904,7 +2886,7 @@ export const mortgageDecisionExplanations = pgTable("mortgage_decision_explanati
 /** Federated Inter-Agency Clearance Exchange — per-agency clearance states. */
 export const agencyClearances = pgTable("agency_clearances", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  transactionId: integer("transaction_id").references(() => transactions.id).notNull(),
+  transactionId: integer("transaction_id").references(() => registryTransactions.id).notNull(),
   agency: varchar("agency", { length: 64 }).notNull(),
   status: clearanceStatusEnum("status").default("pending").notNull(),
   referenceNumber: varchar("reference_number", { length: 128 }),
@@ -3062,3 +3044,4 @@ export const repositoryStores = pgTable("repository_stores", {
 
 export type RepositoryStore = typeof repositoryStores.$inferSelect;
 export type InsertRepositoryStore = typeof repositoryStores.$inferInsert;
+

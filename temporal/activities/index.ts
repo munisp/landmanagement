@@ -11,7 +11,7 @@ import { getPaymentStatus, cancelPayment } from '../../server/mojaloopPaymentSer
 // TigerBeetle client - using gRPC client
 // import { getClient } from '../../server/tigerBeetleClient';
 import { getDb } from '../../server/db';
-import { parcels, transactions } from '../../drizzle/schema';
+import { parcels, registryTransactions, users } from '../../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
 // ============================================================================
@@ -344,20 +344,27 @@ export async function transferPropertyTitle(params: TransferPropertyTitleParams)
     throw new Error('Property not found');
   }
 
-  // Create transaction record
+  // Resolve party names for the registry record
+  const partyIds = [parseInt(params.fromOwnerId), parseInt(params.toOwnerId)];
+  const partyRows = await db.select({ id: users.id, name: users.name }).from(users);
+  const nameOf = (id: number) => partyRows.find((u) => u.id === id)?.name ?? `User ${id}`;
+
+  // Create registry transaction record
   const [transaction] = await db
-    .insert(transactions)
+    .insert(registryTransactions)
     .values({
-      transactionId: `txn-${params.paymentId}`,
+      type: 'transfer',
       parcelId: parcelResults[0].id,
-      fromUserId: parseInt(params.fromOwnerId),
-      toUserId: parseInt(params.toOwnerId),
-      transactionType: 'sale',
+      initiatorId: parseInt(params.fromOwnerId),
+      initiatorName: nameOf(parseInt(params.fromOwnerId)),
+      counterpartyName: nameOf(parseInt(params.toOwnerId)),
       status: 'completed',
-      amount: 0, // Amount already recorded in payment
-      paymentReference: params.paymentId,
-      blockchainTxHash: params.transactionHash,
-      completedAt: new Date(),
+      workflowStage: 'closed',
+      paymentStatus: 'paid',
+      documentStatus: 'verified',
+      considerationAmount: 0, // Amount already recorded in payment
+      externalReference: `txn-${params.paymentId}`,
+      notes: `Blockchain anchor: ${params.transactionHash}`,
     })
     .returning();
 

@@ -53,10 +53,8 @@ export const phase4Router = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const applicationId = `MORT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       const application = await phase4Service.createMortgageApplication({
-        applicationId,
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         applicantId: ctx.user.id,
@@ -150,10 +148,8 @@ export const phase4Router = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const clearanceId = `TAX-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       const clearance = await phase4Service.createTaxClearance({
-        clearanceId,
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         ownerId: ctx.user.id,
@@ -249,10 +245,8 @@ export const phase4Router = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const policyId = `INS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       const policy = await phase4Service.createInsurancePolicy({
-        policyId,
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         policyHolderId: ctx.user.id,
@@ -356,10 +350,8 @@ export const phase4Router = router({
       })
     )
     .mutation(async ({ input }) => {
-      const documentId = `LEGAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       const document = await phase4Service.createLegalDocument({
-        documentId,
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         documentType: input.documentType,
@@ -452,10 +444,8 @@ export const phase4Router = router({
       })
     )
     .mutation(async ({ input }) => {
-      const surveyId = `SURVEY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       const survey = await phase4Service.createCadastralSurvey({
-        surveyId,
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         surveyPlanNumber: input.surveyPlanNumber,
@@ -554,10 +544,8 @@ export const phase4Router = router({
       })
     )
     .mutation(async ({ input }) => {
-      const assessmentId = `ENV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       const assessment = await phase4Service.createEnvironmentalAssessment({
-        assessmentId,
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         assessmentType: input.assessmentType,
@@ -660,10 +648,8 @@ export const phase4Router = router({
       })
     )
     .mutation(async ({ input }) => {
-      const noticeId = `NOTICE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       const notice = await phase4Service.createPublicNotice({
-        noticeId,
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         noticeType: input.noticeType,
@@ -768,10 +754,8 @@ export const phase4Router = router({
       })
     )
     .mutation(async ({ input }) => {
-      const planId = `LANDUSE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       const plan = await phase4Service.createLandUsePlan({
-        planId,
         transactionId: input.transactionId,
         parcelId: input.parcelId,
         currentLandUse: input.currentLandUse,

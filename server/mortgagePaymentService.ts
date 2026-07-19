@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { requireDb } from './db';
 import {
   mortgageApplications,
@@ -125,7 +126,8 @@ export async function createAutoDebitMandate(params: {
     return { mandateId: existing.mandateId };
   }
 
-  const mandateId = `MANDATE-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+  // Final code derived from row identity after insert (unique across instances).
+  const mandateId = `MANDATE-PENDING-${crypto.randomUUID()}`;
 
   let gatewayMandateCode = '';
   let authorizationUrl: string | undefined;
@@ -156,8 +158,9 @@ export async function createAutoDebitMandate(params: {
   const endDate = new Date(startDate);
   endDate.setMonth(endDate.getMonth() + application.loanTerm);
 
-  // Insert mandate
-  await db.insert(autoDebitMandates).values({
+  // Insert mandate with a unique placeholder, then derive the final code
+  // from the row identity (unique across instances and restarts).
+  const [insertedMandate] = await db.insert(autoDebitMandates).values({
     mandateId,
     applicationId: params.applicationId,
     accountNumber: params.accountNumber,
@@ -173,11 +176,17 @@ export async function createAutoDebitMandate(params: {
     status: 'pending',
     nextDebitAt: startDate,
     failedDebitsCount: 0,
-  });
+  }).returning();
 
-  console.log(`[MortgagePayment] Created auto-debit mandate ${mandateId} for application ${params.applicationId}`);
+  const finalMandateId = `MANDATE-${String(insertedMandate.id).padStart(8, '0')}`;
+  await db
+    .update(autoDebitMandates)
+    .set({ mandateId: finalMandateId })
+    .where(eq(autoDebitMandates.id, insertedMandate.id));
 
-  return { mandateId, authorizationUrl };
+  console.log(`[MortgagePayment] Created auto-debit mandate ${finalMandateId} for application ${params.applicationId}`);
+
+  return { mandateId: finalMandateId, authorizationUrl };
 }
 
 /**
@@ -259,7 +268,7 @@ async function processDebit(
 ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
   const db = await requireDb();
 
-  const transactionId = `PAY-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+  const transactionId = `PAY-PENDING-${crypto.randomUUID()}`;
 
   try {
     let gatewayResponse;
@@ -279,8 +288,8 @@ async function processDebit(
     }
 
     if (gatewayResponse?.success) {
-      // Record successful payment
-      await db.insert(mortgagePaymentTransactions).values({
+      // Record successful payment (placeholder id finalized from row identity below)
+      const [insertedTxn] = await db.insert(mortgagePaymentTransactions).values({
         transactionId,
         applicationId: mandate.applicationId,
         scheduleId: scheduleEntry.id,
@@ -293,7 +302,13 @@ async function processDebit(
         gatewayReference: gatewayResponse.reference,
         status: 'completed',
         completedAt: new Date(),
-      });
+      }).returning();
+      const finalTransactionId = `PAY-${String(insertedTxn.id).padStart(10, '0')}`;
+      await db
+        .update(mortgagePaymentTransactions)
+        .set({ transactionId: finalTransactionId })
+        .where(eq(mortgagePaymentTransactions.id, insertedTxn.id));
+      await syncOutstandingBalance(mandate.applicationId);
 
       // Mark schedule entry as paid
       await db
@@ -323,7 +338,7 @@ async function processDebit(
 
       console.log(`[MortgagePayment] Successfully processed debit for mandate ${mandate.mandateId}`);
 
-      return { success: true, transactionId };
+      return { success: true, transactionId: finalTransactionId };
     } else {
       throw new Error(gatewayResponse?.message || 'Payment failed');
     }
@@ -383,7 +398,7 @@ export async function processManualPayment(params: {
 }): Promise<{ success: boolean; transactionId: string }> {
   const db = await requireDb();
 
-  const transactionId = `PAY-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+  const transactionId = `PAY-PENDING-${crypto.randomUUID()}`;
 
   // Get next unpaid schedule entry
   const [scheduleEntry] = await db
@@ -406,8 +421,8 @@ export async function processManualPayment(params: {
   const principalPaid = Math.min(params.amount, scheduleEntry.principalAmount);
   const interestPaid = Math.min(params.amount - principalPaid, scheduleEntry.interestAmount);
 
-  // Record payment transaction
-  await db.insert(mortgagePaymentTransactions).values({
+  // Record payment transaction (placeholder id finalized from row identity below)
+  const [insertedTxn] = await db.insert(mortgagePaymentTransactions).values({
     transactionId,
     applicationId: params.applicationId,
     scheduleId: scheduleEntry.id,
@@ -420,7 +435,12 @@ export async function processManualPayment(params: {
     gatewayReference: params.gatewayReference || null,
     status: 'completed',
     completedAt: new Date(),
-  });
+  }).returning();
+  const finalTransactionId = `PAY-${String(insertedTxn.id).padStart(10, '0')}`;
+  await db
+    .update(mortgagePaymentTransactions)
+    .set({ transactionId: finalTransactionId })
+    .where(eq(mortgagePaymentTransactions.id, insertedTxn.id));
 
   // Update schedule entry
   const newPaidAmount = scheduleEntry.paidAmount + params.amount;
@@ -437,9 +457,11 @@ export async function processManualPayment(params: {
     })
     .where(eq(mortgagePaymentSchedule.id, scheduleEntry.id));
 
-  console.log(`[MortgagePayment] Processed manual payment ${transactionId} for application ${params.applicationId}`);
+  await syncOutstandingBalance(params.applicationId);
 
-  return { success: true, transactionId };
+  console.log(`[MortgagePayment] Processed manual payment ${finalTransactionId} for application ${params.applicationId}`);
+
+  return { success: true, transactionId: finalTransactionId };
 }
 
 /**
@@ -524,7 +546,9 @@ async function chargePaystackMandate(params: {
     };
   } catch (error: any) {
     console.error('[Paystack] Charge failed:', error.message);
-    // Simulate success for development
+    // Simulate success for development only — throws in production, so a
+    // provider outage records the debit as FAILED, never as paid.
+    assertMockFallbackAllowed('chargePaystackMandate');
     return {
       success: true,
       reference: params.reference,
@@ -558,6 +582,8 @@ async function createFlutterwaveMandate(params: {
     };
   } catch (error: any) {
     console.error('[Flutterwave] Mandate creation failed:', error.message);
+    // Development-only fake mandate code — throws in production.
+    assertMockFallbackAllowed('createFlutterwaveMandate');
     return {
       mandate_code: `MND_${Date.now()}`,
     };
@@ -590,9 +616,193 @@ async function chargeFlutterwaveMandate(params: {
     };
   } catch (error: any) {
     console.error('[Flutterwave] Charge failed:', error.message);
+    // Development-only simulated success — throws in production, so a
+    // provider outage records the debit as FAILED, never as paid.
+    assertMockFallbackAllowed('chargeFlutterwaveMandate');
     return {
       success: true,
       reference: params.reference,
     };
   }
+}
+
+/**
+ * Keep mortgage_applications.outstanding_balance in sync with the amortization
+ * schedule: after any completed payment, the balance is the remainingBalance
+ * of the latest schedule row (0 when fully paid). Called after successful
+ * auto-debits and manual payments.
+ */
+async function syncOutstandingBalance(applicationId: number): Promise<void> {
+  const db = await requireDb();
+  const schedule = await db
+    .select()
+    .from(mortgagePaymentSchedule)
+    .where(eq(mortgagePaymentSchedule.applicationId, applicationId))
+    .orderBy(desc(mortgagePaymentSchedule.paymentNumber));
+
+  if (schedule.length === 0) return;
+  // Rows are DESC by paymentNumber: the first paid row is the most recent
+  // payment; its remainingBalance is the current outstanding principal.
+  const allPaid = schedule.every((s) => s.isPaid);
+  const latestPaid = schedule.find((s) => s.isPaid);
+
+  const [application] = await db
+    .select({ loanAmount: mortgageApplications.loanAmount, metadata: mortgageApplications.metadata })
+    .from(mortgageApplications)
+    .where(eq(mortgageApplications.id, applicationId))
+    .limit(1);
+
+  const outstanding = allPaid
+    ? 0
+    : latestPaid
+      ? latestPaid.remainingBalance
+      : application?.loanAmount ?? null;
+
+  await db
+    .update(mortgageApplications)
+    .set({
+      outstandingBalance: outstanding,
+      updatedAt: new Date(),
+      ...(allPaid
+        ? {
+            metadata: {
+              ...((application?.metadata as Record<string, unknown>) ?? {}),
+              repaymentStatus: 'paid_off',
+              paidOffAt: new Date().toISOString(),
+            },
+          }
+        : {}),
+    })
+    .where(eq(mortgageApplications.id, applicationId));
+}
+
+/** Fetch the amortization schedule for an application (overdue flags refreshed). */
+export async function getScheduleForApplication(applicationId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(mortgagePaymentSchedule)
+    .where(eq(mortgagePaymentSchedule.applicationId, applicationId))
+    .orderBy(mortgagePaymentSchedule.paymentNumber);
+
+  const now = new Date();
+  return rows.map((row) => ({
+    ...row,
+    isOverdue: !row.isPaid && row.dueDate < now,
+  }));
+}
+
+/** Fetch the current mandate for an application (any status). */
+export async function getMandateForApplication(applicationId: number) {
+  const db = await requireDb();
+  const [mandate] = await db
+    .select()
+    .from(autoDebitMandates)
+    .where(eq(autoDebitMandates.applicationId, applicationId))
+    .orderBy(desc(autoDebitMandates.createdAt))
+    .limit(1);
+  return mandate ?? null;
+}
+
+/** Admin: list mandates with optional status filter. */
+export async function listMandates(params: { status?: string; limit: number }) {
+  const db = await requireDb();
+  const query = db.select().from(autoDebitMandates);
+  const rows = params.status
+    ? await query.where(eq(autoDebitMandates.status, params.status as any)).limit(params.limit)
+    : await query.limit(params.limit);
+  return rows;
+}
+
+/** Suspend an active mandate (no further auto-debits until reactivated). */
+export async function suspendMandate(mandateId: string, reason: string) {
+  const db = await requireDb();
+  const [updated] = await db
+    .update(autoDebitMandates)
+    .set({ status: 'suspended', suspendedAt: new Date(), updatedAt: new Date() })
+    .where(eq(autoDebitMandates.mandateId, mandateId))
+    .returning();
+  if (!updated) throw new Error('Mandate not found');
+  console.log(`[MortgagePayment] Mandate ${mandateId} suspended: ${reason}`);
+  return updated;
+}
+
+/** Reactivate a suspended mandate. */
+export async function reactivateMandate(mandateId: string) {
+  const db = await requireDb();
+  const [mandate] = await db
+    .select()
+    .from(autoDebitMandates)
+    .where(eq(autoDebitMandates.mandateId, mandateId))
+    .limit(1);
+  if (!mandate) throw new Error('Mandate not found');
+  if (mandate.status !== 'suspended') {
+    throw new Error(`Cannot reactivate a mandate in status ${mandate.status}`);
+  }
+  const [updated] = await db
+    .update(autoDebitMandates)
+    .set({ status: 'active', updatedAt: new Date() })
+    .where(eq(autoDebitMandates.id, mandate.id))
+    .returning();
+  return updated;
+}
+
+/** Payment statistics for an application, computed from real rows. */
+export async function getPaymentStatsForApplication(applicationId: number) {
+  const db = await requireDb();
+  const schedule = await db
+    .select()
+    .from(mortgagePaymentSchedule)
+    .where(eq(mortgagePaymentSchedule.applicationId, applicationId));
+  const transactions = await db
+    .select()
+    .from(mortgagePaymentTransactions)
+    .where(
+      and(
+        eq(mortgagePaymentTransactions.applicationId, applicationId),
+        eq(mortgagePaymentTransactions.status, 'completed')
+      )
+    );
+
+  const totalScheduled = schedule.reduce((sum, s) => sum + s.totalAmount, 0);
+  const totalPaid = transactions.reduce((sum, t) => sum + t.amount, 0);
+  const now = new Date();
+  const overduePayments = schedule.filter((s) => !s.isPaid && s.dueDate < now).length;
+  const next = schedule
+    .filter((s) => !s.isPaid)
+    .sort((a, b) => a.paymentNumber - b.paymentNumber)[0];
+
+  return {
+    applicationId,
+    totalScheduled,
+    totalPaid,
+    totalOutstanding: Math.max(totalScheduled - totalPaid, 0),
+    paymentsMade: transactions.length,
+    paymentsRemaining: schedule.filter((s) => !s.isPaid).length,
+    overduePayments,
+    nextPaymentDue: next?.dueDate ?? null,
+    nextPaymentAmount: next?.totalAmount ?? null,
+  };
+}
+
+/** Upcoming unpaid installments for an application. */
+export async function getUpcomingPaymentsForApplication(applicationId: number, limit = 5) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(mortgagePaymentSchedule)
+    .where(
+      and(
+        eq(mortgagePaymentSchedule.applicationId, applicationId),
+        eq(mortgagePaymentSchedule.isPaid, false)
+      )
+    )
+    .orderBy(mortgagePaymentSchedule.paymentNumber)
+    .limit(limit);
+
+  const now = new Date();
+  return rows.map((row) => ({
+    ...row,
+    isOverdue: row.dueDate < now,
+  }));
 }

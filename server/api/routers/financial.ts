@@ -20,7 +20,6 @@ import {
   getMortgageApplicationById,
   getMortgageWorkflow,
   listMortgageApplicationsForUser,
-  seedMortgageApplications,
   transitionMortgageApplicationStatus,
   updateMortgageApplication,
   type MortgageLifecycleStatus,
@@ -300,13 +299,6 @@ export const financialRouter = router({
         reference: generatePaymentReference(input.prefix),
       };
     }),
-
-  /**
-   * Reset and reseed local mortgage application scenarios
-   */
-  seedMortgageApplications: protectedProcedure.mutation(async () => {
-    return await seedMortgageApplications();
-  }),
 
   /**
    * Get user's mortgage applications

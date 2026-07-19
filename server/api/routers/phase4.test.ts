@@ -12,7 +12,6 @@ import {
   landUsePlans,
   parcels, 
   users,
-  transactions,
 } from '../../../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -57,22 +56,8 @@ describe('Phase 4 Router', () => {
       .returning();
     testParcelId = testParcel[0].id;
 
-    // Create test transaction
-    const testTransaction = await db
-      .insert(transactions)
-      .values({
-        transactionId: `TXN-PHASE4-${Date.now()}`,
-        parcelId: testParcelId,
-        fromUserId: testUserId,
-        toUserId: testUserId,
-        transactionType: 'transfer',
-        status: 'initiated',
-        amount: 100000,
-        currency: 'NGN',
-        paymentMethod: 'mojaloop',
-      })
-      .returning();
-    testTransactionId = testTransaction[0].transactionId;
+    // Sub-system records reference the transaction by public code
+    testTransactionId = `TXN-PHASE4-${Date.now()}`;
   });
 
   afterAll(async () => {
@@ -106,7 +91,6 @@ describe('Phase 4 Router', () => {
 
     if (testTransactionId) {
       try {
-        await db.delete(transactions).where(eq(transactions.transactionId, testTransactionId));
       } catch (error) {
         console.error('Failed to cleanup transaction:', error);
       }
