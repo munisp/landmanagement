@@ -168,7 +168,7 @@ export default function SecurityMonitoring() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Security Monitoring</h1>
-          <p className="text-muted-foreground">Track security events, behavioral risk, honeypot traps, and incident-response automation.</p>
+          <p className="text-muted-foreground">Track security events, behavioral biometrics risk, honeypot traps, and incident-response automation.</p>
         </div>
         <div className="flex gap-2">
           <Select value={timeRange} onValueChange={setTimeRange}>
@@ -203,7 +203,7 @@ export default function SecurityMonitoring() {
         <TabsList className="flex flex-wrap gap-2 h-auto">
           <TabsTrigger value="events">Security Events</TabsTrigger>
           <TabsTrigger value="blocked">Blocked IPs</TabsTrigger>
-          <TabsTrigger value="behavioral"><Radar className="h-4 w-4 mr-2" />Behavioral Analytics</TabsTrigger>
+          <TabsTrigger value="behavioral"><Radar className="h-4 w-4 mr-2" />Behavioral Biometrics</TabsTrigger>
           <TabsTrigger value="honeypot"><Bug className="h-4 w-4 mr-2" />Honeypot Traps</TabsTrigger>
           <TabsTrigger value="incidents"><Siren className="h-4 w-4 mr-2" />Incident Response</TabsTrigger>
         </TabsList>
@@ -302,8 +302,8 @@ export default function SecurityMonitoring() {
           <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
             <Card>
               <CardHeader>
-                <CardTitle>Behavioral analytics for fraud detection</CardTitle>
-                <CardDescription>Register high-risk user behavior and route signals into the incident pipeline.</CardDescription>
+                <CardTitle>Behavioral biometrics for account security</CardTitle>
+                <CardDescription>Register device shifts, location jumps, velocity spikes, and other user-behavior signals, then route high-risk findings into the incident pipeline.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
@@ -320,8 +320,8 @@ export default function SecurityMonitoring() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Behavioral risk signals</CardTitle>
-                <CardDescription>Current user-behavior alerts used for fraud and abuse detection.</CardDescription>
+                <CardTitle>Behavioral biometric risk signals</CardTitle>
+                <CardDescription>Current account-behavior alerts used for device-trust review, fraud detection, and abuse prevention.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {(responseOverview?.behavioralSignals || []).map((signal: any) => (

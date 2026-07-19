@@ -74,7 +74,7 @@ export default function SearchParcels() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-start justify-between mb-8">
+          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <h1 className="text-3xl font-bold mb-2">{t('searchParcels.title')}</h1>
               <p className="text-muted-foreground">
@@ -254,8 +254,8 @@ export default function SearchParcels() {
                 </TabsContent>
               </Tabs>
 
-              <div className="flex gap-2 mt-4">
-                <Button onClick={handleSearch} className="gap-2" disabled={isLoading}>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <Button onClick={handleSearch} className="gap-2 sm:w-auto" disabled={isLoading}>
                   {isLoading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -268,7 +268,7 @@ export default function SearchParcels() {
                     </>
                   )}
                 </Button>
-                <Button variant="outline" onClick={handleClearFilters}>
+                <Button variant="outline" onClick={handleClearFilters} className="sm:w-auto">
                   {t('searchParcels.buttons.clearFilters')}
                 </Button>
               </div>

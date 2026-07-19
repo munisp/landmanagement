@@ -38,6 +38,24 @@ export default function SecurityDashboard() {
     critical: 'bg-red-100 text-red-800 border-red-200'
   };
 
+  const securityScore = Math.max(
+    0,
+    100 -
+      (dashboardData?.metrics.activeThreats || 0) * 6 -
+      (dashboardData?.metrics.highSeverityAlerts || 0) * 4 -
+      (dashboardData?.metrics.policyViolations || 0) * 3 -
+      (dashboardData?.metrics.costAnomalies || 0) * 2
+  );
+
+  const securityScoreTone =
+    securityScore >= 85
+      ? 'text-green-600'
+      : securityScore >= 70
+        ? 'text-yellow-600'
+        : securityScore >= 50
+          ? 'text-orange-600'
+          : 'text-red-600';
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -77,7 +95,17 @@ export default function SecurityDashboard() {
           </div>
 
           {/* Security Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Shield className={`h-5 w-5 ${securityScoreTone}`} />
+                  <span className={`text-2xl font-bold ${securityScoreTone}`}>{securityScore}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Security Score</p>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between mb-2">

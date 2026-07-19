@@ -72,6 +72,8 @@ import * as reportingService from './reportingService';
 import { storagePut } from './storage';
 import { TRPCError } from '@trpc/server';
 import {
+  batchAssignParcels,
+  batchVerifyParcels,
   createParcel,
   geospatialSearch as geospatialParcelSearch,
   getParcelById as getParcelFromRepository,
@@ -611,6 +613,303 @@ export const appRouter = router({
       }),
   }),
 
+  utility: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./utilityRepository');
+      return repo.getUtilityOverview();
+    }),
+
+    createConnection: protectedProcedure
+      .input(z.object({
+        parcelId: z.number(),
+        utilityType: z.enum(['electricity', 'water', 'sewage', 'gas', 'telecom']),
+        providerName: z.string().min(2),
+        accountReference: z.string().min(2),
+        status: z.enum(['pending', 'active', 'suspended', 'closed']),
+        serviceAddress: z.string().min(5),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./utilityRepository');
+        return repo.createUtilityConnection(input);
+      }),
+
+    createClearance: protectedProcedure
+      .input(z.object({
+        parcelId: z.number(),
+        utilityTypes: z.array(z.string()).min(1),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./utilityRepository');
+        return repo.createUtilityClearance(input);
+      }),
+
+    recordPayment: protectedProcedure
+      .input(z.object({
+        connectionId: z.number(),
+        amount: z.number().positive(),
+        paymentMethod: z.enum(['bank_transfer', 'card', 'wallet']),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./utilityRepository');
+        return repo.recordUtilityPayment(input);
+      }),
+  }),
+
+  community: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./communityRepository');
+      return repo.getCommunityOverview();
+    }),
+
+    createForumPost: protectedProcedure
+      .input(z.object({
+        title: z.string().min(3),
+        category: z.string().min(2),
+        author: z.string().min(2),
+        excerpt: z.string().min(10),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./communityRepository');
+        return repo.createForumPost(input);
+      }),
+
+    createTownHall: protectedProcedure
+      .input(z.object({
+        title: z.string().min(3),
+        scheduledFor: z.string().min(5),
+        venue: z.string().min(3),
+        status: z.enum(['scheduled', 'completed']),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./communityRepository');
+        return repo.createTownHall(input);
+      }),
+
+    createFeedback: protectedProcedure
+      .input(z.object({
+        subject: z.string().min(3),
+        submitter: z.string().min(2),
+        channel: z.string().min(2),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./communityRepository');
+        return repo.createFeedback(input);
+      }),
+
+    createPoll: protectedProcedure
+      .input(z.object({
+        question: z.string().min(5),
+        options: z.array(z.string().min(1)).min(2),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./communityRepository');
+        return repo.createPoll(input);
+      }),
+
+    createProposal: protectedProcedure
+      .input(z.object({
+        title: z.string().min(3),
+        proposer: z.string().min(2),
+        area: z.string().min(2),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./communityRepository');
+        return repo.createProposal(input);
+      }),
+
+    createBudget: protectedProcedure
+      .input(z.object({
+        initiative: z.string().min(3),
+        allocatedAmount: z.number().positive(),
+        status: z.enum(['draft', 'voting', 'approved']),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./communityRepository');
+        return repo.createBudget(input);
+      }),
+
+    createNotification: protectedProcedure
+      .input(z.object({
+        title: z.string().min(3),
+        message: z.string().min(5),
+        audience: z.string().min(2),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./communityRepository');
+        return repo.createCommunityNotification(input);
+      }),
+  }),
+
+  heritage: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./heritageRepository');
+      return repo.getHeritageOverview();
+    }),
+
+    createSite: protectedProcedure
+      .input(z.object({
+        siteName: z.string().min(3),
+        designation: z.string().min(3),
+        overlayZone: z.string().min(2),
+        archaeologicalRequirement: z.string().min(5),
+        monitoringStatus: z.enum(['active', 'review']),
+        unescoReference: z.string().nullable(),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./heritageRepository');
+        return repo.createHeritageSite(input);
+      }),
+
+    createClearance: protectedProcedure
+      .input(z.object({
+        parcelId: z.number(),
+        siteName: z.string().min(3),
+        impactAssessment: z.string().min(10),
+        status: z.enum(['pending', 'approved', 'conditional']),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./heritageRepository');
+        return repo.createHeritageClearance(input);
+      }),
+  }),
+
+  agricultural: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./agriculturalRepository');
+      return repo.getAgriculturalOverview();
+    }),
+
+    createParcel: protectedProcedure
+      .input(z.object({
+        parcelId: z.number(),
+        cropType: z.string().min(2),
+        soilQuality: z.string().min(3),
+        irrigationSystem: z.string().min(3),
+        subsidyProgram: z.string().min(2),
+        extensionOfficer: z.string().min(2),
+        productivityIndex: z.number().min(0).max(100),
+        weatherOutlook: z.string().min(3),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./agriculturalRepository');
+        return repo.createAgriculturalParcel(input);
+      }),
+  }),
+
+  mining: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./miningRepository');
+      return repo.getMiningOverview();
+    }),
+
+    createRight: protectedProcedure
+      .input(z.object({
+        parcelId: z.number(),
+        licenseName: z.string().min(3),
+        mineralType: z.string().min(2),
+        demarcationStatus: z.string().min(3),
+        royaltyRate: z.number().min(0),
+        environmentalCompliance: z.string().min(3),
+        closurePlan: z.string().min(3),
+        transferWorkflowStatus: z.string().min(3),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./miningRepository');
+        return repo.createMiningRight(input);
+      }),
+  }),
+
+  coastal: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./coastalRepository');
+      return repo.getCoastalOverview();
+    }),
+
+    createZone: protectedProcedure
+      .input(z.object({
+        parcelId: z.number(),
+        erosionRisk: z.string().min(2),
+        setbackMeters: z.number().min(0),
+        beachAccessPlan: z.string().min(3),
+        marineProtectedArea: z.string().min(2),
+        developmentPermitStatus: z.string().min(3),
+        seaLevelImpactAssessment: z.string().min(3),
+        coastalInfrastructure: z.string().min(3),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./coastalRepository');
+        return repo.createCoastalZone(input);
+      }),
+  }),
+
+  forest: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./forestRepository');
+      return repo.getForestOverview();
+    }),
+
+    createReserve: protectedProcedure
+      .input(z.object({
+        reserveName: z.string().min(3),
+        boundaryDescription: z.string().min(3),
+        deforestationStatus: z.string().min(3),
+        loggingPermitStatus: z.string().min(3),
+        reforestationPlan: z.string().min(3),
+        carbonCreditEstimate: z.number().min(0),
+        wildlifeCorridor: z.string().min(3),
+        fireRiskLevel: z.string().min(2),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./forestRepository');
+        return repo.createForestReserve(input);
+      }),
+  }),
+
+  infrastructure: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./infrastructureRepository');
+      return repo.getInfrastructureOverview();
+    }),
+
+    createProject: protectedProcedure
+      .input(z.object({
+        projectName: z.string().min(3),
+        roadNetworkSegment: z.string().min(3),
+        rightOfWayStatus: z.string().min(3),
+        projectTrackingStatus: z.string().min(3),
+        utilityCorridor: z.string().min(3),
+        landAcquisitionStatus: z.string().min(3),
+        compensationEstimate: z.number().min(0),
+        impactAssessment: z.string().min(3),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./infrastructureRepository');
+        return repo.createInfrastructureProject(input);
+      }),
+  }),
+
+  dataGovernance: router({
+    overview: protectedProcedure.query(async () => {
+      const repo = await import('./dataGovernanceRepository');
+      return repo.getDataGovernanceOverview();
+    }),
+
+    createRecord: protectedProcedure
+      .input(z.object({
+        domain: z.string().min(3),
+        qualityScore: z.number().min(0).max(100),
+        cleansingStatus: z.string().min(3),
+        lineagePath: z.string().min(3),
+        masterRecord: z.string().min(3),
+        catalogEntry: z.string().min(3),
+        governancePolicy: z.string().min(3),
+      }))
+      .mutation(async ({ input }) => {
+        const repo = await import('./dataGovernanceRepository');
+        return repo.createDataGovernanceRecord(input);
+      }),
+  }),
+
   // Parcel Management
   parcels: router({
     search: publicProcedure
@@ -715,6 +1014,34 @@ export const appRouter = router({
           });
         } catch (error) {
           return verifyParcelInRepository(input.id, String(ctx.user.id));
+        }
+      }),
+
+    batchAssign: protectedProcedure
+      .input(z.object({
+        parcelIds: z.array(z.number()).min(1),
+        surveyorId: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          return await parcelService.post('/api/v1/parcels/batch/assign', input);
+        } catch (error) {
+          return batchAssignParcels(input.parcelIds, input.surveyorId);
+        }
+      }),
+
+    batchVerify: protectedProcedure
+      .input(z.object({
+        parcelIds: z.array(z.number()).min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        try {
+          return await parcelService.post('/api/v1/parcels/batch/verify', {
+            parcelIds: input.parcelIds,
+            verifierId: ctx.user.id,
+          });
+        } catch (error) {
+          return batchVerifyParcels(input.parcelIds, String(ctx.user.id));
         }
       }),
 
@@ -2540,6 +2867,31 @@ export const appRouter = router({
             ...document,
             uploadedAt: new Date(document.uploadedAt),
           })),
+        };
+      }),
+
+    proofSummary: protectedProcedure
+      .query(async ({ ctx }) => {
+        const { getVerificationProofSummary } = await import('./identityVerificationRepository');
+        const summary = getVerificationProofSummary(ctx.user.id);
+        return {
+          ...summary,
+          proofs: {
+            ...summary.proofs,
+            nin: {
+              ...summary.proofs.nin,
+              verifiedAt: summary.proofs.nin.verifiedAt ? new Date(summary.proofs.nin.verifiedAt) : null,
+            },
+            bvn: {
+              ...summary.proofs.bvn,
+              verifiedAt: summary.proofs.bvn.verifiedAt ? new Date(summary.proofs.bvn.verifiedAt) : null,
+            },
+            documents: summary.proofs.documents.map((document) => ({
+              ...document,
+              uploadedAt: new Date(document.uploadedAt),
+            })),
+          },
+          generatedAt: new Date(summary.generatedAt),
         };
       }),
 

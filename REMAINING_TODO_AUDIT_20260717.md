@@ -8,7 +8,10 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 
 | Category | Current status | Notes |
 |---|---|---|
-| Notification templates and queueing | Implemented and tracker-corrected | Email templates, SMS templates, retry queueing, and delivery tracking are present in the codebase. |
+| Notification templates and queueing | Implemented and tracker-corrected | Email templates, SMS templates, retry queueing, delivery tracking, and user preferences are present in the codebase. |
+| End-to-end workflow validation | Implemented and tracker-corrected | Search, transaction, payment, blockchain, and verification flows are now reflected in the automated validation coverage and corrected in the tracker. |
+| Multilingual public-page coverage | Implemented and tracker-corrected | ParcelMap, SearchParcels, Dashboard, and global language-switch verification are now backed by runtime i18n fixes and automated multilingual smoke tests. |
+| Audit trail enhancements | Implemented and tracker-corrected | CRUD-linked tracking, user attribution, export, retention, filtering, and API endpoints are present in repository scope. |
 | API documentation and key management | Implemented and tracker-corrected | The live API docs page already provides authentication guidance, code examples, rate-limit documentation, and key management. |
 | Audit CRUD attribution, export, and retention | Implemented and tracker-corrected | User-attributed audit middleware, export services, and concrete retention enforcement are now present. |
 | Public blockchain verification | Implemented and tracker-corrected | `/verify` is routed and used from live UI flows. |
@@ -31,7 +34,7 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 | Final integration, monitoring, and DR | Implemented and tracker-corrected | The repository now includes end-to-end validation evidence, security-audit-oriented automated tests, user documentation, monitoring dashboards, backup/recovery workflows, and UAT coverage documentation. |
 | Advanced security foundation | Implemented and tracker-corrected | Zero-trust-style authorization, WAF/API protection, threat-intelligence integration, behavioral analytics, honeypot monitoring, and incident-response automation are now exposed through the live security-monitoring workflow. |
 | IoT operations | Implemented and tracker-corrected | The repository now includes a live IoT operations workspace covering smart sensors, environmental monitoring, access control, utility-meter readings, device management, and predictive maintenance. |
-| Large future-platform roadmap items | Still unchecked and materially broader than the already-remediated core platform | Includes full Fabric network rollout execution and other long-horizon future programs, but no longer the previously open advanced-security or IoT clusters completed in this pass. |
+| Large future-platform roadmap items | Residual unchecked backlog is now dominated by environment-only execution work | The leading remaining items are production cluster rollout, microservice deployment, load balancer and replication setup, live Mojaloop/FSP onboarding, Polygon Mumbai contract deployment and verification, and physical mobile-device PWA validation. |
 
 ## Verified Fixes Completed in This Pass
 
@@ -70,16 +73,16 @@ A second cleanup pass confirmed that several unchecked roadmap items were alread
 
 | Priority | Reason |
 |---|---|
-| Normalize duplicate historical roadmap sections in `todo.md` | The unchecked total has been reduced further, but future-program and historical-planning entries still inflate the raw count. |
-| Reclassify broad expansion clusters | Remaining long-horizon future programs should be separated from the already-remediated core production application. |
-| Decide whether to mark repository-level Fabric deployment automation complete in the tracker | The deployment script and manifests exist, but live environment execution is distinct from repository completeness. |
-| Decide whether to harden legal-document workflows for offline fallback before closing them | The legal-document service remains more database-dependent than the adjacent mortgage, tax, and insurance workflow modules. |
-| Refresh final delivery documents after validation | The manifest, audit note, and handoff should reflect the new Phase 4 application-workflow closure work. |
+| Document residual environment-only blockers in the tracker and handoff | The leading unchecked items now center on live infrastructure rollout, mobile-device validation, and external-network deployment rather than missing repository workflows. |
+| Separate physical-device PWA checks from repository completeness | iOS Safari, Android Chrome, installation, and offline caching checks now require real-device execution evidence. |
+| Separate live blockchain testnet deployment from repository completeness | Polygon Mumbai deployment, Polygonscan verification, and live contract-interaction tests require wallet funding and external network execution. |
+| Separate external payment-network onboarding from repository completeness | Mojaloop sandbox setup, FSP registration, and live end-to-end settlement flows require third-party environment access. |
+| Refresh delivery documents after the latest closure wave | The audit, manifest, validation note, and handoff should reflect the reduced unchecked count and the environment-only nature of much of the residual backlog. |
 
 ## Current Validation Status Relevant to This Pass
 
 > TypeScript validation returns successfully after the broker commission, database helper, document comparison, search analytics, intelligent mortgage prefill, and land-suitability follow-on fixes.
 
-Current remaining unchecked count in `todo.md` after the latest closure pass is **1323**, but that figure still includes broader future-program entries and historical roadmap duplication and therefore does not equal the actual count of unresolved core-product defects.
+Current remaining unchecked count in `todo.md` after the latest closure pass is **559**, and the leading visible remainder is increasingly concentrated in **environment-only** work: physical mobile-device PWA validation, live Polygon Mumbai deployment and verification, Mojaloop/FSP sandbox onboarding, and production infrastructure rollout steps that cannot be fully completed inside repository scope alone.
 
 This file is an audit note, not a final certification that all remaining unchecked roadmap items are complete.

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +63,7 @@ function buildParcelBoundaries(parcel: any): google.maps.LatLngLiteral[] {
 }
 
 export default function ParcelMap() {
+  const { t } = useTranslation();
   const [, params] = useRoute("/parcels/:id/map");
   const parcelId = params?.id ? parseInt(params.id) : null;
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -87,7 +89,7 @@ export default function ParcelMap() {
 
     const boundaries = buildParcelBoundaries(parcel);
     if (boundaries.length < 3) {
-      toast.error('Parcel geometry is unavailable for mapping.');
+      toast.error(t('parcelMap.messages.geometryUnavailable', { defaultValue: 'Parcel geometry is unavailable for mapping.' }));
       return;
     }
 
@@ -222,9 +224,9 @@ export default function ParcelMap() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Parcel not found</p>
+            <p className="text-muted-foreground">{t('parcelMap.states.notFound', { defaultValue: 'Parcel not found' })}</p>
             <Link href="/search">
-              <Button className="mt-4">Back to Search</Button>
+              <Button className="mt-4">{t('parcelMap.actions.backToSearch', { defaultValue: 'Back to Search' })}</Button>
             </Link>
           </CardContent>
         </Card>
@@ -241,7 +243,7 @@ export default function ParcelMap() {
             <Link href={`/parcels/${parcelId}`}>
               <Button variant="ghost" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
-                Back to Parcel Details
+                {t('parcelMap.actions.backToDetails', { defaultValue: 'Back to Parcel Details' })}
               </Button>
             </Link>
             <div className="flex items-center gap-4">
@@ -301,19 +303,19 @@ export default function ParcelMap() {
             <CardContent>
               <div className="space-y-3 text-sm">
                 <div>
-                  <span className="text-muted-foreground">Survey Plan:</span>
+                  <span className="text-muted-foreground">{t('parcelMap.labels.surveyPlan', { defaultValue: 'Survey Plan:' })}</span>
                   <p className="font-medium">{parcel.surveyPlanNumber}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Area:</span>
+                  <span className="text-muted-foreground">{t('parcelMap.labels.area', { defaultValue: 'Area:' })}</span>
                   <p className="font-medium">{parcel.areaSquareMeters?.toFixed(2)} m² ({(parcel.areaSquareMeters! / 10000).toFixed(4)} hectares)</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Land Use:</span>
+                  <span className="text-muted-foreground">{t('parcelMap.labels.landUse', { defaultValue: 'Land Use:' })}</span>
                   <p className="font-medium capitalize">{parcel.landUseType || 'N/A'}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Location:</span>
+                  <span className="text-muted-foreground">{t('parcelMap.labels.location', { defaultValue: 'Location:' })}</span>
                   <p className="font-medium">{parcel.state} State, {parcel.lga} LGA</p>
                   {parcel.ward && <p className="text-xs text-muted-foreground">{parcel.ward}</p>}
                 </div>
@@ -323,7 +325,8 @@ export default function ParcelMap() {
                     <div className="flex items-center gap-2 text-blue-600">
                       <Ruler className="h-4 w-4" />
                       <div>
-                        <p className="text-xs text-muted-foreground">Measured Area</p>
+                                                  <p className="text-xs text-muted-foreground">{t('parcelMap.measurements.area', { defaultValue: 'Measured Area' })}</p>
+
                         <p className="font-semibold">{measurements.area.toFixed(2)} m²</p>
                       </div>
                     </div>
@@ -335,7 +338,8 @@ export default function ParcelMap() {
                     <div className="flex items-center gap-2 text-red-600">
                       <Ruler className="h-4 w-4" />
                       <div>
-                        <p className="text-xs text-muted-foreground">Measured Distance</p>
+                                                  <p className="text-xs text-muted-foreground">{t('parcelMap.measurements.distance', { defaultValue: 'Measured Distance' })}</p>
+
                         <p className="font-semibold">{measurements.distance.toFixed(2)} m</p>
                       </div>
                     </div>
@@ -347,7 +351,7 @@ export default function ParcelMap() {
                 <Link href={`/parcels/${parcelId}`} className="block">
                   <Button variant="outline" size="sm" className="w-full gap-2">
                     <Maximize2 className="h-4 w-4" />
-                    Full Details
+                    {t('parcelMap.actions.fullDetails', { defaultValue: 'Full Details' })}
                   </Button>
                 </Link>
                 <Button 
@@ -357,12 +361,14 @@ export default function ParcelMap() {
                   onClick={() => {
                     if (polygon) {
                       polygon.setEditable(!polygon.getEditable());
-                      toast.info(polygon.getEditable() ? "Boundary editing enabled" : "Boundary editing disabled");
+                      toast.info(polygon.getEditable()
+                        ? t('parcelMap.messages.editingEnabled', { defaultValue: 'Boundary editing enabled' })
+                        : t('parcelMap.messages.editingDisabled', { defaultValue: 'Boundary editing disabled' }));
                     }
                   }}
                 >
                   <Pencil className="h-4 w-4" />
-                  Toggle Edit Mode
+                  {t('parcelMap.actions.toggleEditMode', { defaultValue: 'Toggle Edit Mode' })}
                 </Button>
               </div>
             </CardContent>
@@ -372,25 +378,25 @@ export default function ParcelMap() {
         {/* Map Controls Legend */}
         <div className="absolute bottom-4 right-4 z-10">
           <Card className="p-4">
-            <h4 className="font-semibold text-sm mb-2">Legend</h4>
+            <h4 className="font-semibold text-sm mb-2">{t('parcelMap.legend.title', { defaultValue: 'Legend' })}</h4>
             <div className="space-y-2 text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded border-2 border-green-500 bg-green-500/20"></div>
-                <span>Verified</span>
+                <span>{t('parcelMap.legend.verified', { defaultValue: 'Verified' })}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded border-2 border-blue-500 bg-blue-500/20"></div>
-                <span>Registered</span>
+                <span>{t('parcelMap.legend.registered', { defaultValue: 'Registered' })}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded border-2 border-yellow-500 bg-yellow-500/20"></div>
-                <span>Pending</span>
+                <span>{t('parcelMap.legend.pending', { defaultValue: 'Pending' })}</span>
               </div>
             </div>
             <div className="mt-3 pt-3 border-t space-y-1 text-xs text-muted-foreground">
-              <p>• Use drawing tools to measure area</p>
-              <p>• Use polyline tool to measure distance</p>
-              <p>• Click boundary to toggle edit mode</p>
+              <p>{t('parcelMap.legend.tipArea', { defaultValue: '• Use drawing tools to measure area' })}</p>
+              <p>{t('parcelMap.legend.tipDistance', { defaultValue: '• Use polyline tool to measure distance' })}</p>
+              <p>{t('parcelMap.legend.tipEdit', { defaultValue: '• Click boundary to toggle edit mode' })}</p>
             </div>
           </Card>
         </div>

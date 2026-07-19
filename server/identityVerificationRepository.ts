@@ -1,4 +1,6 @@
-import { readJsonStore, writeJsonStore } from './jsonStore';
+import fs from 'fs';
+import crypto from 'crypto';
+import path from 'path';
 
 export type VerificationState = 'pending' | 'verified' | 'failed';
 export type KycDocumentStatus = 'pending' | 'verified' | 'rejected';
@@ -33,6 +35,12 @@ interface IdentityStore {
   profiles: IdentityProfile[];
 }
 
+const DATA_DIR = path.join(process.cwd(), 'server', 'data');
+const STORE_PATH = path.join(DATA_DIR, 'identity-verification-store.json');
+
+function ensureDataDir() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 function createSeedProfile(): IdentityProfile {
   return {
@@ -84,16 +92,36 @@ function defaultStore(): IdentityStore {
   };
 }
 
-async function loadStore(): Promise<IdentityStore> {
-  return readJsonStore<IdentityStore>('identity-verification-store', defaultStore);
+function loadStore(): IdentityStore {
+  ensureDataDir();
+  if (!fs.existsSync(STORE_PATH)) {
+    const store = defaultStore();
+    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+    return store;
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')) as IdentityStore;
+    if (!Array.isArray(parsed.profiles) || typeof parsed.nextDocumentId !== 'number') {
+      const store = defaultStore();
+      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+      return store;
+    }
+    return parsed;
+  } catch {
+    const store = defaultStore();
+    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+    return store;
+  }
 }
 
-async function saveStore(store: IdentityStore) {
-  await writeJsonStore('identity-verification-store', store);
+function saveStore(store: IdentityStore) {
+  ensureDataDir();
+  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
 }
 
-async function getOrCreateProfile(userId: number) {
-  const store = await loadStore();
+function getOrCreateProfile(userId: number) {
+  const store = loadStore();
   let profile = store.profiles.find((item) => item.userId === userId);
   if (!profile) {
     profile = {
@@ -104,39 +132,39 @@ async function getOrCreateProfile(userId: number) {
       documents: [],
     };
     store.profiles.push(profile);
-    await saveStore(store);
+    saveStore(store);
   }
   return { store, profile };
 }
 
-export async function getIdentityProfile(userId: number) {
-  return (await getOrCreateProfile(userId)).profile;
+export function getIdentityProfile(userId: number) {
+  return getOrCreateProfile(userId).profile;
 }
 
-export async function verifyNin(userId: number, nin: string) {
-  const { store, profile } = await getOrCreateProfile(userId);
+export function verifyNin(userId: number, nin: string) {
+  const { store, profile } = getOrCreateProfile(userId);
   profile.nin = {
     number: nin,
     status: nin.length === 11 ? 'verified' : 'failed',
     verifiedAt: nin.length === 11 ? new Date().toISOString() : null,
   };
-  await saveStore(store);
+  saveStore(store);
   return profile;
 }
 
-export async function verifyBvn(userId: number, bvn: string) {
-  const { store, profile } = await getOrCreateProfile(userId);
+export function verifyBvn(userId: number, bvn: string) {
+  const { store, profile } = getOrCreateProfile(userId);
   profile.bvn = {
     number: bvn,
     status: bvn.length === 11 ? 'verified' : 'failed',
     verifiedAt: bvn.length === 11 ? new Date().toISOString() : null,
   };
-  await saveStore(store);
+  saveStore(store);
   return profile;
 }
 
-export async function uploadKycDocument(userId: number, input: { type: string; fileName: string }) {
-  const { store, profile } = await getOrCreateProfile(userId);
+export function uploadKycDocument(userId: number, input: { type: string; fileName: string }) {
+  const { store, profile } = getOrCreateProfile(userId);
   const document = {
     id: store.nextDocumentId,
     type: input.type,
@@ -146,6 +174,51 @@ export async function uploadKycDocument(userId: number, input: { type: string; f
   };
   store.nextDocumentId += 1;
   profile.documents.unshift(document);
-  await saveStore(store);
+  saveStore(store);
   return document;
+}
+
+function maskValue(value: string | null) {
+  if (!value) return null;
+  if (value.length <= 4) return '****';
+  return `${value.slice(0, 2)}${'*'.repeat(Math.max(2, value.length - 4))}${value.slice(-2)}`;
+}
+
+function createCommitment(label: string, value: string | null, status: VerificationState | KycDocumentStatus, timestamp: string | null) {
+  const basis = `${label}|${value || 'none'}|${status}|${timestamp || 'none'}`;
+  return crypto.createHash('sha256').update(basis).digest('hex');
+}
+
+export function getVerificationProofSummary(userId: number) {
+  const profile = getIdentityProfile(userId);
+
+  const ninCommitment = createCommitment('nin', profile.nin.number, profile.nin.status, profile.nin.verifiedAt);
+  const bvnCommitment = createCommitment('bvn', profile.bvn.number, profile.bvn.status, profile.bvn.verifiedAt);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    policy: 'Zero-knowledge-style verification summary exposing only commitments, masks, and verification states for sensitive identity attributes.',
+    proofs: {
+      nin: {
+        status: profile.nin.status,
+        maskedValue: maskValue(profile.nin.number),
+        verifiedAt: profile.nin.verifiedAt,
+        commitment: ninCommitment,
+      },
+      bvn: {
+        status: profile.bvn.status,
+        maskedValue: maskValue(profile.bvn.number),
+        verifiedAt: profile.bvn.verifiedAt,
+        commitment: bvnCommitment,
+      },
+      documents: profile.documents.map((document) => ({
+        id: document.id,
+        type: document.type,
+        status: document.status,
+        uploadedAt: document.uploadedAt,
+        fileNameMask: document.fileName.replace(/.(?=.{4})/g, '*'),
+        commitment: createCommitment(`document:${document.id}`, document.fileName, document.status, document.uploadedAt),
+      })),
+    },
+  };
 }

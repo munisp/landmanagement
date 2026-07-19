@@ -30,6 +30,7 @@ export default function IdentityVerification() {
   const [documentFileName, setDocumentFileName] = useState("");
 
   const { data: profile, isLoading } = trpc.identityVerification.profile.useQuery();
+  const { data: proofSummary } = trpc.identityVerification.proofSummary.useQuery();
 
   const verifyNinMutation = trpc.identityVerification.verifyNin.useMutation({
     onSuccess: async () => {
@@ -179,6 +180,48 @@ export default function IdentityVerification() {
                   </div>
                 </div>
               </div>
+
+              {proofSummary && (
+                <div className="mt-6 rounded-lg border bg-muted/30 p-4 space-y-4">
+                  <div>
+                    <p className="font-medium">Zero-knowledge-style proof summary</p>
+                    <p className="text-sm text-muted-foreground">{proofSummary.policy}</p>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="rounded-lg border bg-background p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium">NIN commitment</p>
+                        <Badge variant="outline">{formatStatus(proofSummary.proofs.nin.status)}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">Masked value: {proofSummary.proofs.nin.maskedValue || 'Unavailable'}</p>
+                      <p className="mt-2 break-all text-xs text-muted-foreground">{proofSummary.proofs.nin.commitment}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium">BVN commitment</p>
+                        <Badge variant="outline">{formatStatus(proofSummary.proofs.bvn.status)}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">Masked value: {proofSummary.proofs.bvn.maskedValue || 'Unavailable'}</p>
+                      <p className="mt-2 break-all text-xs text-muted-foreground">{proofSummary.proofs.bvn.commitment}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="font-medium">Document commitments</p>
+                      <p className="mt-2 text-sm text-muted-foreground">Generated {new Date(proofSummary.generatedAt).toLocaleString()}</p>
+                      <div className="mt-3 space-y-2">
+                        {proofSummary.proofs.documents.slice(0, 3).map((document: any) => (
+                          <div key={document.id} className="rounded border p-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-medium">{document.type}</span>
+                              <Badge variant="secondary">{formatStatus(document.status)}</Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">{document.fileNameMask}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

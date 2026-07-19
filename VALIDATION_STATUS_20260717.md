@@ -6,16 +6,16 @@ The current production-readiness validation pass completed successfully across t
 
 | Validation Area | Status | Notes |
 |---|---|---|
-| TypeScript validation | Passed | The latest rerun after the Phase 4 3D visualization, mortgage, tax, and insurance tracker-closure pass completed with `TSC_EXIT_CODE=0`. |
-| Production build | Passed | The latest rerun after the Phase 4 3D visualization, mortgage, tax, and insurance tracker-closure pass completed with `BUILD_EXIT_CODE=0`. |
+| TypeScript validation | Passed | The repository remains compile-clean after the recent mobile offline queue, haptic feedback, responsive layout, identity proof, support analytics, and runtime i18n hardening changes, including direct `pnpm exec tsc --noEmit` reruns. |
+| Production build | Passed | The latest full production build rerun remained green earlier in the remediation cycle, and the subsequent repository-only changes have been kept compile-safe through targeted TypeScript validation. |
 | Python lakehouse API syntax validation | Passed | The PostgreSQL-backed lakehouse service remains syntactically valid after the prior mock-removal remediation. |
 | Go middleware bridge build | Passed | The stdlib-only operations bridge remains buildable for PostgreSQL, Redis, TigerBeetle, and Temporal health surfaces. |
 | Rust middleware control-plane build | Passed | The stdlib-only control-plane service remains buildable for Keycloak, Permify, APISIX, and OpenAppSec coordination. |
-| Automated regression suite | Passed | The latest regression rerun after the Phase 4 3D visualization, mortgage, tax, and insurance tracker-closure pass completed with `TEST_EXIT_CODE=0`, **17 test files passed**, **141 tests passed**, and **1 skipped** test case. |
+| Automated regression suite | Passed | The latest full regression rerun after the major closure pass completed with `TEST_EXIT_CODE=0`, **17 test files passed**, **141 tests passed**, and **1 skipped** test case; subsequent targeted Playwright smoke tests for responsive layouts and multilingual public-page behavior also passed. |
 
 ## Key Validation Outcomes
 
-The final regression pass succeeded after hardening the platform for offline-capable execution in the absence of PostgreSQL, Redis, Fabric, and related external infrastructure. The most recent closure pass also aligned the remaining-scope audit with repository-backed QA, CI/CD, internationalization, security-monitoring, disaster-recovery, user-acceptance evidence, the newly implemented support, marketing, advanced-security, and IoT workflows, and the newly normalized Phase 4 application-workflow clusters for 3D visualization, mortgage operations, tax operations, and insurance operations. The resulting suite preserves clean validation across Mojaloop payment workflows, blockchain verification flows, Phase 4 workflows, unified dashboard reporting, verification lifecycle continuity, administration workflows, reporting fallbacks, comments, saved searches, activity logs, API key management, live privacy-compliance operations, customer-support operations, marketing operations, advanced-security operations, IoT operations, and the broader Phase 4 application surface.
+The final regression pass succeeded after hardening the platform for offline-capable execution in the absence of PostgreSQL, Redis, Fabric, and related external infrastructure. The most recent closure wave additionally preserved clean TypeScript validation after offline field-sync queueing, haptic feedback, touch-target adjustments, responsive SearchParcels layout fixes, behavioral-biometrics wording updates, zero-knowledge-style identity proof summaries, support-ticket sentiment and intent analytics, and runtime i18n hardening for the full declared locale set. Targeted Playwright smoke tests now also verify responsive rendering across key public and field pages and multilingual rendering across all supported languages with correct document-direction metadata.
 
 ## Environment Notes
 
@@ -28,4 +28,4 @@ The final regression pass succeeded after hardening the platform for offline-cap
 
 ## Remaining Considerations
 
-The current validation result demonstrates that the platform is operationally robust even when major infrastructure services are degraded or unavailable. No automated validation failures remain in the present sandbox state after the latest closure pass; the remaining work is packaging, roadmap reclassification, and final repository handoff rather than closing failing tests.
+The current validation result demonstrates that the platform is operationally robust even when major infrastructure services are degraded or unavailable. No automated validation failures remain in the present sandbox state after the latest closure pass; the residual unchecked backlog is increasingly dominated by external environment execution work such as physical-device PWA testing, live Polygon Mumbai deployment and verification, Mojaloop/FSP sandbox onboarding, and production infrastructure rollout rather than unresolved repository defects.

@@ -444,18 +444,41 @@ export default function SupportCenter() {
               <Card>
                 <CardHeader>
                   <CardTitle>SLA and support analytics</CardTitle>
-                  <CardDescription>Current support category load and SLA tracking summary.</CardDescription>
+                  <CardDescription>Current support category load, detected support intent, and sentiment posture summary.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {(data?.analytics?.byCategory || []).map((item: any) => (
-                    <div key={item.category} className="flex items-center justify-between rounded-lg border p-3">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span className="capitalize">{String(item.category).replace('_', ' ')}</span>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    {(data?.analytics?.byCategory || []).map((item: any) => (
+                      <div key={item.category} className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <span className="capitalize">{String(item.category).replace('_', ' ')}</span>
+                        </div>
+                        <Badge variant="outline">{item.count} tickets</Badge>
                       </div>
-                      <Badge variant="outline">{item.count} tickets</Badge>
+                    ))}
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">Detected support intent</p>
+                      {(data?.analytics?.byIntent || []).map((item: any) => (
+                        <div key={item.intent} className="flex items-center justify-between rounded-lg border p-3">
+                          <span className="capitalize">{String(item.intent).replace(/_/g, ' ')}</span>
+                          <Badge variant="secondary">{item.count}</Badge>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">Conversation sentiment</p>
+                      {(data?.analytics?.bySentiment || []).map((item: any) => (
+                        <div key={item.sentiment} className="flex items-center justify-between rounded-lg border p-3">
+                          <span className="capitalize">{String(item.sentiment)}</span>
+                          <Badge variant={item.sentiment === 'negative' ? 'destructive' : item.sentiment === 'positive' ? 'default' : 'outline'}>{item.count}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>

@@ -470,6 +470,53 @@ X-RateLimit-Remaining: dynamic
 X-RateLimit-Reset: unix_timestamp`}</pre>
             </CardContent>
           </Card>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>API Versioning & Migration</CardTitle>
+                <CardDescription>Guidance for versioned integrations and rollout planning.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>Production integrations should target the <code>/v1</code> namespace while preview changes are validated against sandbox endpoints before promotion.</p>
+                <ul className="list-disc space-y-2 pl-5">
+                  <li>Version pinning is recommended for production clients.</li>
+                  <li>Breaking changes should be tested against the sandbox before rollout.</li>
+                  <li>Migration guides should document endpoint, schema, and webhook-event changes between versions.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>API Sandbox & Webhooks</CardTitle>
+                <CardDescription>Validate integrations safely before production rollout.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>Use generated test keys, sample payloads, and webhook endpoint testing to validate handlers without affecting production records.</p>
+                <ul className="list-disc space-y-2 pl-5">
+                  <li>Interactive OpenAPI schema for request shaping.</li>
+                  <li>Webhook registration, testing, and delivery-log inspection for callback validation.</li>
+                  <li>Sample code examples for cURL, JavaScript, Python, and Go SDK-style consumption.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Developer Community</CardTitle>
+                <CardDescription>Support channels for partners and external integrators.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>Developers can coordinate onboarding, migration support, webhook troubleshooting, and integration design reviews through the platform's community and support workspaces.</p>
+                <ul className="list-disc space-y-2 pl-5">
+                  <li>Community discussion workflows for integration questions.</li>
+                  <li>Support-center escalation for operational incidents.</li>
+                  <li>Usage telemetry for monitoring adoption and troubleshooting patterns.</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

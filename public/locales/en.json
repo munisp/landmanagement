@@ -121,6 +121,41 @@
     "noResults": "No results found",
     "confirmDelete": "Are you sure you want to delete this item?"
   },
+  "parcelMap": {
+    "actions": {
+      "backToSearch": "Back to Search",
+      "backToDetails": "Back to Parcel Details",
+      "fullDetails": "Full Details",
+      "toggleEditMode": "Toggle Edit Mode"
+    },
+    "states": {
+      "notFound": "Parcel not found"
+    },
+    "labels": {
+      "surveyPlan": "Survey Plan:",
+      "area": "Area:",
+      "landUse": "Land Use:",
+      "location": "Location:"
+    },
+    "messages": {
+      "geometryUnavailable": "Parcel geometry is unavailable for mapping.",
+      "editingEnabled": "Boundary editing enabled",
+      "editingDisabled": "Boundary editing disabled"
+    },
+    "measurements": {
+      "area": "Measured Area",
+      "distance": "Measured Distance"
+    },
+    "legend": {
+      "title": "Legend",
+      "verified": "Verified",
+      "registered": "Registered",
+      "pending": "Pending",
+      "tipArea": "• Use drawing tools to measure area",
+      "tipDistance": "• Use polyline tool to measure distance",
+      "tipEdit": "• Click boundary to toggle edit mode"
+    }
+  },
   "admin": {
     "userManagement": {
       "title": "User Management",

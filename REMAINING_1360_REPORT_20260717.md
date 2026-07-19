@@ -1,10 +1,10 @@
 # Detailed Report on the Remaining 1360 Unchecked Roadmap Items
 
-This report analyzes the **1360** unchecked checklist items currently remaining in `todo.md` and explains what they represent in practical terms for the landmanagement platform repository.[1] It distinguishes between **genuine unresolved implementation work**, **environment-dependent deployment and rollout work**, and **historical planning drift or duplication** that still inflates the raw total.[1] [2]
+This report originally analyzed **1360** unchecked checklist items in `todo.md`; after the subsequent closure and normalization passes documented in the repository, the visible unchecked count has now been reduced to **559**.[1] [3] The report therefore now serves as a **historical baseline plus updated interpretation** of what the residual backlog represents in practical terms for the landmanagement platform repository.[1] [2] [3]
 
 ## Executive Summary
 
-The remaining unchecked inventory is large in absolute terms, but it is **not** a clean list of 1360 independent missing product features. The backlog is dominated by repeated historical planning blocks, production-deployment runbooks, environment-specific rollout tasks, and long-horizon expansion programs that extend far beyond the already implemented core application workflows.[1] [2] [3]
+The remaining unchecked inventory is still sizable in absolute terms, but it is **not** a clean list of hundreds of missing product features. After the most recent closure wave, the visible remainder is increasingly dominated by repeated historical planning blocks that have not yet been fully normalized, **physical-device PWA validation**, **live blockchain and payment-network deployment**, and **production infrastructure rollout** that extend beyond repository-only implementation work.[1] [2] [3]
 
 A repository-level analysis shows that the largest open clusters are concentrated in platform-improvement ideas, production deployment phases, Hyperledger Fabric and blockchain rollout work, testing and validation expansion, translation completion, and security hardening extensions.[2] Within that inventory, at least **114 unique checklist statements are repeated**, generating **240 repeated unchecked occurrences** in the file and materially overstating the apparent backlog size.[2]
 
@@ -12,8 +12,8 @@ A repository-level analysis shows that the largest open clusters are concentrate
 
 | Metric | Value | Interpretation |
 |---|---:|---|
-| Total unchecked checklist items | 1360 | Raw unresolved checklist count in `todo.md`.[1] |
-| Total checked checklist items | 1941 | Completed or marked-complete items currently tracked in the same file.[1] |
+| Total unchecked checklist items | 559 | Current raw unresolved checklist count in `todo.md` after the latest closure wave.[1] [3] |
+| Total checked checklist items | 2742 | Completed or marked-complete items currently tracked in the same file after the latest closure wave.[1] [3] |
 | Repeated unique unchecked statements | 114 | Distinct roadmap lines that appear more than once in the remaining backlog.[2] |
 | Total repeated unchecked occurrences | 240 | Duplicate planning lines that inflate the raw unresolved count.[2] |
 | Largest single cluster | 171 items | `🚀 Platform Improvements & Enhancements`, which is primarily a future-looking expansion bucket rather than a narrow defect list.[2] |
@@ -146,15 +146,15 @@ Several categories of remaining items should **not** be interpreted as proof tha
 
 ## Recommended Next Actions
 
-The remaining backlog is now large enough that it should be managed as a **portfolio**, not as one flat checklist.[1] [2] A better next step is to split the remaining 1360 unchecked lines into operational classes and track them separately.
+The remaining backlog is now large enough that it should be managed as a **portfolio**, not as one flat checklist.[1] [2] [3] A better next step is to split the remaining unchecked lines into operational classes and track them separately, with special emphasis on separating residual environment-only blockers from any final repository-feasible tasks.
 
 | Recommended action | Reason |
 |---|---|
-| Create a “Core repository gaps” list | Isolate the truly actionable remaining source-code work from noise. |
-| Create an “Environment rollout” list | Separate cluster setup, secrets, Fabric deployment, staging, and production verification. |
-| Create a “Tracker deduplication” pass | Remove repeated historical planning blocks to make the count truthful. |
-| Create a “Future innovation” list | Move stretch ideas, PWA/mobile, IoT, and major roadmap initiatives out of the production-readiness counter. |
-| Create a “Localization completion” list | Treat translation completeness as a focused editorial/programmatic stream rather than a general platform failure. |
+| Create a “Residual environment-only blockers” list | The leading visible remainder now centers on production cluster rollout, physical-device PWA validation, and live third-party network execution. |
+| Create a “Final tracker deduplication” pass | Additional historical duplicate planning blocks still inflate the raw count even after major normalization. |
+| Create a “Live deployment prerequisites” list | Polygon Mumbai wallets, FSP onboarding, production databases, and Kubernetes ownership should be tracked as external execution dependencies. |
+| Create a “Physical-device validation” list | iOS Safari, Android Chrome, installation, and offline-cache checks need real-device evidence rather than more source edits. |
+| Preserve a small “Residual repository gaps” list | Any non-environment code gaps that remain should be tracked separately from rollout work to keep the production-readiness picture honest. |
 
 ## Deliverables Included with This Report
 

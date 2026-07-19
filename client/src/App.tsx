@@ -62,6 +62,21 @@ const WebhookTestingDashboard = lazy(() => import('./pages/WebhookTestingDashboa
 const SupportCenter = lazy(() => import('./pages/SupportCenter'));
 const MarketingCenter = lazy(() => import('./pages/MarketingCenter'));
 const IoTOperations = lazy(() => import('./pages/IoTOperations'));
+const LegalDocumentCenter = lazy(() => import('./pages/LegalDocumentCenter'));
+const CivicComplianceCenter = lazy(() => import('./pages/CivicComplianceCenter'));
+const UtilityConnectionCenter = lazy(() => import('./pages/UtilityConnectionCenter'));
+const CommunityEngagementCenter = lazy(() => import('./pages/CommunityEngagementCenter'));
+const HeritageProtectionCenter = lazy(() => import('./pages/HeritageProtectionCenter'));
+const AgriculturalLandCenter = lazy(() => import('./pages/AgriculturalLandCenter'));
+const MiningRightsCenter = lazy(() => import('./pages/MiningRightsCenter'));
+const CoastalZoneCenter = lazy(() => import('./pages/CoastalZoneCenter'));
+const ForestReserveCenter = lazy(() => import('./pages/ForestReserveCenter'));
+const InfrastructureDevelopmentCenter = lazy(() => import('./pages/InfrastructureDevelopmentCenter'));
+const AdvancedGeospatialCenter = lazy(() => import('./pages/AdvancedGeospatialCenter'));
+const AccessibilityCenter = lazy(() => import('./pages/AccessibilityCenter'));
+const TrainingSupportCenter = lazy(() => import('./pages/TrainingSupportCenter'));
+const DataGovernanceCenter = lazy(() => import('./pages/DataGovernanceCenter'));
+const AdvancedSearchDiscoveryCenter = lazy(() => import('./pages/AdvancedSearchDiscoveryCenter'));
 const AIDocumentProcessing = lazy(() => import("./pages/AIDocumentProcessing"));
 const TitleRiskCopilot = lazy(() => import("./pages/TitleRiskCopilot"));
 const RegistryIntegrityDashboard = lazy(() => import("./pages/RegistryIntegrityDashboard"));
@@ -204,6 +219,21 @@ function Router() {
       <Route path="/support-center" component={SupportCenter} />
       <Route path="/marketing-center" component={MarketingCenter} />
       <Route path="/iot-operations" component={IoTOperations} />
+      <Route path="/legal-document-center" component={LegalDocumentCenter} />
+      <Route path="/civic-compliance-center" component={CivicComplianceCenter} />
+      <Route path="/utility-connection-center" component={UtilityConnectionCenter} />
+      <Route path="/community-engagement-center" component={CommunityEngagementCenter} />
+      <Route path="/heritage-protection-center" component={HeritageProtectionCenter} />
+      <Route path="/agricultural-land-center" component={AgriculturalLandCenter} />
+      <Route path="/mining-rights-center" component={MiningRightsCenter} />
+      <Route path="/coastal-zone-center" component={CoastalZoneCenter} />
+      <Route path="/forest-reserve-center" component={ForestReserveCenter} />
+      <Route path="/infrastructure-development-center" component={InfrastructureDevelopmentCenter} />
+      <Route path="/advanced-geospatial-center" component={AdvancedGeospatialCenter} />
+      <Route path="/accessibility-center" component={AccessibilityCenter} />
+      <Route path="/training-support-center" component={TrainingSupportCenter} />
+      <Route path="/data-governance-center" component={DataGovernanceCenter} />
+      <Route path="/advanced-search-discovery-center" component={AdvancedSearchDiscoveryCenter} />
       <Route path="/ai-document-processing" component={AIDocumentProcessing} />
       <Route path="/title-risk" component={TitleRiskCopilot} />
       <Route path="/registry-integrity" component={RegistryIntegrityDashboard} />

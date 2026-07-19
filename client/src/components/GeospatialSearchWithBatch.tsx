@@ -3,7 +3,7 @@
  * Enhanced geospatial search with batch selection and operations
  */
 
-import { useState, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { MapView } from './Map';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -33,6 +33,25 @@ export function GeospatialSearchWithBatch() {
   const [resultMarkers, setResultMarkers] = useState<google.maps.marker.AdvancedMarkerElement[]>([]);
   const [selectedParcels, setSelectedParcels] = useState<Set<number>>(new Set());
   const [batchMode, setBatchMode] = useState(false);
+  const [surveyorId, setSurveyorId] = useState('surveyor-1');
+
+  const batchAssignMutation = trpc.parcels.batchAssign.useMutation({
+    onSuccess: (updated) => {
+      toast.success(`Assigned ${updated.length} parcel${updated.length === 1 ? '' : 's'} to ${surveyorId}`);
+      setSelectedParcels(new Set());
+      refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const batchVerifyMutation = trpc.parcels.batchVerify.useMutation({
+    onSuccess: (updated) => {
+      toast.success(`Verified ${updated.length} parcel${updated.length === 1 ? '' : 's'} successfully`);
+      setSelectedParcels(new Set());
+      refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   const { data: searchResults, refetch } = trpc.parcels.geospatialSearch.useQuery(
     {
@@ -200,6 +219,34 @@ export function GeospatialSearchWithBatch() {
     URL.revokeObjectURL(url);
 
     toast.success(`Exported ${selectedParcels.size} parcels to CSV`);
+  };
+
+  const selectedResults = useMemo(
+    () => searchResults?.parcels.filter((p: any) => selectedParcels.has(p.id)) ?? [],
+    [searchResults, selectedParcels]
+  );
+
+  const handleBatchAssign = () => {
+    if (selectedParcels.size === 0) {
+      toast.error('Select parcels to assign');
+      return;
+    }
+
+    batchAssignMutation.mutate({
+      parcelIds: Array.from(selectedParcels),
+      surveyorId,
+    });
+  };
+
+  const handleBatchVerify = () => {
+    if (selectedParcels.size === 0) {
+      toast.error('Select parcels to verify');
+      return;
+    }
+
+    batchVerifyMutation.mutate({
+      parcelIds: Array.from(selectedParcels),
+    });
   };
 
   const calculateRoute = () => {
@@ -370,7 +417,33 @@ export function GeospatialSearchWithBatch() {
                   </Button>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  value={surveyorId}
+                  onChange={(event) => setSurveyorId(event.target.value)}
+                  placeholder="surveyor-1"
+                  className="h-8 w-32"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBatchAssign}
+                  disabled={selectedParcels.size === 0 || batchAssignMutation.isPending}
+                  className="gap-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Assign
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBatchVerify}
+                  disabled={selectedParcels.size === 0 || batchVerifyMutation.isPending}
+                  className="gap-2"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Verify
+                </Button>
                 <Button
                   size="sm"
                   onClick={exportToCSV}
@@ -439,6 +512,11 @@ export function GeospatialSearchWithBatch() {
                         <div>
                           <h4 className="font-semibold">{parcel.parcelNumber}</h4>
                           <p className="text-sm text-muted-foreground">{parcel.streetAddress}</p>
+                          {selectedParcels.has(parcel.id) && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {parcel.surveyorId ? `Assigned to ${parcel.surveyorId}` : 'No surveyor assigned yet'}
+                            </p>
+                          )}
                         </div>
                         <Badge variant={parcel.status === 'verified' ? 'default' : 'secondary'}>
                           {parcel.status}

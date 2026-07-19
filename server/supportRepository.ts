@@ -32,6 +32,9 @@ export interface SupportTicketRecord {
   tags: string[];
 }
 
+export type SupportSentiment = 'positive' | 'neutral' | 'negative';
+export type SupportIntent = 'incident_resolution' | 'payment_follow_up' | 'data_request' | 'guidance' | 'account_help';
+
 export interface KnowledgeBaseArticleRecord {
   id: number;
   title: string;
@@ -186,6 +189,38 @@ async function saveStore(store: SupportStore) {
   await writeJsonStore('support-store', store);
 }
 
+function deriveTicketText(ticket: SupportTicketRecord, messages: SupportMessageRecord[]) {
+  return [ticket.subject, ...messages.map((message) => message.message), ticket.tags.join(' ')].join(' ').toLowerCase();
+}
+
+function deriveSentiment(text: string): SupportSentiment {
+  const negativeSignals = ['unable', 'not received', 'failed', 'error', 'issue', 'problem', 'delayed', 'discrepancy'];
+  const positiveSignals = ['thanks', 'resolved', 'great', 'successful', 'appreciate', 'completed'];
+
+  const negativeScore = negativeSignals.filter((signal) => text.includes(signal)).length;
+  const positiveScore = positiveSignals.filter((signal) => text.includes(signal)).length;
+
+  if (negativeScore > positiveScore) return 'negative';
+  if (positiveScore > negativeScore) return 'positive';
+  return 'neutral';
+}
+
+function deriveIntent(ticket: SupportTicketRecord, text: string): SupportIntent {
+  if (ticket.category === 'payments' || text.includes('payment') || text.includes('refund') || text.includes('confirmation')) {
+    return 'payment_follow_up';
+  }
+  if (ticket.category === 'compliance' || text.includes('privacy') || text.includes('export') || text.includes('data package')) {
+    return 'data_request';
+  }
+  if (ticket.category === 'account' || text.includes('login') || text.includes('access') || text.includes('password')) {
+    return 'account_help';
+  }
+  if (text.includes('how do i') || text.includes('how can i') || text.includes('guide') || text.includes('help me')) {
+    return 'guidance';
+  }
+  return 'incident_resolution';
+}
+
 function computeSlaStatus(ticket: SupportTicketRecord) {
   const deadline = new Date(ticket.createdAt).getTime() + ticket.slaHours * 60 * 60 * 1000;
   const now = Date.now();
@@ -206,11 +241,17 @@ export async function listSupportTickets() {
   return store.tickets
     .slice()
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .map((ticket) => ({
-      ...ticket,
-      slaStatus: computeSlaStatus(ticket),
-      messages: store.messages.filter((message) => message.ticketId === ticket.id),
-    }));
+    .map((ticket) => {
+      const messages = store.messages.filter((message) => message.ticketId === ticket.id);
+      const ticketText = deriveTicketText(ticket, messages);
+      return {
+        ...ticket,
+        slaStatus: computeSlaStatus(ticket),
+        sentiment: deriveSentiment(ticketText),
+        detectedIntent: deriveIntent(ticket, ticketText),
+        messages,
+      };
+    });
 }
 
 export async function createSupportTicket(input: {
@@ -354,6 +395,16 @@ export async function getSupportAnalytics() {
     count: tickets.filter((ticket) => ticket.category === category).length,
   }));
 
+  const bySentiment = ['positive', 'neutral', 'negative'].map((sentiment) => ({
+    sentiment,
+    count: tickets.filter((ticket: any) => ticket.sentiment === sentiment).length,
+  }));
+
+  const byIntent = ['incident_resolution', 'payment_follow_up', 'data_request', 'guidance', 'account_help'].map((intent) => ({
+    intent,
+    count: tickets.filter((ticket: any) => ticket.detectedIntent === intent).length,
+  }));
+
   return {
     totals: {
       tickets: tickets.length,
@@ -363,6 +414,8 @@ export async function getSupportAnalytics() {
       averageFirstResponseHours,
     },
     byCategory,
+    bySentiment,
+    byIntent,
     recentTickets: tickets.slice(0, 5),
   };
 }

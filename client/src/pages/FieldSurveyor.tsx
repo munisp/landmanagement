@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,10 +20,36 @@ type DraftFieldData = {
 
 type SortBy = 'date' | 'parcel';
 type FilterSync = 'all' | 'recent';
+type OfflineQueuedRecord = DraftFieldData & { queuedAt: string };
+
+const offlineQueueKey = 'idlr-field-sync-queue';
+
+function readOfflineQueue(): OfflineQueuedRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(offlineQueueKey);
+    return raw ? (JSON.parse(raw) as OfflineQueuedRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeOfflineQueue(records: OfflineQueuedRecord[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(offlineQueueKey, JSON.stringify(records));
+}
 
 export default function FieldSurveyor() {
   const utils = trpc.useUtils();
+
+  const triggerHaptic = (pattern: number | number[]) => {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(pattern);
+    }
+  };
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [queuedRecords, setQueuedRecords] = useState<OfflineQueuedRecord[]>(() => readOfflineQueue());
+  const [isFlushingQueue, setIsFlushingQueue] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
@@ -49,6 +75,7 @@ export default function FieldSurveyor() {
         utils.fieldData.getUserData.invalidate({ limit: 100 }),
         utils.fieldData.getStats.invalidate(),
       ]);
+      triggerHaptic([30, 20, 30]);
       toast.success('Field record saved and synced successfully');
       setFormData({
         parcelNumber: '',
@@ -67,12 +94,67 @@ export default function FieldSurveyor() {
     },
   });
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    writeOfflineQueue(queuedRecords);
+  }, [queuedRecords]);
+
+  useEffect(() => {
+    const flushQueue = async () => {
+      if (!isOnline || isFlushingQueue || queuedRecords.length === 0) return;
+
+      setIsFlushingQueue(true);
+      let syncedCount = 0;
+
+      for (const record of queuedRecords) {
+        try {
+          await syncFieldData.mutateAsync({
+            parcelNumber: record.parcelNumber.trim(),
+            location: record.location,
+            area: record.area,
+            boundaries: record.boundaries,
+            notes: record.notes,
+            photos: record.photos,
+            timestamp: record.queuedAt,
+          });
+          syncedCount += 1;
+        } catch {
+          break;
+        }
+      }
+
+      if (syncedCount > 0) {
+        setQueuedRecords((current) => current.slice(syncedCount));
+        toast.success(`Synchronized ${syncedCount} queued field record${syncedCount === 1 ? '' : 's'}`);
+      }
+
+      setIsFlushingQueue(false);
+    };
+
+    void flushQueue();
+  }, [isFlushingQueue, isOnline, queuedRecords, syncFieldData]);
+
   const deleteFieldData = trpc.fieldData.delete.useMutation({
     onSuccess: async () => {
       await Promise.all([
         utils.fieldData.getUserData.invalidate({ limit: 100 }),
         utils.fieldData.getStats.invalidate(),
       ]);
+      triggerHaptic(20);
       toast.success('Field record deleted');
     },
     onError: (error) => {
@@ -101,6 +183,7 @@ export default function FieldSurveyor() {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         };
+        triggerHaptic(15);
         setLocation(loc);
         setFormData((current) => ({ ...current, location: loc }));
       },
@@ -159,6 +242,7 @@ export default function FieldSurveyor() {
       });
 
       const result = await analyzePhotoMutation.mutateAsync({ imageUrl: uploadResult.url });
+      triggerHaptic([12, 18, 12]);
       setAnalysisResult(result);
 
       setFormData((current) => ({
@@ -202,6 +286,7 @@ export default function FieldSurveyor() {
     canvas.height = video.videoHeight;
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+    triggerHaptic(25);
     const photoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
     const newPhotos = [...photos, photoDataUrl];
     setPhotos(newPhotos);
@@ -215,6 +300,29 @@ export default function FieldSurveyor() {
   const saveRecord = async () => {
     if (!formData.parcelNumber.trim()) {
       toast.error('Please enter a parcel number');
+      return;
+    }
+
+    if (!isOnline) {
+      const queuedRecord: OfflineQueuedRecord = {
+        ...formData,
+        parcelNumber: formData.parcelNumber.trim(),
+        queuedAt: new Date().toISOString(),
+      };
+      setQueuedRecords((current) => [queuedRecord, ...current]);
+      triggerHaptic([20, 20, 20]);
+      toast.success('Offline record queued for sync when connectivity returns');
+      setFormData({
+        parcelNumber: '',
+        location: null,
+        area: '',
+        boundaries: '',
+        notes: '',
+        photos: [],
+      });
+      setLocation(null);
+      setPhotos([]);
+      setAnalysisResult(null);
       return;
     }
 
@@ -277,6 +385,7 @@ export default function FieldSurveyor() {
             </Badge>
           )}
           <Badge variant="outline">{stats?.totalRecords ?? 0} synced records</Badge>
+          {queuedRecords.length > 0 && <Badge variant="secondary">{queuedRecords.length} pending sync</Badge>}
         </div>
       </div>
 
@@ -296,7 +405,7 @@ export default function FieldSurveyor() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm font-semibold">
-              {stats?.lastSync ? new Date(stats.lastSync).toLocaleString() : 'No sync yet'}
+              {isFlushingQueue ? 'Syncing queued records…' : stats?.lastSync ? new Date(stats.lastSync).toLocaleString() : 'No sync yet'}
             </div>
             <p className="text-xs text-muted-foreground">Last Sync</p>
           </CardContent>
@@ -322,12 +431,12 @@ export default function FieldSurveyor() {
           <div>
             <Label>GPS Location</Label>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={getCurrentLocation} className="flex-1">
+              <Button type="button" variant="outline" onClick={getCurrentLocation} className="flex-1 min-h-11">
                 <MapPin className="mr-2 h-4 w-4" />
                 Get Location
               </Button>
               {location && (
-                <Badge variant="default" className="flex items-center gap-1">
+                <Badge variant="default" className="flex min-h-11 items-center gap-1 px-3">
                   <CheckCircle className="h-3 w-3" />
                   Located
                 </Badge>
@@ -378,7 +487,7 @@ export default function FieldSurveyor() {
             <Label>Photos ({photos.length})</Label>
             <div className="space-y-2">
               {!cameraActive ? (
-                <Button type="button" variant="outline" onClick={startCamera} className="w-full">
+                <Button type="button" variant="outline" onClick={startCamera} className="w-full min-h-11">
                   <Camera className="mr-2 h-4 w-4" />
                   Open Camera
                 </Button>
@@ -387,11 +496,11 @@ export default function FieldSurveyor() {
                   <video ref={videoRef} autoPlay playsInline className="w-full rounded-lg border" />
                   <canvas ref={canvasRef} className="hidden" />
                   <div className="flex gap-2">
-                    <Button type="button" onClick={capturePhoto} className="flex-1" disabled={analyzing}>
+                    <Button type="button" onClick={capturePhoto} className="flex-1 min-h-11" disabled={analyzing}>
                       <Camera className="mr-2 h-4 w-4" />
                       Capture
                     </Button>
-                    <Button type="button" variant="outline" onClick={stopCamera}>
+                    <Button type="button" variant="outline" onClick={stopCamera} className="min-h-11 px-4">
                       Close
                     </Button>
                   </div>
@@ -429,9 +538,9 @@ export default function FieldSurveyor() {
             </div>
           </div>
 
-          <Button onClick={saveRecord} className="w-full" disabled={syncFieldData.isPending}>
+          <Button onClick={saveRecord} className="w-full min-h-11" disabled={syncFieldData.isPending || isFlushingQueue}>
             <Save className="mr-2 h-4 w-4" />
-            {syncFieldData.isPending ? 'Saving...' : 'Save and Sync Record'}
+            {isFlushingQueue ? 'Syncing queued records...' : syncFieldData.isPending ? 'Saving...' : isOnline ? 'Save and Sync Record' : 'Queue Record for Sync'}
           </Button>
         </CardContent>
       </Card>
@@ -501,7 +610,11 @@ export default function FieldSurveyor() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => deleteFieldData.mutate({ id: record.id })}
+                        className="min-h-11 min-w-11"
+                        onClick={() => {
+                          triggerHaptic(10);
+                          deleteFieldData.mutate({ id: record.id });
+                        }}
                         disabled={deleteFieldData.isPending}
                       >
                         <Trash2 className="h-4 w-4" />

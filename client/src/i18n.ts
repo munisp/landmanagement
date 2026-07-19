@@ -642,7 +642,7 @@ i18n
   .use(initReactI18next)
   .init({
     fallbackLng: 'en',
-    supportedLngs: ['en', 'fr', 'ha', 'yo', 'ig', 'pcm', 'sw', 'am', 'ar'],
+    supportedLngs: ['en', 'fr', 'es', 'ha', 'yo', 'ig', 'pcm', 'sw', 'am', 'ar'],
     backend: {
       loadPath: '/locales/{{lng}}.json',
     },
@@ -656,5 +656,16 @@ i18n
     // Merge with legacy inline resources as fallback
     resources: legacyResources,
   });
+
+const rtlLanguages = new Set(['ar']);
+
+function applyDocumentLanguage(language: string) {
+  if (typeof document === 'undefined') return;
+  document.documentElement.lang = language;
+  document.documentElement.dir = rtlLanguages.has(language) ? 'rtl' : 'ltr';
+}
+
+applyDocumentLanguage(i18n.resolvedLanguage || i18n.language || 'en');
+i18n.on('languageChanged', applyDocumentLanguage);
 
 export default i18n;

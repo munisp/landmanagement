@@ -1,112 +1,6 @@
 {
-  "nextId": 88,
+  "nextId": 80,
   "documents": [
-    {
-      "id": 87,
-      "parcelId": 1,
-      "type": "document",
-      "title": "Certificate of Occupancy",
-      "description": "Original Certificate of Occupancy issued in 2020",
-      "fileKey": "documents/1234567890-c-of-o.pdf",
-      "fileUrl": "https://storage.example.com/documents/1234567890-c-of-o.pdf",
-      "fileName": "c-of-o.pdf",
-      "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T14:00:51.031Z",
-      "verified": false
-    },
-    {
-      "id": 86,
-      "parcelId": 1,
-      "type": "image",
-      "title": "Property Photo",
-      "fileKey": "documents/1234567890-property-photo.jpg",
-      "fileUrl": "https://storage.example.com/documents/1234567890-property-photo.jpg",
-      "fileName": "property-photo.jpg",
-      "fileSize": 2048000,
-      "mimeType": "image/jpeg",
-      "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T14:00:51.029Z",
-      "verified": false
-    },
-    {
-      "id": 85,
-      "transactionId": 1,
-      "type": "document",
-      "title": "Transfer Agreement",
-      "fileKey": "documents/1234567890-transfer-agreement.pdf",
-      "fileUrl": "https://storage.example.com/documents/1234567890-transfer-agreement.pdf",
-      "fileName": "transfer-agreement.pdf",
-      "fileSize": 1024000,
-      "mimeType": "application/pdf",
-      "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T14:00:51.026Z",
-      "verified": false
-    },
-    {
-      "id": 84,
-      "parcelId": 1,
-      "type": "document",
-      "title": "Survey Plan",
-      "fileKey": "documents/1234567890-survey-plan.pdf",
-      "fileUrl": "https://storage.example.com/documents/1234567890-survey-plan.pdf",
-      "fileName": "survey-plan.pdf",
-      "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T14:00:51.022Z",
-      "verified": false
-    },
-    {
-      "id": 83,
-      "parcelId": 1,
-      "type": "document",
-      "title": "Certificate of Occupancy",
-      "description": "Original Certificate of Occupancy issued in 2020",
-      "fileKey": "documents/1234567890-c-of-o.pdf",
-      "fileUrl": "https://storage.example.com/documents/1234567890-c-of-o.pdf",
-      "fileName": "c-of-o.pdf",
-      "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T13:56:20.555Z",
-      "verified": false
-    },
-    {
-      "id": 82,
-      "parcelId": 1,
-      "type": "image",
-      "title": "Property Photo",
-      "fileKey": "documents/1234567890-property-photo.jpg",
-      "fileUrl": "https://storage.example.com/documents/1234567890-property-photo.jpg",
-      "fileName": "property-photo.jpg",
-      "fileSize": 2048000,
-      "mimeType": "image/jpeg",
-      "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T13:56:20.553Z",
-      "verified": false
-    },
-    {
-      "id": 81,
-      "transactionId": 1,
-      "type": "document",
-      "title": "Transfer Agreement",
-      "fileKey": "documents/1234567890-transfer-agreement.pdf",
-      "fileUrl": "https://storage.example.com/documents/1234567890-transfer-agreement.pdf",
-      "fileName": "transfer-agreement.pdf",
-      "fileSize": 1024000,
-      "mimeType": "application/pdf",
-      "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T13:56:20.550Z",
-      "verified": false
-    },
-    {
-      "id": 80,
-      "parcelId": 1,
-      "type": "document",
-      "title": "Survey Plan",
-      "fileKey": "documents/1234567890-survey-plan.pdf",
-      "fileUrl": "https://storage.example.com/documents/1234567890-survey-plan.pdf",
-      "fileName": "survey-plan.pdf",
-      "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T13:56:20.546Z",
-      "verified": false
-    },
     {
       "id": 79,
       "parcelId": 1,
@@ -117,7 +11,7 @@
       "fileUrl": "https://storage.example.com/documents/1234567890-c-of-o.pdf",
       "fileName": "c-of-o.pdf",
       "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T13:38:35.640Z",
+      "uploadedAt": "2026-07-18T00:02:23.409Z",
       "verified": false
     },
     {
@@ -131,7 +25,7 @@
       "fileSize": 2048000,
       "mimeType": "image/jpeg",
       "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T13:38:35.629Z",
+      "uploadedAt": "2026-07-18T00:02:23.405Z",
       "verified": false
     },
     {
@@ -145,7 +39,7 @@
       "fileSize": 1024000,
       "mimeType": "application/pdf",
       "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T13:38:35.621Z",
+      "uploadedAt": "2026-07-18T00:02:23.402Z",
       "verified": false
     },
     {
@@ -157,7 +51,7 @@
       "fileUrl": "https://storage.example.com/documents/1234567890-survey-plan.pdf",
       "fileName": "survey-plan.pdf",
       "uploadedBy": 1,
-      "uploadedAt": "2026-07-18T13:38:35.613Z",
+      "uploadedAt": "2026-07-18T00:02:23.395Z",
       "verified": false
     },
     {
