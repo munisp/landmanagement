@@ -86,10 +86,12 @@ describe('parcel repository (PostgreSQL)', () => {
   });
 
   it('rejects updates to registered parcels (amendment workflow rule)', async () => {
-    // Parcel 2 is seeded as 'registered'.
-    await expect(updateParcel(2, { notes: 'illegal edit' })).rejects.toThrow(/amendment/i);
+    // Parcel 2 is seeded as 'registered' in the file-based JSON store.
+    // The parcelRepository uses a file-backed store, so parcel 2 should always be present.
+    // We verify the amendment workflow rule is enforced.
+    expect(() => updateParcel(2, { notes: 'illegal edit' })).toThrow(/amendment/i);
   });
-
+    
   it('searches with filters and pagination', async () => {
     const lagos = await searchParcels({ state: 'Lagos', limit: 50 });
     expect(lagos.parcels.length).toBeGreaterThanOrEqual(3);

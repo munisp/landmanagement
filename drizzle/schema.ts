@@ -607,6 +607,11 @@ export const parcels = pgTable("parcels", {
   parcelIdIdx: index("parcels_parcel_id_idx").on(table.parcelId),
   statusIdx: index("parcels_status_idx").on(table.status),
   lgaIdx: index("parcels_lga_idx").on(table.lga),
+  // Composite indexes for common filter combinations
+  stateStatusIdx: index("parcels_state_status_idx").on(table.state, table.status),
+  landUseStatusIdx: index("parcels_land_use_status_idx").on(table.landUse, table.status),
+  stateLgaIdx: index("parcels_state_lga_idx").on(table.state, table.lga),
+  createdAtIdx: index("parcels_created_at_idx").on(table.createdAt),
 }));
 
 export type Parcel = typeof parcels.$inferSelect;
@@ -2970,6 +2975,11 @@ export const registryTransactions = pgTable("registry_transactions", {
 }, (table) => ({
   parcelIdx: index("registry_transactions_parcel_idx").on(table.parcelId),
   statusIdx: index("registry_transactions_status_idx").on(table.status),
+  // Composite indexes for common query patterns
+  parcelStatusIdx: index("registry_transactions_parcel_status_idx").on(table.parcelId, table.status),
+  initiatorStatusIdx: index("registry_transactions_initiator_status_idx").on(table.initiatorId, table.status),
+  typeStatusIdx: index("registry_transactions_type_status_idx").on(table.type, table.status),
+  createdAtIdx: index("registry_transactions_created_at_idx").on(table.createdAt),
 }));
 
 export type RegistryTransaction = typeof registryTransactions.$inferSelect;
@@ -3048,3 +3058,88 @@ export type RepositoryStore = typeof repositoryStores.$inferSelect;
 export type InsertRepositoryStore = typeof repositoryStores.$inferInsert;
 
 
+
+// --- NEW SCHEMA TABLES FOR INTEGRATIONS ---
+
+export const tigerbeetleLedgerAccounts = pgTable("tigerbeetle_ledger_accounts", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  ledgerId: integer("ledger_id").notNull(),
+  accountId: varchar("account_id", { length: 128 }).notNull().unique(),
+  accountType: varchar("account_type", { length: 32 }).notNull(),
+  code: integer("code").notNull(),
+  userId: integer("user_id").references(() => users.id),
+  parcelId: integer("parcel_id").references(() => parcels.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const temporalWorkflowAudit = pgTable("temporal_workflow_audit", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  workflowId: varchar("workflow_id", { length: 255 }).notNull(),
+  runId: varchar("run_id", { length: 255 }).notNull(),
+  workflowType: varchar("workflow_type", { length: 128 }).notNull(),
+  status: varchar("status", { length: 32 }).notNull(),
+  input: jsonb("input"),
+  output: jsonb("output"),
+  error: text("error"),
+  startedAt: timestamp("started_at").notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const keycloakSessionSync = pgTable("keycloak_session_sync", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  keycloakSessionId: varchar("keycloak_session_id", { length: 255 }).notNull().unique(),
+  keycloakUserId: varchar("keycloak_user_id", { length: 255 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 64 }),
+  userAgent: text("user_agent"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastSyncedAt: timestamp("last_synced_at").defaultNow().notNull(),
+});
+
+export const fluvioTopicRegistry = pgTable("fluvio_topic_registry", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  topicName: varchar("topic_name", { length: 255 }).notNull().unique(),
+  partitions: integer("partitions").default(1).notNull(),
+  replicationFactor: integer("replication_factor").default(1).notNull(),
+  retentionTime: varchar("retention_time", { length: 32 }),
+  status: varchar("status", { length: 32 }).default('active').notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const apisixRoutePersistence = pgTable("apisix_route_persistence", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  routeId: varchar("route_id", { length: 128 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  uris: jsonb("uris").notNull(),
+  methods: jsonb("methods"),
+  upstreamId: varchar("upstream_id", { length: 128 }),
+  plugins: jsonb("plugins"),
+  status: varchar("status", { length: 32 }).default('active').notNull(),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const permifySchemaSync = pgTable("permify_schema_sync", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  version: varchar("version", { length: 128 }).notNull().unique(),
+  schemaDefinition: text("schema_definition").notNull(),
+  appliedAt: timestamp("applied_at").defaultNow().notNull(),
+  status: varchar("status", { length: 32 }).default('applied').notNull(),
+  appliedBy: varchar("applied_by", { length: 128 }),
+});
+
+export const openappsecPolicyAudit = pgTable("openappsec_policy_audit", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  policyId: varchar("policy_id", { length: 128 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  mode: varchar("mode", { length: 32 }).notNull(),
+  action: varchar("action", { length: 32 }).notNull(),
+  changes: jsonb("changes"),
+  appliedAt: timestamp("applied_at").defaultNow().notNull(),
+  appliedBy: varchar("applied_by", { length: 128 }),
+});

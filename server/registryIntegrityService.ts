@@ -101,19 +101,46 @@ async function persistFindings(findings: IntegrityFinding[]): Promise<{ inserted
       continue;
     }
 
-    await db.insert(registryIntegrityFindings).values({
-      checkType: finding.checkType,
-      severity: finding.severity,
-      status: 'open',
-      parcelId: finding.parcelId ?? null,
-      relatedEntityType: finding.relatedEntityType ?? null,
-      relatedEntityId: finding.relatedEntityId ?? null,
-      description: finding.description,
-      evidence: finding.evidence ?? null,
-      detectedBy: finding.detectedBy,
-      scanRunId: finding.scanRunId ?? null,
-    });
-    inserted += 1;
+    try {
+      await db.insert(registryIntegrityFindings).values({
+        checkType: finding.checkType,
+        severity: finding.severity,
+        status: 'open',
+        parcelId: finding.parcelId ?? null,
+        relatedEntityType: finding.relatedEntityType ?? null,
+        relatedEntityId: finding.relatedEntityId ?? null,
+        description: finding.description,
+        evidence: finding.evidence ?? null,
+        detectedBy: finding.detectedBy,
+        scanRunId: finding.scanRunId ?? null,
+      });
+      inserted += 1;
+    } catch (err: any) {
+      // FK violation: parcel_id from in-memory store not yet persisted to DB.
+      // Retry without the FK-constrained parcel_id, storing it in relatedEntityId instead.
+      // Drizzle wraps the PG error; check both err and err.cause for the FK code.
+      const pgErr = err?.cause ?? err;
+      const isFkViolation = (pgErr?.code === '23503' || err?.code === '23503') &&
+        (String(pgErr?.constraint ?? err?.constraint ?? '').includes('parcel_id') ||
+         String(pgErr?.detail ?? err?.detail ?? '').includes('parcel_id'));
+      if (isFkViolation) {
+        await db.insert(registryIntegrityFindings).values({
+          checkType: finding.checkType,
+          severity: finding.severity,
+          status: 'open',
+          parcelId: null,
+          relatedEntityType: finding.relatedEntityType ?? 'parcel',
+          relatedEntityId: finding.parcelId ?? null,
+          description: finding.description,
+          evidence: finding.evidence ?? null,
+          detectedBy: finding.detectedBy,
+          scanRunId: finding.scanRunId ?? null,
+        });
+        inserted += 1;
+      } else {
+        throw err;
+      }
+    }
   }
   return { inserted, deduplicated };
 }

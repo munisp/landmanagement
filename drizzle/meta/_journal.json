@@ -134,6 +134,27 @@
       "when": 1784000000000,
       "tag": "0018_activity_logs_nullable_user",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784590224172,
+      "tag": "0019_missing_marketplace_transactions",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1784590225172,
+      "tag": "0020_missing_integration_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1784591396586,
+      "tag": "0021_composite_indexes_and_relations",
+      "breakpoints": true
     }
   ]
 }

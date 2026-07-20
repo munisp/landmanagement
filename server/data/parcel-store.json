@@ -1,6 +1,1523 @@
 {
   "parcels": [
     {
+      "id": 79,
+      "parcelNumber": "LA-LE-2026-079",
+      "surveyPlanNumber": "SP/E2E/1784591501734",
+      "state": "Lagos",
+      "lga": "Lekki",
+      "ward": "Ward 2",
+      "streetAddress": "15 Admiralty Way, Lekki Phase 1",
+      "areaSquareMeters": 1000,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 85000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-e2e-01",
+      "createdAt": "2026-07-20T23:51:41.734Z",
+      "updatedAt": "2026-07-20T23:51:41.736Z",
+      "verifierId": "registrar-e2e-01",
+      "verifiedAt": "2026-07-20T23:51:41.736Z"
+    },
+    {
+      "id": 78,
+      "parcelNumber": "AN-ON-2026-078",
+      "surveyPlanNumber": "SP/BV/1784591497504-2",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 550,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 46750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:51:37.504Z",
+      "updatedAt": "2026-07-20T23:51:37.505Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:51:37.505Z"
+    },
+    {
+      "id": 77,
+      "parcelNumber": "AN-ON-2026-077",
+      "surveyPlanNumber": "SP/BV/1784591497503-1",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 450,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 38250000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:51:37.504Z",
+      "updatedAt": "2026-07-20T23:51:37.505Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:51:37.505Z"
+    },
+    {
+      "id": 76,
+      "parcelNumber": "OG-SA-2026-076",
+      "surveyPlanNumber": "SP/IDEM/1784591497499",
+      "state": "Ogun",
+      "lga": "Sagamu",
+      "areaSquareMeters": 300,
+      "geometryGeoJSON": "{}",
+      "landUseType": "agricultural",
+      "status": "verified",
+      "estimatedValue": 25500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:51:37.499Z",
+      "updatedAt": "2026-07-20T23:51:37.500Z",
+      "verifierId": "registrar-01",
+      "verifiedAt": "2026-07-20T23:51:37.500Z"
+    },
+    {
+      "id": 75,
+      "parcelNumber": "OG-AB-2026-075",
+      "surveyPlanNumber": "SP/VERIFY/1784591497497",
+      "state": "Ogun",
+      "lga": "Abeokuta",
+      "areaSquareMeters": 800,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 68000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:51:37.497Z",
+      "updatedAt": "2026-07-20T23:51:37.498Z",
+      "verifierId": "registrar-smoke-01",
+      "verifiedAt": "2026-07-20T23:51:37.498Z"
+    },
+    {
+      "id": 74,
+      "parcelNumber": "DE-WA-2026-074",
+      "surveyPlanNumber": "SP/UPDATE/1784591497487",
+      "state": "Delta",
+      "lga": "Warri",
+      "areaSquareMeters": 400,
+      "geometryGeoJSON": "{}",
+      "landUseType": "industrial",
+      "status": "pending_verification",
+      "estimatedValue": 34000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:51:37.487Z",
+      "updatedAt": "2026-07-20T23:51:37.488Z",
+      "streetAddress": "5 Refinery Road",
+      "notes": "Updated notes"
+    },
+    {
+      "id": 73,
+      "parcelNumber": "KA-KA-2026-073",
+      "surveyPlanNumber": "SP/BATCH/1784591497482-2",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 600,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 51000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:51:37.482Z",
+      "updatedAt": "2026-07-20T23:51:37.486Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 72,
+      "parcelNumber": "KA-KA-2026-072",
+      "surveyPlanNumber": "SP/BATCH/1784591497481-1",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 500,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 42500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:51:37.481Z",
+      "updatedAt": "2026-07-20T23:51:37.486Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 71,
+      "parcelNumber": "RI-PO-2026-071",
+      "surveyPlanNumber": "SP/SMOKE/1784591497396",
+      "state": "Rivers",
+      "lga": "Port Harcourt",
+      "ward": "Ward 5",
+      "streetAddress": "10 Aba Road, Port Harcourt",
+      "areaSquareMeters": 750,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "commercial",
+      "status": "pending_verification",
+      "estimatedValue": 63750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-smoke-01",
+      "createdAt": "2026-07-20T23:51:37.407Z",
+      "updatedAt": "2026-07-20T23:51:37.407Z"
+    },
+    {
+      "id": 70,
+      "parcelNumber": "AB-GA-2026-070",
+      "surveyPlanNumber": "SP/TEST/1002",
+      "state": "Abuja",
+      "lga": "Garki",
+      "areaSquareMeters": 900,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 76500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:51:29.817Z",
+      "updatedAt": "2026-07-20T23:51:29.818Z",
+      "verifierId": "registrar-42",
+      "verifiedAt": "2026-07-20T23:51:29.818Z"
+    },
+    {
+      "id": 69,
+      "parcelNumber": "LA-ET-2026-069",
+      "surveyPlanNumber": "SP/TEST/1001",
+      "state": "Lagos",
+      "lga": "Eti-Osa",
+      "ward": "Ward 9",
+      "streetAddress": "1 Persistence Close",
+      "areaSquareMeters": 640,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 54400000,
+      "notes": "Integration test parcel",
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:51:29.812Z",
+      "updatedAt": "2026-07-20T23:51:29.812Z"
+    },
+    {
+      "id": 68,
+      "parcelNumber": "LA-LE-2026-068",
+      "surveyPlanNumber": "SP/E2E/1784591172075",
+      "state": "Lagos",
+      "lga": "Lekki",
+      "ward": "Ward 2",
+      "streetAddress": "15 Admiralty Way, Lekki Phase 1",
+      "areaSquareMeters": 1000,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 85000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-e2e-01",
+      "createdAt": "2026-07-20T23:46:12.092Z",
+      "updatedAt": "2026-07-20T23:46:12.093Z",
+      "verifierId": "registrar-e2e-01",
+      "verifiedAt": "2026-07-20T23:46:12.093Z"
+    },
+    {
+      "id": 67,
+      "parcelNumber": "AN-ON-2026-067",
+      "surveyPlanNumber": "SP/BV/1784591170502-2",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 550,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 46750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:46:10.503Z",
+      "updatedAt": "2026-07-20T23:46:10.504Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:46:10.504Z"
+    },
+    {
+      "id": 66,
+      "parcelNumber": "AN-ON-2026-066",
+      "surveyPlanNumber": "SP/BV/1784591170502-1",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 450,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 38250000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:46:10.502Z",
+      "updatedAt": "2026-07-20T23:46:10.504Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:46:10.504Z"
+    },
+    {
+      "id": 65,
+      "parcelNumber": "OG-SA-2026-065",
+      "surveyPlanNumber": "SP/IDEM/1784591170501",
+      "state": "Ogun",
+      "lga": "Sagamu",
+      "areaSquareMeters": 300,
+      "geometryGeoJSON": "{}",
+      "landUseType": "agricultural",
+      "status": "verified",
+      "estimatedValue": 25500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:46:10.501Z",
+      "updatedAt": "2026-07-20T23:46:10.501Z",
+      "verifierId": "registrar-01",
+      "verifiedAt": "2026-07-20T23:46:10.501Z"
+    },
+    {
+      "id": 64,
+      "parcelNumber": "OG-AB-2026-064",
+      "surveyPlanNumber": "SP/VERIFY/1784591170499",
+      "state": "Ogun",
+      "lga": "Abeokuta",
+      "areaSquareMeters": 800,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 68000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:46:10.499Z",
+      "updatedAt": "2026-07-20T23:46:10.500Z",
+      "verifierId": "registrar-smoke-01",
+      "verifiedAt": "2026-07-20T23:46:10.500Z"
+    },
+    {
+      "id": 63,
+      "parcelNumber": "DE-WA-2026-063",
+      "surveyPlanNumber": "SP/UPDATE/1784591170496",
+      "state": "Delta",
+      "lga": "Warri",
+      "areaSquareMeters": 400,
+      "geometryGeoJSON": "{}",
+      "landUseType": "industrial",
+      "status": "pending_verification",
+      "estimatedValue": 34000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:46:10.496Z",
+      "updatedAt": "2026-07-20T23:46:10.497Z",
+      "streetAddress": "5 Refinery Road",
+      "notes": "Updated notes"
+    },
+    {
+      "id": 62,
+      "parcelNumber": "KA-KA-2026-062",
+      "surveyPlanNumber": "SP/BATCH/1784591170495-2",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 600,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 51000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:46:10.495Z",
+      "updatedAt": "2026-07-20T23:46:10.495Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 61,
+      "parcelNumber": "KA-KA-2026-061",
+      "surveyPlanNumber": "SP/BATCH/1784591170494-1",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 500,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 42500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:46:10.494Z",
+      "updatedAt": "2026-07-20T23:46:10.495Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 60,
+      "parcelNumber": "RI-PO-2026-060",
+      "surveyPlanNumber": "SP/SMOKE/1784591170487",
+      "state": "Rivers",
+      "lga": "Port Harcourt",
+      "ward": "Ward 5",
+      "streetAddress": "10 Aba Road, Port Harcourt",
+      "areaSquareMeters": 750,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "commercial",
+      "status": "pending_verification",
+      "estimatedValue": 63750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-smoke-01",
+      "createdAt": "2026-07-20T23:46:10.488Z",
+      "updatedAt": "2026-07-20T23:46:10.488Z"
+    },
+    {
+      "id": 59,
+      "parcelNumber": "AB-GA-2026-059",
+      "surveyPlanNumber": "SP/TEST/1002",
+      "state": "Abuja",
+      "lga": "Garki",
+      "areaSquareMeters": 900,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 76500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:46:05.345Z",
+      "updatedAt": "2026-07-20T23:46:05.346Z",
+      "verifierId": "registrar-42",
+      "verifiedAt": "2026-07-20T23:46:05.346Z"
+    },
+    {
+      "id": 58,
+      "parcelNumber": "LA-ET-2026-058",
+      "surveyPlanNumber": "SP/TEST/1001",
+      "state": "Lagos",
+      "lga": "Eti-Osa",
+      "ward": "Ward 9",
+      "streetAddress": "1 Persistence Close",
+      "areaSquareMeters": 640,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 54400000,
+      "notes": "Integration test parcel",
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:46:05.342Z",
+      "updatedAt": "2026-07-20T23:46:05.342Z"
+    },
+    {
+      "id": 57,
+      "parcelNumber": "LA-LE-2026-057",
+      "surveyPlanNumber": "SP/E2E/1784591152311",
+      "state": "Lagos",
+      "lga": "Lekki",
+      "ward": "Ward 2",
+      "streetAddress": "15 Admiralty Way, Lekki Phase 1",
+      "areaSquareMeters": 1000,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 85000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-e2e-01",
+      "createdAt": "2026-07-20T23:45:52.311Z",
+      "updatedAt": "2026-07-20T23:45:52.312Z",
+      "verifierId": "registrar-e2e-01",
+      "verifiedAt": "2026-07-20T23:45:52.312Z"
+    },
+    {
+      "id": 56,
+      "parcelNumber": "AN-ON-2026-056",
+      "surveyPlanNumber": "SP/BV/1784591151700-2",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 550,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 46750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:45:51.700Z",
+      "updatedAt": "2026-07-20T23:45:51.701Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:45:51.701Z"
+    },
+    {
+      "id": 55,
+      "parcelNumber": "AN-ON-2026-055",
+      "surveyPlanNumber": "SP/BV/1784591151699-1",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 450,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 38250000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:45:51.700Z",
+      "updatedAt": "2026-07-20T23:45:51.701Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:45:51.701Z"
+    },
+    {
+      "id": 54,
+      "parcelNumber": "OG-SA-2026-054",
+      "surveyPlanNumber": "SP/IDEM/1784591151698",
+      "state": "Ogun",
+      "lga": "Sagamu",
+      "areaSquareMeters": 300,
+      "geometryGeoJSON": "{}",
+      "landUseType": "agricultural",
+      "status": "verified",
+      "estimatedValue": 25500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:45:51.698Z",
+      "updatedAt": "2026-07-20T23:45:51.699Z",
+      "verifierId": "registrar-01",
+      "verifiedAt": "2026-07-20T23:45:51.699Z"
+    },
+    {
+      "id": 53,
+      "parcelNumber": "OG-AB-2026-053",
+      "surveyPlanNumber": "SP/VERIFY/1784591151697",
+      "state": "Ogun",
+      "lga": "Abeokuta",
+      "areaSquareMeters": 800,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 68000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:45:51.697Z",
+      "updatedAt": "2026-07-20T23:45:51.698Z",
+      "verifierId": "registrar-smoke-01",
+      "verifiedAt": "2026-07-20T23:45:51.698Z"
+    },
+    {
+      "id": 52,
+      "parcelNumber": "DE-WA-2026-052",
+      "surveyPlanNumber": "SP/UPDATE/1784591151694",
+      "state": "Delta",
+      "lga": "Warri",
+      "areaSquareMeters": 400,
+      "geometryGeoJSON": "{}",
+      "landUseType": "industrial",
+      "status": "pending_verification",
+      "estimatedValue": 34000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:45:51.694Z",
+      "updatedAt": "2026-07-20T23:45:51.695Z",
+      "streetAddress": "5 Refinery Road",
+      "notes": "Updated notes"
+    },
+    {
+      "id": 51,
+      "parcelNumber": "KA-KA-2026-051",
+      "surveyPlanNumber": "SP/BATCH/1784591151693-2",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 600,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 51000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:45:51.693Z",
+      "updatedAt": "2026-07-20T23:45:51.693Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 50,
+      "parcelNumber": "KA-KA-2026-050",
+      "surveyPlanNumber": "SP/BATCH/1784591151692-1",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 500,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 42500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:45:51.692Z",
+      "updatedAt": "2026-07-20T23:45:51.693Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 49,
+      "parcelNumber": "RI-PO-2026-049",
+      "surveyPlanNumber": "SP/SMOKE/1784591151686",
+      "state": "Rivers",
+      "lga": "Port Harcourt",
+      "ward": "Ward 5",
+      "streetAddress": "10 Aba Road, Port Harcourt",
+      "areaSquareMeters": 750,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "commercial",
+      "status": "pending_verification",
+      "estimatedValue": 63750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-smoke-01",
+      "createdAt": "2026-07-20T23:45:51.686Z",
+      "updatedAt": "2026-07-20T23:45:51.686Z"
+    },
+    {
+      "id": 48,
+      "parcelNumber": "LA-LE-2026-048",
+      "surveyPlanNumber": "SP/E2E/1784591097865",
+      "state": "Lagos",
+      "lga": "Lekki",
+      "ward": "Ward 2",
+      "streetAddress": "15 Admiralty Way, Lekki Phase 1",
+      "areaSquareMeters": 1000,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 85000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-e2e-01",
+      "createdAt": "2026-07-20T23:44:57.866Z",
+      "updatedAt": "2026-07-20T23:44:57.866Z",
+      "verifierId": "registrar-e2e-01",
+      "verifiedAt": "2026-07-20T23:44:57.866Z"
+    },
+    {
+      "id": 47,
+      "parcelNumber": "AN-ON-2026-047",
+      "surveyPlanNumber": "SP/BV/1784591097329-2",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 550,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 46750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:57.329Z",
+      "updatedAt": "2026-07-20T23:44:57.329Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:44:57.329Z"
+    },
+    {
+      "id": 46,
+      "parcelNumber": "AN-ON-2026-046",
+      "surveyPlanNumber": "SP/BV/1784591097328-1",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 450,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 38250000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:57.328Z",
+      "updatedAt": "2026-07-20T23:44:57.329Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:44:57.329Z"
+    },
+    {
+      "id": 45,
+      "parcelNumber": "OG-SA-2026-045",
+      "surveyPlanNumber": "SP/IDEM/1784591097327",
+      "state": "Ogun",
+      "lga": "Sagamu",
+      "areaSquareMeters": 300,
+      "geometryGeoJSON": "{}",
+      "landUseType": "agricultural",
+      "status": "verified",
+      "estimatedValue": 25500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:57.327Z",
+      "updatedAt": "2026-07-20T23:44:57.328Z",
+      "verifierId": "registrar-01",
+      "verifiedAt": "2026-07-20T23:44:57.328Z"
+    },
+    {
+      "id": 44,
+      "parcelNumber": "OG-AB-2026-044",
+      "surveyPlanNumber": "SP/VERIFY/1784591097326",
+      "state": "Ogun",
+      "lga": "Abeokuta",
+      "areaSquareMeters": 800,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 68000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:57.326Z",
+      "updatedAt": "2026-07-20T23:44:57.327Z",
+      "verifierId": "registrar-smoke-01",
+      "verifiedAt": "2026-07-20T23:44:57.327Z"
+    },
+    {
+      "id": 43,
+      "parcelNumber": "DE-WA-2026-043",
+      "surveyPlanNumber": "SP/UPDATE/1784591097323",
+      "state": "Delta",
+      "lga": "Warri",
+      "areaSquareMeters": 400,
+      "geometryGeoJSON": "{}",
+      "landUseType": "industrial",
+      "status": "pending_verification",
+      "estimatedValue": 34000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:57.323Z",
+      "updatedAt": "2026-07-20T23:44:57.324Z",
+      "streetAddress": "5 Refinery Road",
+      "notes": "Updated notes"
+    },
+    {
+      "id": 42,
+      "parcelNumber": "KA-KA-2026-042",
+      "surveyPlanNumber": "SP/BATCH/1784591097321-2",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 600,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 51000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:57.321Z",
+      "updatedAt": "2026-07-20T23:44:57.322Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 41,
+      "parcelNumber": "KA-KA-2026-041",
+      "surveyPlanNumber": "SP/BATCH/1784591097321-1",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 500,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 42500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:57.321Z",
+      "updatedAt": "2026-07-20T23:44:57.322Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 40,
+      "parcelNumber": "RI-PO-2026-040",
+      "surveyPlanNumber": "SP/SMOKE/1784591097306",
+      "state": "Rivers",
+      "lga": "Port Harcourt",
+      "ward": "Ward 5",
+      "streetAddress": "10 Aba Road, Port Harcourt",
+      "areaSquareMeters": 750,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "commercial",
+      "status": "pending_verification",
+      "estimatedValue": 63750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-smoke-01",
+      "createdAt": "2026-07-20T23:44:57.307Z",
+      "updatedAt": "2026-07-20T23:44:57.307Z"
+    },
+    {
+      "id": 39,
+      "parcelNumber": "LA-LE-2026-039",
+      "surveyPlanNumber": "SP/E2E/1784591085528",
+      "state": "Lagos",
+      "lga": "Lekki",
+      "ward": "Ward 2",
+      "streetAddress": "15 Admiralty Way, Lekki Phase 1",
+      "areaSquareMeters": 1000,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 85000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-e2e-01",
+      "createdAt": "2026-07-20T23:44:45.528Z",
+      "updatedAt": "2026-07-20T23:44:45.529Z",
+      "verifierId": "registrar-e2e-01",
+      "verifiedAt": "2026-07-20T23:44:45.529Z"
+    },
+    {
+      "id": 38,
+      "parcelNumber": "AN-ON-2026-038",
+      "surveyPlanNumber": "SP/BV/1784591085088-2",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 550,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 46750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:45.088Z",
+      "updatedAt": "2026-07-20T23:44:45.089Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:44:45.089Z"
+    },
+    {
+      "id": 37,
+      "parcelNumber": "AN-ON-2026-037",
+      "surveyPlanNumber": "SP/BV/1784591085088-1",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 450,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 38250000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:45.088Z",
+      "updatedAt": "2026-07-20T23:44:45.089Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:44:45.089Z"
+    },
+    {
+      "id": 36,
+      "parcelNumber": "OG-SA-2026-036",
+      "surveyPlanNumber": "SP/IDEM/1784591085086",
+      "state": "Ogun",
+      "lga": "Sagamu",
+      "areaSquareMeters": 300,
+      "geometryGeoJSON": "{}",
+      "landUseType": "agricultural",
+      "status": "verified",
+      "estimatedValue": 25500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:45.087Z",
+      "updatedAt": "2026-07-20T23:44:45.087Z",
+      "verifierId": "registrar-01",
+      "verifiedAt": "2026-07-20T23:44:45.087Z"
+    },
+    {
+      "id": 35,
+      "parcelNumber": "OG-AB-2026-035",
+      "surveyPlanNumber": "SP/VERIFY/1784591085085",
+      "state": "Ogun",
+      "lga": "Abeokuta",
+      "areaSquareMeters": 800,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 68000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:45.085Z",
+      "updatedAt": "2026-07-20T23:44:45.086Z",
+      "verifierId": "registrar-smoke-01",
+      "verifiedAt": "2026-07-20T23:44:45.086Z"
+    },
+    {
+      "id": 34,
+      "parcelNumber": "DE-WA-2026-034",
+      "surveyPlanNumber": "SP/UPDATE/1784591085082",
+      "state": "Delta",
+      "lga": "Warri",
+      "areaSquareMeters": 400,
+      "geometryGeoJSON": "{}",
+      "landUseType": "industrial",
+      "status": "pending_verification",
+      "estimatedValue": 34000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:45.083Z",
+      "updatedAt": "2026-07-20T23:44:45.083Z",
+      "streetAddress": "5 Refinery Road",
+      "notes": "Updated notes"
+    },
+    {
+      "id": 33,
+      "parcelNumber": "KA-KA-2026-033",
+      "surveyPlanNumber": "SP/BATCH/1784591085080-2",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 600,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 51000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:45.081Z",
+      "updatedAt": "2026-07-20T23:44:45.081Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 32,
+      "parcelNumber": "KA-KA-2026-032",
+      "surveyPlanNumber": "SP/BATCH/1784591085080-1",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 500,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 42500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:45.080Z",
+      "updatedAt": "2026-07-20T23:44:45.081Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 31,
+      "parcelNumber": "RI-PO-2026-031",
+      "surveyPlanNumber": "SP/SMOKE/1784591085066",
+      "state": "Rivers",
+      "lga": "Port Harcourt",
+      "ward": "Ward 5",
+      "streetAddress": "10 Aba Road, Port Harcourt",
+      "areaSquareMeters": 750,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "commercial",
+      "status": "pending_verification",
+      "estimatedValue": 63750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-smoke-01",
+      "createdAt": "2026-07-20T23:44:45.067Z",
+      "updatedAt": "2026-07-20T23:44:45.067Z"
+    },
+    {
+      "id": 30,
+      "parcelNumber": "LA-LE-2026-030",
+      "surveyPlanNumber": "SP/E2E/1784591049162",
+      "state": "Lagos",
+      "lga": "Lekki",
+      "ward": "Ward 2",
+      "streetAddress": "15 Admiralty Way, Lekki Phase 1",
+      "areaSquareMeters": 1000,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 85000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-e2e-01",
+      "createdAt": "2026-07-20T23:44:09.162Z",
+      "updatedAt": "2026-07-20T23:44:09.163Z",
+      "verifierId": "registrar-e2e-01",
+      "verifiedAt": "2026-07-20T23:44:09.163Z"
+    },
+    {
+      "id": 29,
+      "parcelNumber": "AN-ON-2026-029",
+      "surveyPlanNumber": "SP/BV/1784591048777-2",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 550,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 46750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:08.777Z",
+      "updatedAt": "2026-07-20T23:44:08.778Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:44:08.778Z"
+    },
+    {
+      "id": 28,
+      "parcelNumber": "AN-ON-2026-028",
+      "surveyPlanNumber": "SP/BV/1784591048777-1",
+      "state": "Anambra",
+      "lga": "Onitsha",
+      "areaSquareMeters": 450,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 38250000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:08.777Z",
+      "updatedAt": "2026-07-20T23:44:08.778Z",
+      "verifierId": "registrar-batch-01",
+      "verifiedAt": "2026-07-20T23:44:08.778Z"
+    },
+    {
+      "id": 27,
+      "parcelNumber": "OG-SA-2026-027",
+      "surveyPlanNumber": "SP/IDEM/1784591048776",
+      "state": "Ogun",
+      "lga": "Sagamu",
+      "areaSquareMeters": 300,
+      "geometryGeoJSON": "{}",
+      "landUseType": "agricultural",
+      "status": "verified",
+      "estimatedValue": 25500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:08.776Z",
+      "updatedAt": "2026-07-20T23:44:08.777Z",
+      "verifierId": "registrar-01",
+      "verifiedAt": "2026-07-20T23:44:08.777Z"
+    },
+    {
+      "id": 26,
+      "parcelNumber": "OG-AB-2026-026",
+      "surveyPlanNumber": "SP/VERIFY/1784591048775",
+      "state": "Ogun",
+      "lga": "Abeokuta",
+      "areaSquareMeters": 800,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "verified",
+      "estimatedValue": 68000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:08.775Z",
+      "updatedAt": "2026-07-20T23:44:08.776Z",
+      "verifierId": "registrar-smoke-01",
+      "verifiedAt": "2026-07-20T23:44:08.776Z"
+    },
+    {
+      "id": 25,
+      "parcelNumber": "DE-WA-2026-025",
+      "surveyPlanNumber": "SP/UPDATE/1784591048772",
+      "state": "Delta",
+      "lga": "Warri",
+      "areaSquareMeters": 400,
+      "geometryGeoJSON": "{}",
+      "landUseType": "industrial",
+      "status": "pending_verification",
+      "estimatedValue": 34000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:08.773Z",
+      "updatedAt": "2026-07-20T23:44:08.773Z",
+      "streetAddress": "5 Refinery Road",
+      "notes": "Updated notes"
+    },
+    {
+      "id": 24,
+      "parcelNumber": "KA-KA-2026-024",
+      "surveyPlanNumber": "SP/BATCH/1784591048771-2",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 600,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 51000000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:08.771Z",
+      "updatedAt": "2026-07-20T23:44:08.771Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 23,
+      "parcelNumber": "KA-KA-2026-023",
+      "surveyPlanNumber": "SP/BATCH/1784591048770-1",
+      "state": "Kano",
+      "lga": "Kano Municipal",
+      "areaSquareMeters": 500,
+      "geometryGeoJSON": "{}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 42500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "createdAt": "2026-07-20T23:44:08.770Z",
+      "updatedAt": "2026-07-20T23:44:08.771Z",
+      "surveyorId": "surveyor-batch-01"
+    },
+    {
+      "id": 22,
+      "parcelNumber": "RI-PO-2026-022",
+      "surveyPlanNumber": "SP/SMOKE/1784591048756",
+      "state": "Rivers",
+      "lga": "Port Harcourt",
+      "ward": "Ward 5",
+      "streetAddress": "10 Aba Road, Port Harcourt",
+      "areaSquareMeters": 750,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "commercial",
+      "status": "pending_verification",
+      "estimatedValue": 63750000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-smoke-01",
+      "createdAt": "2026-07-20T23:44:08.757Z",
+      "updatedAt": "2026-07-20T23:44:08.757Z"
+    },
+    {
+      "id": 21,
+      "parcelNumber": "AB-GA-2026-021",
+      "surveyPlanNumber": "SP/TEST/1002",
+      "state": "Abuja",
+      "lga": "Garki",
+      "areaSquareMeters": 900,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 76500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:38:35.055Z",
+      "updatedAt": "2026-07-20T23:38:35.056Z",
+      "verifierId": "registrar-42",
+      "verifiedAt": "2026-07-20T23:38:35.056Z"
+    },
+    {
+      "id": 20,
+      "parcelNumber": "LA-ET-2026-020",
+      "surveyPlanNumber": "SP/TEST/1001",
+      "state": "Lagos",
+      "lga": "Eti-Osa",
+      "ward": "Ward 9",
+      "streetAddress": "1 Persistence Close",
+      "areaSquareMeters": 640,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 54400000,
+      "notes": "Integration test parcel",
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:38:35.053Z",
+      "updatedAt": "2026-07-20T23:38:35.053Z"
+    },
+    {
+      "id": 19,
+      "parcelNumber": "AB-GA-2026-019",
+      "surveyPlanNumber": "SP/TEST/1002",
+      "state": "Abuja",
+      "lga": "Garki",
+      "areaSquareMeters": 900,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 76500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:38:13.391Z",
+      "updatedAt": "2026-07-20T23:38:13.391Z",
+      "verifierId": "registrar-42",
+      "verifiedAt": "2026-07-20T23:38:13.391Z"
+    },
+    {
+      "id": 18,
+      "parcelNumber": "LA-ET-2026-018",
+      "surveyPlanNumber": "SP/TEST/1001",
+      "state": "Lagos",
+      "lga": "Eti-Osa",
+      "ward": "Ward 9",
+      "streetAddress": "1 Persistence Close",
+      "areaSquareMeters": 640,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 54400000,
+      "notes": "Integration test parcel",
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:38:13.389Z",
+      "updatedAt": "2026-07-20T23:38:13.389Z"
+    },
+    {
+      "id": 17,
+      "parcelNumber": "AB-GA-2026-017",
+      "surveyPlanNumber": "SP/TEST/1002",
+      "state": "Abuja",
+      "lga": "Garki",
+      "areaSquareMeters": 900,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 76500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:36:49.554Z",
+      "updatedAt": "2026-07-20T23:36:49.554Z",
+      "verifierId": "registrar-42",
+      "verifiedAt": "2026-07-20T23:36:49.554Z"
+    },
+    {
+      "id": 16,
+      "parcelNumber": "LA-ET-2026-016",
+      "surveyPlanNumber": "SP/TEST/1001",
+      "state": "Lagos",
+      "lga": "Eti-Osa",
+      "ward": "Ward 9",
+      "streetAddress": "1 Persistence Close",
+      "areaSquareMeters": 640,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 54400000,
+      "notes": "Integration test parcel",
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:36:49.551Z",
+      "updatedAt": "2026-07-20T23:36:49.551Z"
+    },
+    {
+      "id": 15,
+      "parcelNumber": "AB-GA-2026-015",
+      "surveyPlanNumber": "SP/TEST/REGISTERED",
+      "state": "Abuja",
+      "lga": "Garki",
+      "areaSquareMeters": 900,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "pending_verification",
+      "estimatedValue": 76500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:35:35.315Z",
+      "updatedAt": "2026-07-20T23:35:35.315Z"
+    },
+    {
+      "id": 14,
+      "parcelNumber": "AB-GA-2026-014",
+      "surveyPlanNumber": "SP/TEST/1002",
+      "state": "Abuja",
+      "lga": "Garki",
+      "areaSquareMeters": 900,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 76500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:35:35.313Z",
+      "updatedAt": "2026-07-20T23:35:35.314Z",
+      "verifierId": "registrar-42",
+      "verifiedAt": "2026-07-20T23:35:35.314Z"
+    },
+    {
+      "id": 13,
+      "parcelNumber": "LA-ET-2026-013",
+      "surveyPlanNumber": "SP/TEST/1001",
+      "state": "Lagos",
+      "lga": "Eti-Osa",
+      "ward": "Ward 9",
+      "streetAddress": "1 Persistence Close",
+      "areaSquareMeters": 640,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 54400000,
+      "notes": "Integration test parcel",
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:35:35.311Z",
+      "updatedAt": "2026-07-20T23:35:35.311Z"
+    },
+    {
+      "id": 12,
+      "parcelNumber": "AB-GA-2026-012",
+      "surveyPlanNumber": "SP/TEST/REGISTERED",
+      "state": "Abuja",
+      "lga": "Garki",
+      "areaSquareMeters": 900,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "pending_verification",
+      "estimatedValue": 76500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:31:52.812Z",
+      "updatedAt": "2026-07-20T23:31:52.812Z"
+    },
+    {
+      "id": 11,
+      "parcelNumber": "AB-GA-2026-011",
+      "surveyPlanNumber": "SP/TEST/1002",
+      "state": "Abuja",
+      "lga": "Garki",
+      "areaSquareMeters": 900,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 76500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:31:52.811Z",
+      "updatedAt": "2026-07-20T23:31:52.811Z",
+      "verifierId": "registrar-42",
+      "verifiedAt": "2026-07-20T23:31:52.811Z"
+    },
+    {
+      "id": 10,
+      "parcelNumber": "LA-ET-2026-010",
+      "surveyPlanNumber": "SP/TEST/1001",
+      "state": "Lagos",
+      "lga": "Eti-Osa",
+      "ward": "Ward 9",
+      "streetAddress": "1 Persistence Close",
+      "areaSquareMeters": 640,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 54400000,
+      "notes": "Integration test parcel",
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:31:52.808Z",
+      "updatedAt": "2026-07-20T23:31:52.808Z"
+    },
+    {
+      "id": 9,
+      "parcelNumber": "AB-GA-2026-009",
+      "surveyPlanNumber": "SP/TEST/1002",
+      "state": "Abuja",
+      "lga": "Garki",
+      "areaSquareMeters": 900,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 76500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:30:35.519Z",
+      "updatedAt": "2026-07-20T23:30:35.519Z",
+      "verifierId": "registrar-42",
+      "verifiedAt": "2026-07-20T23:30:35.519Z"
+    },
+    {
+      "id": 8,
+      "parcelNumber": "LA-ET-2026-008",
+      "surveyPlanNumber": "SP/TEST/1001",
+      "state": "Lagos",
+      "lga": "Eti-Osa",
+      "ward": "Ward 9",
+      "streetAddress": "1 Persistence Close",
+      "areaSquareMeters": 640,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 54400000,
+      "notes": "Integration test parcel",
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:30:35.516Z",
+      "updatedAt": "2026-07-20T23:30:35.516Z"
+    },
+    {
+      "id": 7,
+      "parcelNumber": "AB-GA-2026-007",
+      "surveyPlanNumber": "SP/TEST/1002",
+      "state": "Abuja",
+      "lga": "Garki",
+      "areaSquareMeters": 900,
+      "geometryGeoJSON": "{}",
+      "landUseType": "commercial",
+      "status": "verified",
+      "estimatedValue": 76500000,
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:20:52.235Z",
+      "updatedAt": "2026-07-20T23:20:52.235Z",
+      "verifierId": "registrar-42",
+      "verifiedAt": "2026-07-20T23:20:52.235Z"
+    },
+    {
+      "id": 6,
+      "parcelNumber": "LA-ET-2026-006",
+      "surveyPlanNumber": "SP/TEST/1001",
+      "state": "Lagos",
+      "lga": "Eti-Osa",
+      "ward": "Ward 9",
+      "streetAddress": "1 Persistence Close",
+      "areaSquareMeters": 640,
+      "geometryGeoJSON": "{\"type\":\"Polygon\",\"coordinates\":[]}",
+      "landUseType": "residential",
+      "status": "pending_verification",
+      "estimatedValue": 54400000,
+      "notes": "Integration test parcel",
+      "coordinates": {
+        "lat": 6.5244,
+        "lng": 3.3792
+      },
+      "surveyorId": "surveyor-test",
+      "createdAt": "2026-07-20T23:20:52.233Z",
+      "updatedAt": "2026-07-20T23:20:52.233Z"
+    },
+    {
       "id": 1,
       "parcelNumber": "LG-VI-2024-001",
       "surveyPlanNumber": "SP/2024/001",
@@ -124,5 +1641,5 @@
       "updatedAt": "2024-02-05T14:00:00.000Z"
     }
   ],
-  "nextId": 6
+  "nextId": 80
 }
