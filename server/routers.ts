@@ -48,6 +48,12 @@ import { publicSecurityRouter } from './api/routers/public-security';
 import { parcelSubscriptionsRouter, notificationPreferencesRouter, notificationInboxRouter } from './api/routers/parcel-subscriptions';
 import { identityRouter } from './api/routers/identity';
 import { legalRouter } from './api/routers/legal';
+import { miningRouter } from "./api/routers/mining";
+import { oilGasRouter } from "./api/routers/oil-gas";
+import { concessionsRouter } from "./api/routers/concessions";
+import { environmentalRouter } from "./api/routers/environmental";
+import { cofoWorkflowRouter } from "./api/routers/cofo-workflow";
+import { onboardingRouter } from "./api/routers/onboarding";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { notificationService } from "./notifications";
@@ -143,6 +149,12 @@ function getMimeType(format: string): string {
 }
 
 export const appRouter = router({
+  mining: miningRouter,
+  oilGas: oilGasRouter,
+  concessions: concessionsRouter,
+  environmental: environmentalRouter,
+  cofoWorkflow: cofoWorkflowRouter,
+  onboarding: onboardingRouter,
   system: systemRouter,
   creditBureau: creditBureauRouter,
   mortgageInsurance: mortgageInsuranceRouter,
@@ -811,29 +823,6 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const repo = await import('./agriculturalRepository');
         return repo.createAgriculturalParcel(input);
-      }),
-  }),
-
-  mining: router({
-    overview: protectedProcedure.query(async () => {
-      const repo = await import('./miningRepository');
-      return repo.getMiningOverview();
-    }),
-
-    createRight: protectedProcedure
-      .input(z.object({
-        parcelId: z.number(),
-        licenseName: z.string().min(3),
-        mineralType: z.string().min(2),
-        demarcationStatus: z.string().min(3),
-        royaltyRate: z.number().min(0),
-        environmentalCompliance: z.string().min(3),
-        closurePlan: z.string().min(3),
-        transferWorkflowStatus: z.string().min(3),
-      }))
-      .mutation(async ({ input }) => {
-        const repo = await import('./miningRepository');
-        return repo.createMiningRight(input);
       }),
   }),
 

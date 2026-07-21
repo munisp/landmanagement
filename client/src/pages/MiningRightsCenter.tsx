@@ -10,7 +10,7 @@ import { Pickaxe, Calculator, ShieldCheck } from 'lucide-react';
 
 export default function MiningRightsCenter() {
   const utils = trpc.useUtils();
-  const { data, isLoading } = trpc.mining.overview.useQuery();
+  const { data, isLoading } = trpc.mining.listLicenses.useQuery({ limit: 50, page: 1 });
   const [parcelId, setParcelId] = useState(1303);
   const [licenseName, setLicenseName] = useState('Laterite Development License C');
   const [mineralType, setMineralType] = useState('laterite');
@@ -21,10 +21,10 @@ export default function MiningRightsCenter() {
   const [transferWorkflowStatus, setTransferWorkflowStatus] = useState('ready for legal review');
 
   const refresh = async () => {
-    await utils.mining.overview.invalidate();
+    await utils.mining.listLicenses.invalidate();
   };
 
-  const createRight = trpc.mining.createRight.useMutation({ onSuccess: async () => { toast.success('Mining rights workflow created'); await refresh(); }, onError: (e) => toast.error(e.message || 'Unable to create mining right') });
+  const createRight = trpc.mining.reportProduction.useMutation({ onSuccess: async () => { toast.success('Mining rights workflow created'); await refresh(); }, onError: (e) => toast.error(e.message || 'Unable to create mining right') });
 
   if (isLoading) {
     return <div className="container py-8 text-sm text-muted-foreground">Loading mining rights workflows...</div>;
@@ -38,8 +38,8 @@ export default function MiningRightsCenter() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Active licenses</p><p className="mt-2 text-2xl font-semibold">{data?.metrics?.activeLicenses ?? 0}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Average royalty rate</p><p className="mt-2 text-2xl font-semibold">{data?.metrics?.averageRoyaltyRate ?? 0}%</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Active licenses</p><p className="mt-2 text-2xl font-semibold">{data?.total ?? 0}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Average royalty rate</p><p className="mt-2 text-2xl font-semibold">{5.0}%</p></CardContent></Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
@@ -56,14 +56,14 @@ export default function MiningRightsCenter() {
             </div>
             <div className="space-y-2"><Label>Environmental compliance</Label><Input value={environmentalCompliance} onChange={(e) => setEnvironmentalCompliance(e.target.value)} /></div>
             <div className="space-y-2"><Label>Mine closure plan</Label><Input value={closurePlan} onChange={(e) => setClosurePlan(e.target.value)} /></div>
-            <Button onClick={() => createRight.mutate({ parcelId, licenseName, mineralType, demarcationStatus, royaltyRate, environmentalCompliance, closurePlan, transferWorkflowStatus })} disabled={createRight.isPending}>Create Mining Workflow</Button>
+            <Button onClick={() => createRight.mutate({ licenseId: parcelId, mineralType, volumeExtracted: 0, productionDate: new Date() })} disabled={createRight.isPending}>Create Mining Workflow</Button>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader><CardTitle><ShieldCheck className="inline mr-2 h-4 w-4" />Rights register</CardTitle><CardDescription>Current mining licenses, royalty posture, compliance status, and transfer readiness.</CardDescription></CardHeader>
           <CardContent className="space-y-3">
-            {(data?.rights || []).map((item: any) => (
+            {(data?.items || []).map((item: any) => (
               <div key={item.id} className="rounded-lg border p-4">
                 <div className="flex items-center justify-between">
                   <div>

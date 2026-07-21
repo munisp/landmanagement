@@ -176,6 +176,13 @@
       "when": 1784598088143,
       "tag": "0024_legal_framework",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1784599359667,
+      "tag": "0025_multi_sector_schema",
+      "breakpoints": true
     }
   ]
 }

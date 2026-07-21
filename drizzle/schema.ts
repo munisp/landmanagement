@@ -1,3 +1,4 @@
+import { numeric } from "drizzle-orm/pg-core";
 import { bigint, boolean, decimal, doublePrecision, integer, json, jsonb, index, uniqueIndex, pgEnum, pgTable, real, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 /**
@@ -7,8 +8,11 @@ import { bigint, boolean, decimal, doublePrecision, integer, json, jsonb, index,
  */
 
 // Define enums for PostgreSQL
+
 export const roleEnum = pgEnum("role", ["user", "surveyor", "registrar", "admin"]);
+
 export const entityTypeEnum = pgEnum("entity_type", ["parcel", "transaction"]);
+
 
 export const users: any = pgTable("users", {
   /**
@@ -38,6 +42,7 @@ export type InsertUser = typeof users.$inferInsert;
 /**
  * Comments table for parcels and transactions
  */
+
 export const comments = pgTable("comments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -54,6 +59,7 @@ export type InsertComment = typeof comments.$inferInsert;
 /**
  * Activity logs for tracking user actions
  */
+
 export const activityLogs = pgTable("activity_logs", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   // Nullable: anonymous audit events (failed logins, rejected API keys) have
@@ -71,6 +77,7 @@ export type InsertActivityLog = typeof activityLogs.$inferInsert;
 /**
  * Saved searches for quick access to frequently used queries
  */
+
 export const savedSearches = pgTable("saved_searches", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -87,6 +94,7 @@ export type InsertSavedSearch = typeof savedSearches.$inferInsert;
 /**
  * Verification status enum
  */
+
 export const verificationStatusEnum = pgEnum("verification_status", [
   "draft",
   "submitted", 
@@ -98,6 +106,7 @@ export const verificationStatusEnum = pgEnum("verification_status", [
 /**
  * Verification requests for parcels
  */
+
 export const verificationRequests = pgTable("verification_requests", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   parcelId: varchar("parcel_id", { length: 64 }).notNull(),
@@ -122,6 +131,7 @@ export type InsertVerificationRequest = typeof verificationRequests.$inferInsert
 /**
  * Verification documents uploaded as part of the verification process
  */
+
 export const verificationDocuments = pgTable("verification_documents", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   verificationRequestId: integer("verification_request_id").notNull().references(() => verificationRequests.id, { onDelete: 'cascade' }),
@@ -143,6 +153,7 @@ export type InsertVerificationDocument = typeof verificationDocuments.$inferInse
 /**
  * Verification workflow history for audit trail
  */
+
 export const verificationHistory = pgTable("verification_history", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   verificationRequestId: integer("verification_request_id").notNull().references(() => verificationRequests.id, { onDelete: 'cascade' }),
@@ -161,9 +172,13 @@ export type InsertVerificationHistory = typeof verificationHistory.$inferInsert;
 /**
  * Scheduled Reports and Report History
  */
+
 export const reportFrequencyEnum = pgEnum("report_frequency", ["once", "daily", "weekly", "monthly", "custom"]);
+
 export const reportFormatEnum = pgEnum("report_format", ["pdf", "excel", "csv"]);
+
 export const reportStatusEnum = pgEnum("report_status", ["pending", "generating", "completed", "failed"]);
+
 
 export const scheduled_reports = pgTable("scheduled_reports", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -185,6 +200,7 @@ export const scheduled_reports = pgTable("scheduled_reports", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+
 export const report_history = pgTable("report_history", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   scheduledReportId: integer("scheduled_report_id").references(() => scheduled_reports.id, { onDelete: 'set null' }),
@@ -202,6 +218,7 @@ export const report_history = pgTable("report_history", {
   expiresAt: timestamp("expires_at"), // Optional expiration for auto-cleanup
 });
 
+
 export const report_templates = pgTable("report_templates", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: text("name").notNull(),
@@ -218,6 +235,7 @@ export const report_templates = pgTable("report_templates", {
 /**
  * Email Templates Table for customizable report email delivery
  */
+
 export const email_templates = pgTable("email_templates", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -238,7 +256,9 @@ export const email_templates = pgTable("email_templates", {
 /**
  * Webhook Endpoints Table for external system notifications
  */
+
 export const webhookStatusEnum = pgEnum("webhook_status", ["active", "inactive", "failed"]);
+
 
 export const webhook_endpoints = pgTable("webhook_endpoints", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -265,7 +285,9 @@ export const webhook_endpoints = pgTable("webhook_endpoints", {
 /**
  * Webhook Delivery Log Table for tracking webhook executions
  */
+
 export const webhookDeliveryStatusEnum = pgEnum("webhook_delivery_status", ["success", "failed", "pending"]);
+
 
 export const webhook_delivery_log = pgTable("webhook_delivery_log", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -296,6 +318,7 @@ export type InsertWebhookDeliveryLog = typeof webhook_delivery_log.$inferInsert;
 /**
  * Admin notifications table for real-time alerts
  */
+
 export const notificationTypeEnum = pgEnum("notification_type", [
   "user_registration",
   "suspicious_activity",
@@ -310,7 +333,9 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "user_suspended"
 ]);
 
+
 export const notificationPriorityEnum = pgEnum("notification_priority", ["low", "medium", "high", "critical"]);
+
 
 export const adminNotifications = pgTable("admin_notifications", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -336,7 +361,9 @@ export type InsertAdminNotification = typeof adminNotifications.$inferInsert;
 /**
  * Email logs for tracking email delivery
  */
+
 export const emailStatusEnum = pgEnum("email_status", ["pending", "sent", "failed", "bounced"]);
+
 
 export const emailLogs = pgTable("email_logs", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -360,6 +387,7 @@ export type InsertEmailLog = typeof emailLogs.$inferInsert;
 /**
  * Email queue for retry logic
  */
+
 export const emailQueue = pgTable("email_queue", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   recipientEmail: varchar("recipient_email", { length: 320 }).notNull(),
@@ -386,6 +414,7 @@ export type InsertEmailQueue = typeof emailQueue.$inferInsert;
 /**
  * Analytics daily metrics for aggregated data
  */
+
 export const analyticsDailyMetrics = pgTable("analytics_daily_metrics", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   date: varchar("date", { length: 10 }).notNull().unique(), // YYYY-MM-DD
@@ -411,6 +440,7 @@ export type InsertAnalyticsDailyMetrics = typeof analyticsDailyMetrics.$inferIns
 /**
  * Security events for monitoring
  */
+
 export const securityEventTypeEnum = pgEnum("security_event_type", [
   "failed_login",
   "suspicious_activity",
@@ -420,6 +450,7 @@ export const securityEventTypeEnum = pgEnum("security_event_type", [
   "password_reset",
   "role_escalation"
 ]);
+
 
 export const securityEvents = pgTable("security_events", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -447,6 +478,7 @@ export type InsertSecurityEvent = typeof securityEvents.$inferInsert;
 /**
  * Blocked IPs for security
  */
+
 export const blockedIps = pgTable("blocked_ips", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   ipAddress: varchar("ip_address", { length: 45 }).notNull().unique(),
@@ -467,6 +499,7 @@ export type InsertBlockedIp = typeof blockedIps.$inferInsert;
 /**
  * Login attempts for tracking
  */
+
 export const loginAttempts = pgTable("login_attempts", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").references(() => users.id, { onDelete: 'cascade' }),
@@ -489,6 +522,7 @@ export type InsertLoginAttempt = typeof loginAttempts.$inferInsert;
 /**
  * Document AI processing results
  */
+
 export const documentProcessingResults = pgTable("document_processing_results", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   verificationDocumentId: integer("verification_document_id").notNull().references(() => verificationDocuments.id, { onDelete: 'cascade' }),
@@ -515,6 +549,7 @@ export type InsertDocumentProcessingResult = typeof documentProcessingResults.$i
 /**
  * Field data submissions from mobile surveyors
  */
+
 export const fieldData = pgTable("field_data", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -541,6 +576,7 @@ export type InsertFieldData = typeof fieldData.$inferInsert;
 /**
  * Blockchain transactions for audit trail
  */
+
 export const blockchainTransactions = pgTable("blockchain_transactions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -569,7 +605,9 @@ export type InsertBlockchainTransaction = typeof blockchainTransactions.$inferIn
 /**
  * Parcels table for land registry
  */
+
 export const parcelStatusEnum = pgEnum("parcel_status", ["draft", "pending_verification", "verified", "registered", "transferred", "disputed", "archived"]);
+
 
 export const parcels = pgTable("parcels", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -620,6 +658,7 @@ export type InsertParcel = typeof parcels.$inferInsert;
 /**
  * API Keys table for programmatic access
  */
+
 export const apiKeys = pgTable("api_keys", {
   id: varchar("id", { length: 64 }).primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -643,6 +682,7 @@ export const apiKeys = pgTable("api_keys", {
  * appends 'rate_limit_hit' and 'error' events. getUsageStats aggregates this
  * table — no simulated metrics.
  */
+
 export const apiKeyUsageEvents = pgTable("api_key_usage_events", {
   id: serial("id").primaryKey(),
   keyId: varchar("key_id", { length: 64 }).notNull().references(() => apiKeys.id, { onDelete: 'cascade' }),
@@ -661,6 +701,7 @@ export type InsertApiKey = typeof apiKeys.$inferInsert;
  */
 
 // Payment status enum
+
 export const paymentStatusEnum = pgEnum("payment_status", [
   "pending",
   "quote_received",
@@ -672,6 +713,7 @@ export const paymentStatusEnum = pgEnum("payment_status", [
 ]);
 
 // Payment transaction type enum
+
 export const paymentTransactionTypeEnum = pgEnum("payment_transaction_type", [
   "transfer",
   "deposit",
@@ -685,6 +727,7 @@ export const paymentTransactionTypeEnum = pgEnum("payment_transaction_type", [
  * Mojaloop Payment Transactions
  * Tracks all payment transactions through the Mojaloop network
  */
+
 export const mojaloopTransactions = pgTable("mojaloop_transactions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   
@@ -756,6 +799,7 @@ export type InsertMojaloopTransaction = typeof mojaloopTransactions.$inferInsert
  * Mojaloop Payment Events Log
  * Tracks all events in the payment lifecycle for audit trail
  */
+
 export const mojaloopPaymentEvents = pgTable("mojaloop_payment_events", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   
@@ -786,6 +830,7 @@ export type InsertMojaloopPaymentEvent = typeof mojaloopPaymentEvents.$inferInse
  * FSP (Financial Service Provider) Configuration
  * Stores configuration for connecting to different FSPs in the Mojaloop network
  */
+
 export const mojaloopFspConfig = pgTable("mojaloop_fsp_config", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   
@@ -831,6 +876,7 @@ export type InsertMojaloopFspConfig = typeof mojaloopFspConfig.$inferInsert;
  * Mortgage Applications Table
  * Tracks mortgage applications linked to property transactions
  */
+
 export const mortgageStatusEnum = pgEnum("mortgage_status", [
   "pending",
   "under_review",
@@ -839,6 +885,7 @@ export const mortgageStatusEnum = pgEnum("mortgage_status", [
   "disbursed",
   "cancelled"
 ]);
+
 
 export const mortgageApplications = pgTable("mortgage_applications", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -889,6 +936,7 @@ export const mortgageApplications = pgTable("mortgage_applications", {
 }));
 
 /** Mortgage workflow events — lifecycle audit trail per application. */
+
 export const mortgageWorkflowEvents = pgTable("mortgage_workflow_events", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   applicationId: varchar("application_id", { length: 64 }).notNull(),
@@ -910,6 +958,7 @@ export type InsertMortgageApplication = typeof mortgageApplications.$inferInsert
  * Mortgage Payment Schedule Table
  * Tracks individual scheduled payments for each mortgage
  */
+
 export const mortgagePaymentSchedule = pgTable("mortgage_payment_schedule", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   scheduleId: varchar("schedule_id", { length: 64 }).notNull().unique(),
@@ -949,6 +998,7 @@ export type InsertMortgagePaymentSchedule = typeof mortgagePaymentSchedule.$infe
  * Mortgage Payment Transactions Table
  * Uses existing paymentStatusEnum from Mojaloop payments section
  */
+
 export const mortgagePaymentTransactions = pgTable("mortgage_payment_transactions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   transactionId: varchar("transaction_id", { length: 64 }).notNull().unique(),
@@ -992,6 +1042,7 @@ export type InsertMortgagePaymentTransaction = typeof mortgagePaymentTransaction
 /**
  * Auto Debit Mandates Table
  */
+
 export const mandateStatusEnum = pgEnum("mandate_status", [
   "pending",
   "active",
@@ -999,6 +1050,7 @@ export const mandateStatusEnum = pgEnum("mandate_status", [
   "cancelled",
   "expired"
 ]);
+
 
 export const autoDebitMandates = pgTable("auto_debit_mandates", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1049,6 +1101,7 @@ export type InsertAutoDebitMandate = typeof autoDebitMandates.$inferInsert;
  * Tax Clearances Table
  * Tracks property tax clearance certificates
  */
+
 export const taxClearanceStatusEnum = pgEnum("tax_clearance_status", [
   "pending",
   "in_progress",
@@ -1057,6 +1110,7 @@ export const taxClearanceStatusEnum = pgEnum("tax_clearance_status", [
   "rejected",
   "expired"
 ]);
+
 
 export const taxClearances = pgTable("tax_clearances", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1101,6 +1155,7 @@ export type InsertTaxClearance = typeof taxClearances.$inferInsert;
  * Insurance Policies Table
  * Tracks property insurance policies
  */
+
 export const insurancePolicyStatusEnum = pgEnum("insurance_policy_status", [
   "pending",
   "active",
@@ -1108,6 +1163,7 @@ export const insurancePolicyStatusEnum = pgEnum("insurance_policy_status", [
   "cancelled",
   "suspended"
 ]);
+
 
 export const insurancePolicies = pgTable("insurance_policies", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1157,6 +1213,7 @@ export type InsertInsurancePolicy = typeof insurancePolicies.$inferInsert;
  * Legal Documents Table
  * Tracks legal documents for property transactions
  */
+
 export const legalDocumentTypeEnum = pgEnum("legal_document_type", [
   "deed_of_assignment",
   "power_of_attorney",
@@ -1168,6 +1225,7 @@ export const legalDocumentTypeEnum = pgEnum("legal_document_type", [
   "other"
 ]);
 
+
 export const legalDocumentStatusEnum = pgEnum("legal_document_status", [
   "draft",
   "pending_review",
@@ -1176,6 +1234,7 @@ export const legalDocumentStatusEnum = pgEnum("legal_document_status", [
   "registered",
   "rejected"
 ]);
+
 
 export const legalDocuments = pgTable("legal_documents", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1225,6 +1284,7 @@ export type InsertLegalDocument = typeof legalDocuments.$inferInsert;
  * Cadastral Surveys Table
  * Tracks cadastral survey plans and approvals
  */
+
 export const cadastralSurveyStatusEnum = pgEnum("cadastral_survey_status", [
   "pending",
   "in_progress",
@@ -1233,6 +1293,7 @@ export const cadastralSurveyStatusEnum = pgEnum("cadastral_survey_status", [
   "rejected",
   "expired"
 ]);
+
 
 export const cadastralSurveys = pgTable("cadastral_surveys", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1284,6 +1345,7 @@ export type InsertCadastralSurvey = typeof cadastralSurveys.$inferInsert;
  * Environmental Assessments Table
  * Tracks environmental impact assessments
  */
+
 export const environmentalAssessmentStatusEnum = pgEnum("environmental_assessment_status", [
   "pending",
   "under_review",
@@ -1292,6 +1354,7 @@ export const environmentalAssessmentStatusEnum = pgEnum("environmental_assessmen
   "rejected",
   "expired"
 ]);
+
 
 export const environmentalAssessments = pgTable("environmental_assessments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1348,6 +1411,7 @@ export type InsertEnvironmentalAssessment = typeof environmentalAssessments.$inf
  * Public Notices Table
  * Tracks public notice publications for property transactions
  */
+
 export const publicNoticeStatusEnum = pgEnum("public_notice_status", [
   "pending",
   "published",
@@ -1356,6 +1420,7 @@ export const publicNoticeStatusEnum = pgEnum("public_notice_status", [
   "completed",
   "cancelled"
 ]);
+
 
 export const publicNotices = pgTable("public_notices", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1404,6 +1469,7 @@ export type InsertPublicNotice = typeof publicNotices.$inferInsert;
  * Land Use Plans Table
  * Tracks land use planning compliance and approvals
  */
+
 export const landUsePlanStatusEnum = pgEnum("land_use_plan_status", [
   "pending",
   "under_review",
@@ -1412,6 +1478,7 @@ export const landUsePlanStatusEnum = pgEnum("land_use_plan_status", [
   "rejected",
   "expired"
 ]);
+
 
 export const landUsePlans = pgTable("land_use_plans", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1466,6 +1533,7 @@ export type InsertLandUsePlan = typeof landUsePlans.$inferInsert;
  * User Preferences Table
  * Stores user-specific preferences and settings
  */
+
 export const userPreferences = pgTable("user_preferences", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull().references(() => users.id).unique(),
@@ -1503,6 +1571,7 @@ export type InsertUserPreference = typeof userPreferences.$inferInsert;
 // MARKETPLACE TABLES
 // ============================================
 
+
 export const marketplaceListings = pgTable('marketplace_listings', {
   id: serial('id').primaryKey(),
   parcelId: integer('parcel_id').notNull().references(() => parcels.id),
@@ -1524,6 +1593,7 @@ export const marketplaceListings = pgTable('marketplace_listings', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+
 export const marketplaceBids = pgTable('marketplace_bids', {
   id: serial('id').primaryKey(),
   listingId: integer('listing_id').notNull().references(() => marketplaceListings.id),
@@ -1533,6 +1603,7 @@ export const marketplaceBids = pgTable('marketplace_bids', {
   message: text('message'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
 
 export const marketplaceEscrow = pgTable('marketplace_escrow', {
   id: serial('id').primaryKey(),
@@ -1550,6 +1621,7 @@ export const marketplaceEscrow = pgTable('marketplace_escrow', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+
 export const marketplaceFavorites = pgTable('marketplace_favorites', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull().references(() => users.id),
@@ -1561,6 +1633,7 @@ export const marketplaceFavorites = pgTable('marketplace_favorites', {
  * Mortgage Insurance Policies Table
  * Uses existing insurancePolicyStatusEnum from property insurance section
  */
+
 export const mortgageInsurancePolicies = pgTable("mortgage_insurance_policies", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   policyNumber: varchar("policy_number", { length: 64 }).notNull().unique(),
@@ -1605,6 +1678,7 @@ export type InsertMortgageInsurancePolicy = typeof mortgageInsurancePolicies.$in
 /**
  * Escrow Accounts Table
  */
+
 export const escrowTransactionTypeEnum = pgEnum("escrow_transaction_type", [
   "deposit",
   "withdrawal",
@@ -1613,6 +1687,7 @@ export const escrowTransactionTypeEnum = pgEnum("escrow_transaction_type", [
   "adjustment",
   "refund",
 ]);
+
 
 export const escrowAccounts = pgTable("escrow_accounts", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1644,6 +1719,7 @@ export type InsertEscrowAccount = typeof escrowAccounts.$inferInsert;
 /**
  * Escrow Transactions Table
  */
+
 export const escrowTransactions = pgTable("escrow_transactions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   transactionId: varchar("transaction_id", { length: 64 }).notNull().unique(),
@@ -1677,6 +1753,7 @@ export type InsertEscrowTransaction = typeof escrowTransactions.$inferInsert;
 /**
  * Document Verification Tables
  */
+
 export const documentTypeEnum = pgEnum("document_type", [
   "income_statement",
   "employment_letter",
@@ -1689,6 +1766,7 @@ export const documentTypeEnum = pgEnum("document_type", [
   "other",
 ]);
 
+
 export const documentVerificationStatusEnum = pgEnum("document_verification_status", [
   "pending",
   "processing",
@@ -1696,6 +1774,7 @@ export const documentVerificationStatusEnum = pgEnum("document_verification_stat
   "rejected",
   "requires_review",
 ]);
+
 
 export const documentVerifications = pgTable("document_verifications", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1747,6 +1826,7 @@ export type InsertDocumentVerification = typeof documentVerifications.$inferInse
 /**
  * Verification Audit Log
  */
+
 export const verificationAuditLog = pgTable("verification_audit_log", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   verificationId: integer("verification_id").notNull().references(() => documentVerifications.id),
@@ -1775,12 +1855,14 @@ export type InsertVerificationAuditLog = typeof verificationAuditLog.$inferInser
 /**
  * Mortgage Broker Tables
  */
+
 export const brokerStatusEnum = pgEnum("broker_status", [
   "pending",
   "active",
   "suspended",
   "inactive",
 ]);
+
 
 export const mortgageBrokers = pgTable("mortgage_brokers", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1825,6 +1907,7 @@ export type InsertMortgageBroker = typeof mortgageBrokers.$inferInsert;
 /**
  * Broker Clients Table
  */
+
 export const brokerClients = pgTable("broker_clients", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   brokerId: integer("broker_id").notNull().references(() => mortgageBrokers.id),
@@ -1858,12 +1941,14 @@ export type InsertBrokerClient = typeof brokerClients.$inferInsert;
 /**
  * Broker Commission Structure Table
  */
+
 export const commissionTierEnum = pgEnum("commission_tier", [
   "standard",
   "premium",
   "platinum",
   "custom",
 ]);
+
 
 export const brokerCommissionStructures = pgTable("broker_commission_structures", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1894,12 +1979,14 @@ export type InsertBrokerCommissionStructure = typeof brokerCommissionStructures.
 /**
  * Broker Commissions Table
  */
+
 export const commissionStatusEnum = pgEnum("commission_status", [
   "pending",
   "approved",
   "paid",
   "cancelled",
 ]);
+
 
 export const brokerCommissions = pgTable("broker_commissions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -1935,6 +2022,7 @@ export type InsertBrokerCommission = typeof brokerCommissions.$inferInsert;
 /**
  * Broker Application Submissions Table (links brokers to applications)
  */
+
 export const brokerApplicationSubmissions = pgTable("broker_application_submissions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   brokerId: integer("broker_id").notNull().references(() => mortgageBrokers.id),
@@ -1959,12 +2047,14 @@ export type InsertBrokerApplicationSubmission = typeof brokerApplicationSubmissi
 /**
  * Secondary Market Tables
  */
+
 export const loanPoolStatusEnum = pgEnum("loan_pool_status", [
   "draft",
   "active",
   "closed",
   "sold",
 ]);
+
 
 export const riskTierEnum = pgEnum("risk_tier", [
   "aaa",
@@ -1974,6 +2064,7 @@ export const riskTierEnum = pgEnum("risk_tier", [
   "bb",
   "b",
 ]);
+
 
 export const loanPools = pgTable("loan_pools", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2015,6 +2106,7 @@ export type InsertLoanPool = typeof loanPools.$inferInsert;
 /**
  * Loan Pool Loans Table (many-to-many relationship)
  */
+
 export const loanPoolLoans = pgTable("loan_pool_loans", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   poolId: integer("pool_id").notNull().references(() => loanPools.id),
@@ -2042,6 +2134,7 @@ export type InsertLoanPoolLoan = typeof loanPoolLoans.$inferInsert;
 /**
  * Investors Table
  */
+
 export const investorTypeEnum = pgEnum("investor_type", [
   "institutional",
   "individual",
@@ -2049,11 +2142,13 @@ export const investorTypeEnum = pgEnum("investor_type", [
   "bank",
 ]);
 
+
 export const investorStatusEnum = pgEnum("investor_status", [
   "active",
   "inactive",
   "suspended",
 ]);
+
 
 export const investors = pgTable("investors", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2097,12 +2192,14 @@ export type InsertInvestor = typeof investors.$inferInsert;
 /**
  * Pool Investments Table
  */
+
 export const investmentStatusEnum = pgEnum("investment_status", [
   "pending",
   "active",
   "matured",
   "cancelled",
 ]);
+
 
 export const poolInvestments = pgTable("pool_investments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2142,11 +2239,13 @@ export type InsertPoolInvestment = typeof poolInvestments.$inferInsert;
 /**
  * Investment Distributions Table
  */
+
 export const distributionTypeEnum = pgEnum("distribution_type", [
   "interest",
   "principal",
   "fee",
 ]);
+
 
 export const investmentDistributions = pgTable("investment_distributions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2176,12 +2275,14 @@ export type InsertInvestmentDistribution = typeof investmentDistributions.$infer
 /**
  * Servicing Rights Transfer Table
  */
+
 export const transferStatusEnum = pgEnum("transfer_status", [
   "pending",
   "approved",
   "completed",
   "cancelled",
 ]);
+
 
 export const servicingRightsTransfers = pgTable("servicing_rights_transfers", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2220,6 +2321,7 @@ export type InsertServicingRightsTransfer = typeof servicingRightsTransfers.$inf
 // Webhook Integration System
 // ============================================================================
 
+
 export const webhookEventTypeEnum = pgEnum("webhook_event_type", [
   "loan_status_changed",
   "commission_paid",
@@ -2239,6 +2341,7 @@ export const webhookEventTypeEnum = pgEnum("webhook_event_type", [
  * Keeping for reference, will be removed after migration
  */
 /*
+
 export const webhookEndpoints = pgTable("webhook_endpoints", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   
@@ -2271,6 +2374,7 @@ export type WebhookEndpoint = typeof webhookEndpoints.$inferSelect;
 export type InsertWebhookEndpoint = typeof webhookEndpoints.$inferInsert;
 
 // Webhook Delivery Logs (replaced by webhook_delivery_log at line 268)
+
 export const webhookDeliveryLogs = pgTable("webhook_delivery_logs", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   
@@ -2316,6 +2420,7 @@ export type InsertWebhookDeliveryLog = typeof webhookDeliveryLogs.$inferInsert;
 // operations tables added during the infrastructure-completeness audit.
 // -----------------------------------------------------------------------------
 
+
 export const authProviderTypeEnum = pgEnum("auth_provider_type", [
   "manus_oauth",
   "keycloak",
@@ -2323,6 +2428,7 @@ export const authProviderTypeEnum = pgEnum("auth_provider_type", [
   "saml",
   "local",
 ]);
+
 
 export const integrationKindEnum = pgEnum("integration_kind", [
   "keycloak",
@@ -2338,6 +2444,7 @@ export const integrationKindEnum = pgEnum("integration_kind", [
   "postgres",
 ]);
 
+
 export const integrationStatusEnum = pgEnum("integration_status", [
   "draft",
   "configured",
@@ -2346,6 +2453,7 @@ export const integrationStatusEnum = pgEnum("integration_status", [
   "failed",
   "disabled",
 ]);
+
 
 export const integrationSyncStatusEnum = pgEnum("integration_sync_status", [
   "pending",
@@ -2356,12 +2464,14 @@ export const integrationSyncStatusEnum = pgEnum("integration_sync_status", [
   "skipped",
 ]);
 
+
 export const authorizationSubjectTypeEnum = pgEnum("authorization_subject_type", [
   "user",
   "group",
   "role",
   "service",
 ]);
+
 
 export const authorizationResourceTypeEnum = pgEnum("authorization_resource_type", [
   "parcel",
@@ -2375,6 +2485,7 @@ export const authorizationResourceTypeEnum = pgEnum("authorization_resource_type
   "system",
 ]);
 
+
 export const apiGatewayResourceTypeEnum = pgEnum("api_gateway_resource_type", [
   "route",
   "upstream",
@@ -2384,11 +2495,13 @@ export const apiGatewayResourceTypeEnum = pgEnum("api_gateway_resource_type", [
   "certificate",
 ]);
 
+
 export const streamBackendEnum = pgEnum("stream_backend", [
   "kafka",
   "fluvio",
   "dapr_pubsub",
 ]);
+
 
 export const streamDeliveryStatusEnum = pgEnum("stream_delivery_status", [
   "pending",
@@ -2398,11 +2511,13 @@ export const streamDeliveryStatusEnum = pgEnum("stream_delivery_status", [
   "dead_lettered",
 ]);
 
+
 export const wafPolicyModeEnum = pgEnum("waf_policy_mode", [
   "detect",
   "prevent",
   "disabled",
 ]);
+
 
 export const wafIncidentSeverityEnum = pgEnum("waf_incident_severity", [
   "low",
@@ -2410,6 +2525,7 @@ export const wafIncidentSeverityEnum = pgEnum("waf_incident_severity", [
   "high",
   "critical",
 ]);
+
 
 export const lakehouseJobTypeEnum = pgEnum("lakehouse_job_type", [
   "ingest",
@@ -2419,11 +2535,13 @@ export const lakehouseJobTypeEnum = pgEnum("lakehouse_job_type", [
   "analytics_refresh",
 ]);
 
+
 export const sessionStatusEnum = pgEnum("session_status", [
   "active",
   "revoked",
   "expired",
 ]);
+
 
 export const mfaFactorTypeEnum = pgEnum("mfa_factor_type", [
   "totp",
@@ -2431,6 +2549,7 @@ export const mfaFactorTypeEnum = pgEnum("mfa_factor_type", [
   "email",
   "recovery_code",
 ]);
+
 
 export const identityProviders = pgTable("identity_providers", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2455,6 +2574,7 @@ export const identityProviders = pgTable("identity_providers", {
   enabledIdx: index("identity_providers_enabled_idx").on(table.enabled),
 }));
 
+
 export const externalIdentities = pgTable("external_identities", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -2470,6 +2590,7 @@ export const externalIdentities = pgTable("external_identities", {
   providerSubjectIdx: index("external_identities_provider_subject_idx").on(table.providerId, table.externalSubject),
   userIdx: index("external_identities_user_idx").on(table.userId),
 }));
+
 
 export const userSessions = pgTable("user_sessions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2490,6 +2611,7 @@ export const userSessions = pgTable("user_sessions", {
   expiresIdx: index("user_sessions_expires_idx").on(table.expiresAt),
 }));
 
+
 export const mfaFactors = pgTable("mfa_factors", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -2509,6 +2631,7 @@ export const mfaFactors = pgTable("mfa_factors", {
   typeIdx: index("mfa_factors_type_idx").on(table.factorType),
 }));
 
+
 export const trustedDevices = pgTable("trusted_devices", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -2522,6 +2645,7 @@ export const trustedDevices = pgTable("trusted_devices", {
 }, (table) => ({
   userDeviceIdx: index("trusted_devices_user_device_idx").on(table.userId, table.deviceFingerprint),
 }));
+
 
 export const integrationRegistry = pgTable("integration_registry", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2543,6 +2667,7 @@ export const integrationRegistry = pgTable("integration_registry", {
   statusIdx: index("integration_registry_status_idx").on(table.status),
 }));
 
+
 export const integrationSyncRuns = pgTable("integration_sync_runs", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   integrationId: integer("integration_id").notNull().references(() => integrationRegistry.id, { onDelete: "cascade" }),
@@ -2560,6 +2685,7 @@ export const integrationSyncRuns = pgTable("integration_sync_runs", {
   integrationIdx: index("integration_sync_runs_integration_idx").on(table.integrationId),
   statusIdx: index("integration_sync_runs_status_idx").on(table.status),
 }));
+
 
 export const authorizationRelationships = pgTable("authorization_relationships", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2579,6 +2705,7 @@ export const authorizationRelationships = pgTable("authorization_relationships",
   resourceIdx: index("authorization_relationships_resource_idx").on(table.resourceType, table.resourceId),
 }));
 
+
 export const authorizationDecisionAudit = pgTable("authorization_decision_audit", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   integrationId: integer("integration_id").references(() => integrationRegistry.id),
@@ -2596,6 +2723,7 @@ export const authorizationDecisionAudit = pgTable("authorization_decision_audit"
   checkedIdx: index("authorization_decision_audit_checked_idx").on(table.checkedAt),
   actorIdx: index("authorization_decision_audit_actor_idx").on(table.actorUserId),
 }));
+
 
 export const apiGatewayResources = pgTable("api_gateway_resources", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2618,6 +2746,7 @@ export const apiGatewayResources = pgTable("api_gateway_resources", {
   nameIdx: index("api_gateway_resources_name_idx").on(table.name),
 }));
 
+
 export const daprComponents = pgTable("dapr_components", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   integrationId: integer("integration_id").references(() => integrationRegistry.id),
@@ -2632,6 +2761,7 @@ export const daprComponents = pgTable("dapr_components", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
 
 export const eventOutbox = pgTable("event_outbox", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2655,6 +2785,7 @@ export const eventOutbox = pgTable("event_outbox", {
   availableIdx: index("event_outbox_available_idx").on(table.availableAt),
 }));
 
+
 export const streamConsumerCheckpoints = pgTable("stream_consumer_checkpoints", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   backend: streamBackendEnum("backend").notNull(),
@@ -2670,6 +2801,7 @@ export const streamConsumerCheckpoints = pgTable("stream_consumer_checkpoints", 
 }, (table) => ({
   groupTopicIdx: index("stream_consumer_checkpoints_group_topic_idx").on(table.consumerGroup, table.topic, table.partitionId),
 }));
+
 
 export const wafPolicies = pgTable("waf_policies", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2687,6 +2819,7 @@ export const wafPolicies = pgTable("waf_policies", {
   modeIdx: index("waf_policies_mode_idx").on(table.mode),
 }));
 
+
 export const wafIncidents = pgTable("waf_incidents", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   policyId: integer("policy_id").references(() => wafPolicies.id, { onDelete: "set null" }),
@@ -2702,6 +2835,7 @@ export const wafIncidents = pgTable("waf_incidents", {
   severityIdx: index("waf_incidents_severity_idx").on(table.severity),
   createdIdx: index("waf_incidents_created_idx").on(table.createdAt),
 }));
+
 
 export const lakehouseSyncJobs = pgTable("lakehouse_sync_jobs", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2722,6 +2856,7 @@ export const lakehouseSyncJobs = pgTable("lakehouse_sync_jobs", {
   tableIdx: index("lakehouse_sync_jobs_table_idx").on(table.tableName),
   statusIdx: index("lakehouse_sync_jobs_status_idx").on(table.status),
 }));
+
 
 export const lakehouseQueryAudit = pgTable("lakehouse_query_audit", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -2782,15 +2917,23 @@ export type InsertLakehouseQueryAudit = typeof lakehouseQueryAudit.$inferInsert;
 // Privacy-Aware Data Exchange Gateway
 // ---------------------------------------------------------------------------
 
+
 export const riskBandEnum = pgEnum("risk_band", ["low", "medium", "high", "critical"]);
+
 export const integrityFindingSeverityEnum = pgEnum("integrity_finding_severity", ["info", "low", "medium", "high", "critical"]);
+
 export const integrityFindingStatusEnum = pgEnum("integrity_finding_status", ["open", "acknowledged", "resolved", "dismissed"]);
+
 export const settlementStatusEnum = pgEnum("settlement_status", ["draft", "pending", "release_ready", "released", "blocked", "cancelled"]);
+
 export const checkpointStatusEnum = pgEnum("checkpoint_status", ["pending", "fulfilled", "waived", "failed"]);
+
 export const clearanceStatusEnum = pgEnum("clearance_status", ["pending", "submitted", "approved", "rejected", "expired"]);
+
 export const exchangeDecisionEnum = pgEnum("exchange_decision", ["allowed", "denied", "conditional"]);
 
 /** Title Risk Copilot — persisted risk assessments per parcel/transaction. */
+
 export const titleRiskAssessments = pgTable("title_risk_assessments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   parcelId: integer("parcel_id").references(() => parcels.id),
@@ -2810,6 +2953,7 @@ export const titleRiskAssessments = pgTable("title_risk_assessments", {
 }));
 
 /** Registry Integrity Monitoring — anomaly findings with operator review queue. */
+
 export const registryIntegrityFindings = pgTable("registry_integrity_findings", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   checkType: varchar("check_type", { length: 64 }).notNull(),
@@ -2837,6 +2981,7 @@ export const registryIntegrityFindings = pgTable("registry_integrity_findings", 
 }));
 
 /** Programmable Escrow & Settlement Orchestrator — settlement envelopes. */
+
 export const escrowSettlements = pgTable("escrow_settlements", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   settlementRef: varchar("settlement_ref", { length: 64 }).notNull().unique(),
@@ -2857,6 +3002,7 @@ export const escrowSettlements = pgTable("escrow_settlements", {
 }));
 
 /** Settlement checkpoints — deterministic release conditions. */
+
 export const settlementCheckpoints = pgTable("settlement_checkpoints", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   settlementId: integer("settlement_id").references(() => escrowSettlements.id).notNull(),
@@ -2877,6 +3023,7 @@ export const settlementCheckpoints = pgTable("settlement_checkpoints", {
 }));
 
 /** Explainable Mortgage Decisioning — persisted underwriting explanations. */
+
 export const mortgageDecisionExplanations = pgTable("mortgage_decision_explanations", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   applicationId: integer("application_id").references(() => mortgageApplications.id).notNull(),
@@ -2891,6 +3038,7 @@ export const mortgageDecisionExplanations = pgTable("mortgage_decision_explanati
 }));
 
 /** Federated Inter-Agency Clearance Exchange — per-agency clearance states. */
+
 export const agencyClearances = pgTable("agency_clearances", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   transactionId: integer("transaction_id").references(() => registryTransactions.id).notNull(),
@@ -2911,6 +3059,7 @@ export const agencyClearances = pgTable("agency_clearances", {
 }));
 
 /** Privacy-Aware Data Exchange Gateway — export authorization audit trail. */
+
 export const dataExchangeAudits = pgTable("data_exchange_audits", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   subjectUserId: integer("subject_user_id").references(() => users.id),
@@ -2955,6 +3104,7 @@ export type InsertDataExchangeAudit = typeof dataExchangeAudits.$inferInsert;
  * and title perfection. Distinct from the legacy `transactions` table used by
  * smart-contract/reporting services.
  */
+
 export const registryTransactions = pgTable("registry_transactions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   type: varchar("type", { length: 64 }).notNull(),
@@ -2990,6 +3140,7 @@ export type InsertRegistryTransaction = typeof registryTransactions.$inferInsert
  * only through explicit confirmation (provider webhook / bank reconciliation),
  * never automatically at creation time.
  */
+
 export const payments = pgTable("payments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   transactionId: integer("transaction_id").notNull().references(() => registryTransactions.id),
@@ -3021,6 +3172,7 @@ export type InsertPayment = typeof payments.$inferInsert;
 /**
  * Titles — ownership instruments per parcel.
  */
+
 export const titles = pgTable("titles", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   titleNumber: varchar("title_number", { length: 64 }).notNull().unique(),
@@ -3048,6 +3200,7 @@ export type InsertTitle = typeof titles.$inferInsert;
  * Repository document stores (migration 0013) — JSONB persistence for the
  * secondary feature repositories. One row per repository collection.
  */
+
 export const repositoryStores = pgTable("repository_stores", {
   collection: varchar("collection", { length: 128 }).primaryKey(),
   data: jsonb("data").notNull(),
@@ -3061,6 +3214,7 @@ export type InsertRepositoryStore = typeof repositoryStores.$inferInsert;
 
 // --- NEW SCHEMA TABLES FOR INTEGRATIONS ---
 
+
 export const tigerbeetleLedgerAccounts = pgTable("tigerbeetle_ledger_accounts", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   ledgerId: integer("ledger_id").notNull(),
@@ -3072,6 +3226,7 @@ export const tigerbeetleLedgerAccounts = pgTable("tigerbeetle_ledger_accounts", 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
 
 export const temporalWorkflowAudit = pgTable("temporal_workflow_audit", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -3087,6 +3242,7 @@ export const temporalWorkflowAudit = pgTable("temporal_workflow_audit", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+
 export const keycloakSessionSync = pgTable("keycloak_session_sync", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull().references(() => users.id),
@@ -3099,6 +3255,7 @@ export const keycloakSessionSync = pgTable("keycloak_session_sync", {
   lastSyncedAt: timestamp("last_synced_at").defaultNow().notNull(),
 });
 
+
 export const fluvioTopicRegistry = pgTable("fluvio_topic_registry", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   topicName: varchar("topic_name", { length: 255 }).notNull().unique(),
@@ -3109,6 +3266,7 @@ export const fluvioTopicRegistry = pgTable("fluvio_topic_registry", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
 
 export const apisixRoutePersistence = pgTable("apisix_route_persistence", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -3124,6 +3282,7 @@ export const apisixRoutePersistence = pgTable("apisix_route_persistence", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+
 export const permifySchemaSync = pgTable("permify_schema_sync", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   version: varchar("version", { length: 128 }).notNull().unique(),
@@ -3132,6 +3291,7 @@ export const permifySchemaSync = pgTable("permify_schema_sync", {
   status: varchar("status", { length: 32 }).default('applied').notNull(),
   appliedBy: varchar("applied_by", { length: 128 }),
 });
+
 
 export const openappsecPolicyAudit = pgTable("openappsec_policy_audit", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -3148,6 +3308,7 @@ export const openappsecPolicyAudit = pgTable("openappsec_policy_audit", {
 // PARCEL SUBSCRIPTIONS & NOTIFICATION PREFERENCES
 // ============================================
 
+
 export const parcelSubscriptionEventEnum = pgEnum("parcel_subscription_event", [
   "status_change",
   "document_uploaded",
@@ -3160,6 +3321,7 @@ export const parcelSubscriptionEventEnum = pgEnum("parcel_subscription_event", [
   "survey_completed",
   "all",
 ]);
+
 
 export const parcelSubscriptions = pgTable("parcel_subscriptions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -3178,6 +3340,7 @@ export const parcelSubscriptions = pgTable("parcel_subscriptions", {
 
 export type ParcelSubscription = typeof parcelSubscriptions.$inferSelect;
 export type InsertParcelSubscription = typeof parcelSubscriptions.$inferInsert;
+
 
 export const notificationPreferences = pgTable("notification_preferences", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -3211,6 +3374,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
 export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
 
+
 export const notificationInbox = pgTable("notification_inbox", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -3239,17 +3403,25 @@ export type InsertNotificationInboxItem = typeof notificationInbox.$inferInsert;
 // PostGIS Spatial Schema (Migration 0022)
 // ============================================================================
 
+
 export const floodRiskLevelEnum = pgEnum("flood_risk_level", ["low", "moderate", "high", "extreme"]);
+
 export const boundaryTypeEnum = pgEnum("boundary_type", ["country", "state", "lga", "ward", "district"]);
+
 export const violationTypeEnum = pgEnum("violation_type_enum", ["overlap", "sliver", "gap", "invalid_geometry", "self_intersection", "duplicate"]);
+
 export const violationSeverityEnum = pgEnum("violation_severity", ["low", "medium", "high", "critical"]);
+
 export const violationStatusEnum = pgEnum("violation_status", ["open", "investigating", "resolved", "dismissed"]);
+
 export const droneMissionStatusEnum = pgEnum("drone_mission_status", ["planned", "in_progress", "completed", "failed", "cancelled"]);
+
 export const roadClassEnum = pgEnum("road_class", ["motorway", "trunk", "primary", "secondary", "tertiary", "residential", "track", "path"]);
 
 /**
  * Flood Zones — polygon geometries for flood risk assessment
  */
+
 export const floodZones = pgTable("flood_zones", {
   id: serial("id").primaryKey(),
   zoneCode: varchar("zone_code", { length: 32 }).notNull(),
@@ -3276,6 +3448,7 @@ export type InsertFloodZone = typeof floodZones.$inferInsert;
 /**
  * Administrative Boundaries — LGA, State, Ward polygons
  */
+
 export const adminBoundaries = pgTable("admin_boundaries", {
   id: serial("id").primaryKey(),
   boundaryType: boundaryTypeEnum("boundary_type").notNull(),
@@ -3304,6 +3477,7 @@ export type InsertAdminBoundary = typeof adminBoundaries.$inferInsert;
 /**
  * Infrastructure Points — roads, water, power, schools, hospitals
  */
+
 export const infrastructurePoints = pgTable("infrastructure_points", {
   id: serial("id").primaryKey(),
   infraType: varchar("infra_type", { length: 64 }).notNull(),
@@ -3328,6 +3502,7 @@ export type InsertInfrastructurePoint = typeof infrastructurePoints.$inferInsert
 /**
  * Road Network — LineString geometries for routing and access scoring
  */
+
 export const roadNetwork = pgTable("road_network", {
   id: serial("id").primaryKey(),
   roadClass: roadClassEnum("road_class").notNull(),
@@ -3352,6 +3527,7 @@ export type InsertRoadSegment = typeof roadNetwork.$inferInsert;
 /**
  * Spatial Audit Log — tracks all geometry changes to parcels
  */
+
 export const spatialAuditLog = pgTable("spatial_audit_log", {
   id: serial("id").primaryKey(),
   parcelId: integer("parcel_id").references(() => parcels.id),
@@ -3374,6 +3550,7 @@ export type InsertSpatialAuditLogEntry = typeof spatialAuditLog.$inferInsert;
 /**
  * Topology Violations — overlapping parcels, slivers, gaps
  */
+
 export const topologyViolations = pgTable("topology_violations", {
   id: serial("id").primaryKey(),
   violationType: violationTypeEnum("violation_type").notNull(),
@@ -3398,6 +3575,7 @@ export type InsertTopologyViolation = typeof topologyViolations.$inferInsert;
 /**
  * Spatial Analytics Cache — precomputed spatial statistics
  */
+
 export const spatialAnalyticsCache = pgTable("spatial_analytics_cache", {
   id: serial("id").primaryKey(),
   cacheKey: varchar("cache_key", { length: 256 }).notNull().unique(),
@@ -3420,6 +3598,7 @@ export type InsertSpatialAnalyticsCache = typeof spatialAnalyticsCache.$inferIns
 /**
  * Drone Survey Missions — enhanced with spatial coverage
  */
+
 export const droneSurveyMissions = pgTable("drone_survey_missions", {
   id: serial("id").primaryKey(),
   parcelId: integer("parcel_id").references(() => parcels.id),
@@ -3452,6 +3631,7 @@ export type InsertDroneSurveyMission = typeof droneSurveyMissions.$inferInsert;
 /**
  * Surveyor GPS Tracks — real-time field tracking
  */
+
 export const surveyorGpsTracks = pgTable("surveyor_gps_tracks", {
   id: serial("id").primaryKey(),
   surveyorId: integer("surveyor_id").references(() => users.id).notNull(),
@@ -3475,6 +3655,7 @@ export type InsertSurveyorGpsTrack = typeof surveyorGpsTracks.$inferInsert;
 /**
  * Vector Tile Cache — PMTiles / MVT cache
  */
+
 export const vectorTileCache = pgTable("vector_tile_cache", {
   id: serial("id").primaryKey(),
   layerName: varchar("layer_name", { length: 128 }).notNull(),
@@ -3494,6 +3675,7 @@ export type InsertVectorTileCacheEntry = typeof vectorTileCache.$inferInsert;
 /**
  * Elevation Tiles — DEM raster tile metadata
  */
+
 export const elevationTiles = pgTable("elevation_tiles", {
   id: serial("id").primaryKey(),
   tileX: integer("tile_x").notNull(),
@@ -3512,3 +3694,355 @@ export const elevationTiles = pgTable("elevation_tiles", {
 }));
 export type ElevationTile = typeof elevationTiles.$inferSelect;
 export type InsertElevationTile = typeof elevationTiles.$inferInsert;
+
+// ============================================================
+// MULTI-SECTOR RESOURCE MANAGEMENT SCHEMA
+// Extends the platform to support Mining, Oil/Gas, Water Rights,
+// Forestry, Agriculture, and Environmental Compliance sectors.
+// ============================================================
+
+// ── Sector Enums ────────────────────────────────────────────
+
+export const sectorTypeEnum = pgEnum("sector_type", [
+  "land", "mining", "oil_gas", "water", "forestry", "agriculture", "fisheries", "renewable_energy"
+]);
+
+
+export const miningLicenseTypeEnum = pgEnum("mining_license_type", [
+  "exploration_license", "mining_lease", "quarrying_lease", "small_scale_mining",
+  "mineral_buying_center", "water_use_permit"
+]);
+
+
+export const petroleumLicenseTypeEnum = pgEnum("petroleum_license_type", [
+  "OPL", "OML", "marginal_field", "gas_flare_permit", "pipeline_license"
+]);
+
+
+export const licenseStatusEnum = pgEnum("license_status", [
+  "application", "under_review", "approved", "active", "suspended",
+  "revoked", "expired", "renewal_pending"
+]);
+
+
+export const terrainTypeEnum = pgEnum("terrain_type", [
+  "onshore", "shallow_water", "deep_water", "ultra_deep_water"
+]);
+
+
+export const waterSourceTypeEnum = pgEnum("water_source_type", [
+  "river", "lake", "groundwater_borehole", "reservoir", "spring", "coastal"
+]);
+
+
+export const concessionStatusEnum = pgEnum("concession_status", [
+  "application", "under_review", "granted", "active", "suspended", "revoked", "expired"
+]);
+
+
+export const eiaCategoryEnum = pgEnum("eia_category", [
+  "A", "B1", "B2", "C"  // A = full EIA, B1 = limited study, B2 = environmental audit, C = no assessment
+]);
+
+// ── Mining Licenses ─────────────────────────────────────────
+
+export const miningLicenses = pgTable("mining_licenses", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  licenseNumber: varchar("license_number", { length: 64 }).unique().notNull(),
+  type: miningLicenseTypeEnum("type").notNull(),
+  status: licenseStatusEnum("status").default("application").notNull(),
+  operatorId: integer("operator_id").notNull().references(() => users.id),
+  stateCode: varchar("state_code", { length: 3 }).notNull(),
+  lgaCode: varchar("lga_code", { length: 10 }),
+  tenantCode: varchar("tenant_code", { length: 20 }).default("FED").notNull(),
+  mineralsApproved: text("minerals_approved").array(),
+  areaHectares: numeric("area_hectares", { precision: 12, scale: 4 }),
+  geometryGeoJSON: text("geometry_geojson"),
+  issueDate: timestamp("issue_date"),
+  expiryDate: timestamp("expiry_date"),
+  renewalCount: integer("renewal_count").default(0).notNull(),
+  annualFeeNgn: bigint("annual_fee_ngn", { mode: "number" }).default(0).notNull(),
+  royaltyRatePercent: numeric("royalty_rate_percent", { precision: 5, scale: 2 }).default("5.00").notNull(),
+  eiaReference: varchar("eia_reference", { length: 64 }),
+  approvedBy: integer("approved_by").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  operatorIdx: index("mining_licenses_operator_idx").on(t.operatorId),
+  stateIdx: index("mining_licenses_state_idx").on(t.stateCode),
+  statusIdx: index("mining_licenses_status_idx").on(t.status),
+  expiryIdx: index("mining_licenses_expiry_idx").on(t.expiryDate),
+}));
+
+// ── Mineral Production Records ───────────────────────────────
+
+export const mineralProduction = pgTable("mineral_production", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  licenseId: integer("license_id").notNull().references(() => miningLicenses.id),
+  mineralType: varchar("mineral_type", { length: 64 }).notNull(),
+  volumeExtracted: numeric("volume_extracted", { precision: 18, scale: 4 }).notNull(),
+  unit: varchar("unit", { length: 16 }).default("tonnes").notNull(),
+  productionDate: timestamp("production_date").notNull(),
+  reportedBy: integer("reported_by").notNull().references(() => users.id),
+  verifiedBy: integer("verified_by").references(() => users.id),
+  royaltyAmountNgn: bigint("royalty_amount_ngn", { mode: "number" }).default(0).notNull(),
+  royaltyPaid: boolean("royalty_paid").default(false).notNull(),
+  tigerBeetleTransferId: varchar("tigerbeetle_transfer_id", { length: 128 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  licenseIdx: index("mineral_production_license_idx").on(t.licenseId),
+  dateIdx: index("mineral_production_date_idx").on(t.productionDate),
+}));
+
+// ── Oil & Gas Blocks ─────────────────────────────────────────
+
+export const oilGasBlocks = pgTable("oil_gas_blocks", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  blockName: varchar("block_name", { length: 32 }).unique().notNull(),
+  basin: varchar("basin", { length: 64 }).notNull(),
+  terrain: terrainTypeEnum("terrain").notNull(),
+  status: licenseStatusEnum("status").default("application").notNull(),
+  operatorId: integer("operator_id").references(() => users.id),
+  areaKm2: numeric("area_km2", { precision: 12, scale: 4 }),
+  geometryGeoJSON: text("geometry_geojson"),
+  estimatedReservesBarrels: bigint("estimated_reserves_barrels", { mode: "number" }),
+  discoveryYear: integer("discovery_year"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  operatorIdx: index("oil_gas_blocks_operator_idx").on(t.operatorId),
+  statusIdx: index("oil_gas_blocks_status_idx").on(t.status),
+}));
+
+// ── Petroleum Licenses (OPL/OML) ─────────────────────────────
+
+export const petroleumLicenses = pgTable("petroleum_licenses", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  licenseNumber: varchar("license_number", { length: 32 }).unique().notNull(),
+  type: petroleumLicenseTypeEnum("type").notNull(),
+  blockId: integer("block_id").notNull().references(() => oilGasBlocks.id),
+  operatorId: integer("operator_id").notNull().references(() => users.id),
+  status: licenseStatusEnum("status").default("application").notNull(),
+  issueDate: timestamp("issue_date"),
+  expiryDate: timestamp("expiry_date"),
+  farmOutPercentage: numeric("farm_out_percentage", { precision: 5, scale: 2 }),
+  royaltyRatePercent: numeric("royalty_rate_percent", { precision: 5, scale: 2 }).default("12.50").notNull(),
+  annualRentalUsd: bigint("annual_rental_usd", { mode: "number" }).default(0).notNull(),
+  eiaReference: varchar("eia_reference", { length: 64 }),
+  approvedBy: integer("approved_by").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  blockIdx: index("petroleum_licenses_block_idx").on(t.blockId),
+  operatorIdx: index("petroleum_licenses_operator_idx").on(t.operatorId),
+  statusIdx: index("petroleum_licenses_status_idx").on(t.status),
+}));
+
+// ── Oil Production Metering ──────────────────────────────────
+
+export const oilProductionMetering = pgTable("oil_production_metering", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  licenseId: integer("license_id").notNull().references(() => petroleumLicenses.id),
+  wellId: varchar("well_id", { length: 32 }).notNull(),
+  barrelsProduced: numeric("barrels_produced", { precision: 18, scale: 4 }).notNull(),
+  gasFlaredMcf: numeric("gas_flared_mcf", { precision: 18, scale: 4 }).default("0").notNull(),
+  waterCutPercent: numeric("water_cut_percent", { precision: 5, scale: 2 }),
+  timestamp: timestamp("timestamp").notNull(),
+  meterHash: varchar("meter_hash", { length: 128 }),
+  reportedBy: integer("reported_by").references(() => users.id),
+  royaltyAmountUsd: bigint("royalty_amount_usd", { mode: "number" }).default(0).notNull(),
+  royaltyPaid: boolean("royalty_paid").default(false).notNull(),
+  tigerBeetleTransferId: varchar("tigerbeetle_transfer_id", { length: 128 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  licenseIdx: index("oil_production_license_idx").on(t.licenseId),
+  timestampIdx: index("oil_production_timestamp_idx").on(t.timestamp),
+  wellIdx: index("oil_production_well_idx").on(t.wellId),
+}));
+
+// ── Water Rights ─────────────────────────────────────────────
+
+export const waterRights = pgTable("water_rights", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  licenseNumber: varchar("license_number", { length: 64 }).unique().notNull(),
+  sourceType: waterSourceTypeEnum("source_type").notNull(),
+  basin: varchar("basin", { length: 64 }),
+  stateCode: varchar("state_code", { length: 3 }).notNull(),
+  operatorId: integer("operator_id").notNull().references(() => users.id),
+  status: licenseStatusEnum("status").default("application").notNull(),
+  maxDailyVolumeM3: numeric("max_daily_volume_m3", { precision: 12, scale: 2 }).notNull(),
+  purposeOfUse: varchar("purpose_of_use", { length: 128 }).notNull(),
+  issueDate: timestamp("issue_date"),
+  expiryDate: timestamp("expiry_date"),
+  annualFeeNgn: bigint("annual_fee_ngn", { mode: "number" }).default(0).notNull(),
+  geometryGeoJSON: text("geometry_geojson"),
+  eiaReference: varchar("eia_reference", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  operatorIdx: index("water_rights_operator_idx").on(t.operatorId),
+  stateIdx: index("water_rights_state_idx").on(t.stateCode),
+}));
+
+// ── Agricultural Concessions ─────────────────────────────────
+
+export const agriculturalConcessions = pgTable("agricultural_concessions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  concessionNumber: varchar("concession_number", { length: 64 }).unique().notNull(),
+  operatorId: integer("operator_id").notNull().references(() => users.id),
+  stateCode: varchar("state_code", { length: 3 }).notNull(),
+  lgaCode: varchar("lga_code", { length: 10 }),
+  status: concessionStatusEnum("status").default("application").notNull(),
+  cropTypes: text("crop_types").array(),
+  hectares: numeric("hectares", { precision: 12, scale: 4 }).notNull(),
+  geometryGeoJSON: text("geometry_geojson"),
+  issueDate: timestamp("issue_date"),
+  expiryDate: timestamp("expiry_date"),
+  annualRentNgn: bigint("annual_rent_ngn", { mode: "number" }).default(0).notNull(),
+  employmentTarget: integer("employment_target"),
+  eiaReference: varchar("eia_reference", { length: 64 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  operatorIdx: index("agri_concessions_operator_idx").on(t.operatorId),
+  stateIdx: index("agri_concessions_state_idx").on(t.stateCode),
+}));
+
+// ── Forestry Concessions ─────────────────────────────────────
+
+export const forestryConcessions = pgTable("forestry_concessions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  concessionNumber: varchar("concession_number", { length: 64 }).unique().notNull(),
+  operatorId: integer("operator_id").notNull().references(() => users.id),
+  stateCode: varchar("state_code", { length: 3 }).notNull(),
+  status: concessionStatusEnum("status").default("application").notNull(),
+  allowableCutVolumeCubicM: numeric("allowable_cut_volume_cubic_m", { precision: 12, scale: 2 }),
+  hectares: numeric("hectares", { precision: 12, scale: 4 }).notNull(),
+  geometryGeoJSON: text("geometry_geojson"),
+  issueDate: timestamp("issue_date"),
+  expiryDate: timestamp("expiry_date"),
+  reforestationObligationMet: boolean("reforestation_obligation_met").default(false).notNull(),
+  annualRentNgn: bigint("annual_rent_ngn", { mode: "number" }).default(0).notNull(),
+  eiaReference: varchar("eia_reference", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  operatorIdx: index("forestry_concessions_operator_idx").on(t.operatorId),
+}));
+
+// ── Environmental Compliance ─────────────────────────────────
+
+export const environmentalCompliance = pgTable("environmental_compliance", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  sectorType: sectorTypeEnum("sector_type").notNull(),
+  entityId: integer("entity_id").notNull(),
+  operatorId: integer("operator_id").notNull().references(() => users.id),
+  eiaCategory: eiaCategoryEnum("eia_category").notNull(),
+  eiaStatus: varchar("eia_status", { length: 32 }).default("pending").notNull(),
+  eiaApprovedDate: timestamp("eia_approved_date"),
+  eiaExpiryDate: timestamp("eia_expiry_date"),
+  lastAuditDate: timestamp("last_audit_date"),
+  nextAuditDue: timestamp("next_audit_due"),
+  riskScore: integer("risk_score").default(0).notNull(),
+  violationsCount: integer("violations_count").default(0).notNull(),
+  penaltiesNgn: bigint("penalties_ngn", { mode: "number" }).default(0).notNull(),
+  remediationStatus: varchar("remediation_status", { length: 32 }).default("none").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  sectorEntityIdx: index("env_compliance_sector_entity_idx").on(t.sectorType, t.entityId),
+  operatorIdx: index("env_compliance_operator_idx").on(t.operatorId),
+  riskIdx: index("env_compliance_risk_idx").on(t.riskScore),
+}));
+
+// ── Stakeholder Onboarding ───────────────────────────────────
+
+export const stakeholderOnboarding = pgTable("stakeholder_onboarding", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  sector: sectorTypeEnum("sector").notNull(),
+  role: varchar("role", { length: 64 }).notNull(),
+  onboardingStatus: varchar("onboarding_status", { length: 32 }).default("pending").notNull(),
+  keycloakUserId: varchar("keycloak_user_id", { length: 128 }),
+  keycloakRolesAssigned: text("keycloak_roles_assigned").array(),
+  permifyPoliciesApplied: boolean("permify_policies_applied").default(false).notNull(),
+  ninVerified: boolean("nin_verified").default(false).notNull(),
+  bvnVerified: boolean("bvn_verified").default(false).notNull(),
+  documentsSubmitted: boolean("documents_submitted").default(false).notNull(),
+  documentsVerified: boolean("documents_verified").default(false).notNull(),
+  trainingCompleted: boolean("training_completed").default(false).notNull(),
+  activatedAt: timestamp("activated_at"),
+  invitedBy: integer("invited_by").references(() => users.id),
+  inviteToken: varchar("invite_token", { length: 128 }).unique(),
+  inviteExpiresAt: timestamp("invite_expires_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  userIdx: index("onboarding_user_idx").on(t.userId),
+  statusIdx: index("onboarding_status_idx").on(t.onboardingStatus),
+  sectorIdx: index("onboarding_sector_idx").on(t.sector),
+}));
+
+// ── C of O Workflow Stages ───────────────────────────────────
+
+export const cofOApplications = pgTable("cof_o_applications", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  applicationNumber: varchar("application_number", { length: 64 }).unique().notNull(),
+  parcelId: integer("parcel_id").notNull().references(() => parcels.id),
+  applicantId: integer("applicant_id").notNull().references(() => users.id),
+  sector: sectorTypeEnum("sector").default("land").notNull(),
+  status: varchar("status", { length: 32 }).default("submitted").notNull(),
+  currentStage: varchar("current_stage", { length: 64 }).default("submission").notNull(),
+  // Workflow stages: submission -> nin_verification -> document_review ->
+  //   survey_verification -> site_inspection -> legal_review ->
+  //   governor_consent -> gazette_publication -> issuance
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  ninVerifiedAt: timestamp("nin_verified_at"),
+  documentsVerifiedAt: timestamp("documents_verified_at"),
+  surveyVerifiedAt: timestamp("survey_verified_at"),
+  siteInspectedAt: timestamp("site_inspected_at"),
+  legalReviewedAt: timestamp("legal_reviewed_at"),
+  governorConsentAt: timestamp("governor_consent_at"),
+  gazettePublishedAt: timestamp("gazette_published_at"),
+  issuedAt: timestamp("issued_at"),
+  rejectedAt: timestamp("rejected_at"),
+  rejectionReason: text("rejection_reason"),
+  assignedSurveyorId: integer("assigned_surveyor_id").references(() => users.id),
+  assignedRegistrarId: integer("assigned_registrar_id").references(() => users.id),
+  legalOfficerId: integer("legal_officer_id").references(() => users.id),
+  temporalWorkflowId: varchar("temporal_workflow_id", { length: 256 }),
+  gazetteNoticeNumber: varchar("gazette_notice_number", { length: 64 }),
+  certificateNumber: varchar("certificate_number", { length: 64 }).unique(),
+  processingFeeNgn: bigint("processing_fee_ngn", { mode: "number" }).default(0).notNull(),
+  feesPaid: boolean("fees_paid").default(false).notNull(),
+  tigerBeetleTransferId: varchar("tigerbeetle_transfer_id", { length: 128 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  parcelIdx: index("cofo_parcel_idx").on(t.parcelId),
+  applicantIdx: index("cofo_applicant_idx").on(t.applicantId),
+  statusIdx: index("cofo_status_idx").on(t.status),
+  stageIdx: index("cofo_stage_idx").on(t.currentStage),
+}));
+
+// ── C of O Stage Audit Log ───────────────────────────────────
+
+export const cofOStageLog = pgTable("cof_o_stage_log", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  applicationId: integer("application_id").notNull().references(() => cofOApplications.id),
+  fromStage: varchar("from_stage", { length: 64 }),
+  toStage: varchar("to_stage", { length: 64 }).notNull(),
+  action: varchar("action", { length: 64 }).notNull(),
+  performedBy: integer("performed_by").notNull().references(() => users.id),
+  notes: text("notes"),
+  attachmentUrl: varchar("attachment_url", { length: 512 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  applicationIdx: index("cofo_stage_log_app_idx").on(t.applicationId),
+}));
