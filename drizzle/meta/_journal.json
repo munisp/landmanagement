@@ -155,6 +155,13 @@
       "when": 1784591396586,
       "tag": "0021_composite_indexes_and_relations",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1784594500388,
+      "tag": "0022_postgis_spatial_schema",
+      "breakpoints": true
     }
   ]
 }

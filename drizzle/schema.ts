@@ -3234,3 +3234,281 @@ export const notificationInbox = pgTable("notification_inbox", {
 
 export type NotificationInboxItem = typeof notificationInbox.$inferSelect;
 export type InsertNotificationInboxItem = typeof notificationInbox.$inferInsert;
+
+// ============================================================================
+// PostGIS Spatial Schema (Migration 0022)
+// ============================================================================
+
+export const floodRiskLevelEnum = pgEnum("flood_risk_level", ["low", "moderate", "high", "extreme"]);
+export const boundaryTypeEnum = pgEnum("boundary_type", ["country", "state", "lga", "ward", "district"]);
+export const violationTypeEnum = pgEnum("violation_type_enum", ["overlap", "sliver", "gap", "invalid_geometry", "self_intersection", "duplicate"]);
+export const violationSeverityEnum = pgEnum("violation_severity", ["low", "medium", "high", "critical"]);
+export const violationStatusEnum = pgEnum("violation_status", ["open", "investigating", "resolved", "dismissed"]);
+export const droneMissionStatusEnum = pgEnum("drone_mission_status", ["planned", "in_progress", "completed", "failed", "cancelled"]);
+export const roadClassEnum = pgEnum("road_class", ["motorway", "trunk", "primary", "secondary", "tertiary", "residential", "track", "path"]);
+
+/**
+ * Flood Zones — polygon geometries for flood risk assessment
+ */
+export const floodZones = pgTable("flood_zones", {
+  id: serial("id").primaryKey(),
+  zoneCode: varchar("zone_code", { length: 32 }).notNull(),
+  zoneName: varchar("zone_name", { length: 128 }).notNull(),
+  riskLevel: floodRiskLevelEnum("risk_level").notNull(),
+  returnPeriodYears: integer("return_period_years"),
+  maxDepthM: doublePrecision("max_depth_m"),
+  velocityMs: doublePrecision("velocity_m_s"),
+  dataSource: varchar("data_source", { length: 128 }),
+  dataYear: integer("data_year"),
+  state: varchar("state", { length: 128 }),
+  lga: varchar("lga", { length: 128 }),
+  // geom stored as text WKT for Drizzle compatibility; PostGIS handles native geometry
+  geomWkt: text("geom_wkt"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  riskLevelIdx: index("flood_zones_risk_level_idx").on(table.riskLevel),
+  stateIdx: index("flood_zones_state_idx").on(table.state),
+}));
+export type FloodZone = typeof floodZones.$inferSelect;
+export type InsertFloodZone = typeof floodZones.$inferInsert;
+
+/**
+ * Administrative Boundaries — LGA, State, Ward polygons
+ */
+export const adminBoundaries = pgTable("admin_boundaries", {
+  id: serial("id").primaryKey(),
+  boundaryType: boundaryTypeEnum("boundary_type").notNull(),
+  name: varchar("name", { length: 256 }).notNull(),
+  code: varchar("code", { length: 64 }),
+  parentId: integer("parent_id"),
+  population: integer("population"),
+  areaKm2: doublePrecision("area_km2"),
+  geomWkt: text("geom_wkt"),
+  centroidLng: doublePrecision("centroid_lng"),
+  centroidLat: doublePrecision("centroid_lat"),
+  bboxWest: doublePrecision("bbox_west"),
+  bboxSouth: doublePrecision("bbox_south"),
+  bboxEast: doublePrecision("bbox_east"),
+  bboxNorth: doublePrecision("bbox_north"),
+  dataSource: varchar("data_source", { length: 128 }),
+  dataYear: integer("data_year"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  typeIdx: index("admin_boundaries_type_idx").on(table.boundaryType),
+  parentIdx: index("admin_boundaries_parent_idx").on(table.parentId),
+}));
+export type AdminBoundary = typeof adminBoundaries.$inferSelect;
+export type InsertAdminBoundary = typeof adminBoundaries.$inferInsert;
+
+/**
+ * Infrastructure Points — roads, water, power, schools, hospitals
+ */
+export const infrastructurePoints = pgTable("infrastructure_points", {
+  id: serial("id").primaryKey(),
+  infraType: varchar("infra_type", { length: 64 }).notNull(),
+  name: varchar("name", { length: 256 }),
+  operator: varchar("operator", { length: 128 }),
+  capacity: integer("capacity"),
+  status: varchar("status", { length: 32 }).default("operational"),
+  state: varchar("state", { length: 128 }),
+  lga: varchar("lga", { length: 128 }),
+  lng: doublePrecision("lng"),
+  lat: doublePrecision("lat"),
+  metadata: jsonb("metadata"),
+  dataSource: varchar("data_source", { length: 128 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  typeIdx: index("infrastructure_points_type_idx").on(table.infraType),
+  stateIdx: index("infrastructure_points_state_idx").on(table.state),
+}));
+export type InfrastructurePoint = typeof infrastructurePoints.$inferSelect;
+export type InsertInfrastructurePoint = typeof infrastructurePoints.$inferInsert;
+
+/**
+ * Road Network — LineString geometries for routing and access scoring
+ */
+export const roadNetwork = pgTable("road_network", {
+  id: serial("id").primaryKey(),
+  roadClass: roadClassEnum("road_class").notNull(),
+  name: varchar("name", { length: 256 }),
+  surface: varchar("surface", { length: 32 }),
+  lanes: integer("lanes"),
+  maxSpeedKmh: integer("max_speed_kmh"),
+  oneway: boolean("oneway").default(false),
+  state: varchar("state", { length: 128 }),
+  lga: varchar("lga", { length: 128 }),
+  geomWkt: text("geom_wkt"),
+  lengthM: doublePrecision("length_m"),
+  dataSource: varchar("data_source", { length: 128 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  classIdx: index("road_network_class_idx").on(table.roadClass),
+  stateIdx: index("road_network_state_idx").on(table.state),
+}));
+export type RoadSegment = typeof roadNetwork.$inferSelect;
+export type InsertRoadSegment = typeof roadNetwork.$inferInsert;
+
+/**
+ * Spatial Audit Log — tracks all geometry changes to parcels
+ */
+export const spatialAuditLog = pgTable("spatial_audit_log", {
+  id: serial("id").primaryKey(),
+  parcelId: integer("parcel_id").references(() => parcels.id),
+  action: varchar("action", { length: 32 }).notNull(),
+  changedBy: integer("changed_by").references(() => users.id),
+  oldGeomWkt: text("old_geom_wkt"),
+  newGeomWkt: text("new_geom_wkt"),
+  areaChangeM2: doublePrecision("area_change_m2"),
+  overlapDetected: boolean("overlap_detected").default(false),
+  overlapParcelIds: jsonb("overlap_parcel_ids"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  parcelIdx: index("spatial_audit_log_parcel_idx").on(table.parcelId),
+  createdAtIdx: index("spatial_audit_log_created_at_idx").on(table.createdAt),
+}));
+export type SpatialAuditLogEntry = typeof spatialAuditLog.$inferSelect;
+export type InsertSpatialAuditLogEntry = typeof spatialAuditLog.$inferInsert;
+
+/**
+ * Topology Violations — overlapping parcels, slivers, gaps
+ */
+export const topologyViolations = pgTable("topology_violations", {
+  id: serial("id").primaryKey(),
+  violationType: violationTypeEnum("violation_type").notNull(),
+  parcelIdA: integer("parcel_id_a").references(() => parcels.id),
+  parcelIdB: integer("parcel_id_b").references(() => parcels.id),
+  overlapAreaM2: doublePrecision("overlap_area_m2"),
+  overlapGeomWkt: text("overlap_geom_wkt"),
+  severity: violationSeverityEnum("severity").notNull(),
+  status: violationStatusEnum("status").default("open").notNull(),
+  detectedAt: timestamp("detected_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: integer("resolved_by").references(() => users.id),
+  resolutionNotes: text("resolution_notes"),
+}, (table) => ({
+  parcelAIdx: index("topology_violations_parcel_a_idx").on(table.parcelIdA),
+  parcelBIdx: index("topology_violations_parcel_b_idx").on(table.parcelIdB),
+  statusIdx: index("topology_violations_status_idx").on(table.status),
+}));
+export type TopologyViolation = typeof topologyViolations.$inferSelect;
+export type InsertTopologyViolation = typeof topologyViolations.$inferInsert;
+
+/**
+ * Spatial Analytics Cache — precomputed spatial statistics
+ */
+export const spatialAnalyticsCache = pgTable("spatial_analytics_cache", {
+  id: serial("id").primaryKey(),
+  cacheKey: varchar("cache_key", { length: 256 }).notNull().unique(),
+  analysisType: varchar("analysis_type", { length: 64 }).notNull(),
+  parcelId: integer("parcel_id").references(() => parcels.id),
+  state: varchar("state", { length: 128 }),
+  lga: varchar("lga", { length: 128 }),
+  result: jsonb("result").notNull(),
+  computedAt: timestamp("computed_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+  computationMs: integer("computation_ms"),
+}, (table) => ({
+  cacheKeyIdx: index("spatial_analytics_cache_key_idx").on(table.cacheKey),
+  parcelIdx: index("spatial_analytics_cache_parcel_idx").on(table.parcelId),
+  typeIdx: index("spatial_analytics_cache_type_idx").on(table.analysisType),
+}));
+export type SpatialAnalyticsCache = typeof spatialAnalyticsCache.$inferSelect;
+export type InsertSpatialAnalyticsCache = typeof spatialAnalyticsCache.$inferInsert;
+
+/**
+ * Drone Survey Missions — enhanced with spatial coverage
+ */
+export const droneSurveyMissions = pgTable("drone_survey_missions", {
+  id: serial("id").primaryKey(),
+  parcelId: integer("parcel_id").references(() => parcels.id),
+  missionName: varchar("mission_name", { length: 256 }).notNull(),
+  status: droneMissionStatusEnum("status").default("planned").notNull(),
+  droneModel: varchar("drone_model", { length: 128 }),
+  pilotId: integer("pilot_id").references(() => users.id),
+  flightAltitudeM: doublePrecision("flight_altitude_m"),
+  gsdCmPx: doublePrecision("gsd_cm_px"),
+  overlapPct: doublePrecision("overlap_pct"),
+  coverageAreaM2: doublePrecision("coverage_area_m2"),
+  flightPathWkt: text("flight_path_wkt"),
+  coveragePolygonWkt: text("coverage_polygon_wkt"),
+  orthomosaicUrl: text("orthomosaic_url"),
+  pointCloudUrl: text("point_cloud_url"),
+  dsmUrl: text("dsm_url"),
+  dtmUrl: text("dtm_url"),
+  ndviUrl: text("ndvi_url"),
+  flightStartAt: timestamp("flight_start_at"),
+  flightEndAt: timestamp("flight_end_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  metadata: jsonb("metadata"),
+}, (table) => ({
+  parcelIdx: index("drone_missions_parcel_idx").on(table.parcelId),
+  statusIdx: index("drone_missions_status_idx").on(table.status),
+}));
+export type DroneSurveyMission = typeof droneSurveyMissions.$inferSelect;
+export type InsertDroneSurveyMission = typeof droneSurveyMissions.$inferInsert;
+
+/**
+ * Surveyor GPS Tracks — real-time field tracking
+ */
+export const surveyorGpsTracks = pgTable("surveyor_gps_tracks", {
+  id: serial("id").primaryKey(),
+  surveyorId: integer("surveyor_id").references(() => users.id).notNull(),
+  sessionId: varchar("session_id", { length: 64 }).notNull(),
+  lng: doublePrecision("lng").notNull(),
+  lat: doublePrecision("lat").notNull(),
+  altitudeM: doublePrecision("altitude_m"),
+  accuracyM: doublePrecision("accuracy_m"),
+  speedMs: doublePrecision("speed_m_s"),
+  headingDegrees: doublePrecision("heading_degrees"),
+  recordedAt: timestamp("recorded_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  surveyorIdx: index("surveyor_gps_tracks_surveyor_idx").on(table.surveyorId),
+  sessionIdx: index("surveyor_gps_tracks_session_idx").on(table.sessionId),
+  recordedAtIdx: index("surveyor_gps_tracks_recorded_at_idx").on(table.recordedAt),
+}));
+export type SurveyorGpsTrack = typeof surveyorGpsTracks.$inferSelect;
+export type InsertSurveyorGpsTrack = typeof surveyorGpsTracks.$inferInsert;
+
+/**
+ * Vector Tile Cache — PMTiles / MVT cache
+ */
+export const vectorTileCache = pgTable("vector_tile_cache", {
+  id: serial("id").primaryKey(),
+  layerName: varchar("layer_name", { length: 128 }).notNull(),
+  zoom: integer("zoom").notNull(),
+  tileX: integer("tile_x").notNull(),
+  tileY: integer("tile_y").notNull(),
+  contentType: varchar("content_type", { length: 64 }).default("application/x-protobuf"),
+  etag: varchar("etag", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+}, (table) => ({
+  layerZoomIdx: index("vector_tile_cache_layer_zoom_idx").on(table.layerName, table.zoom),
+}));
+export type VectorTileCacheEntry = typeof vectorTileCache.$inferSelect;
+export type InsertVectorTileCacheEntry = typeof vectorTileCache.$inferInsert;
+
+/**
+ * Elevation Tiles — DEM raster tile metadata
+ */
+export const elevationTiles = pgTable("elevation_tiles", {
+  id: serial("id").primaryKey(),
+  tileX: integer("tile_x").notNull(),
+  tileY: integer("tile_y").notNull(),
+  zoomLevel: integer("zoom_level").notNull(),
+  resolutionM: doublePrecision("resolution_m"),
+  minElevationM: doublePrecision("min_elevation_m"),
+  maxElevationM: doublePrecision("max_elevation_m"),
+  meanElevationM: doublePrecision("mean_elevation_m"),
+  dataSource: varchar("data_source", { length: 128 }),
+  geomWkt: text("geom_wkt"),
+  rasterUrl: text("raster_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  zoomIdx: index("elevation_tiles_zoom_idx").on(table.zoomLevel),
+}));
+export type ElevationTile = typeof elevationTiles.$inferSelect;
+export type InsertElevationTile = typeof elevationTiles.$inferInsert;

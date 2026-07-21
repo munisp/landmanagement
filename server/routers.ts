@@ -26,6 +26,7 @@ import { valuationsRouter } from './api/routers/valuations';
 import { geoAnalyticsRouter } from './api/routers/geo-analytics';
 import { geospatialIntelligenceRouter } from './api/routers/geospatial-intelligence';
 import { geolibreRouter } from './api/routers/geolibre';
+import { geospatialRouter } from './api/routers/geospatial';
 import { mortgageApplicationsRouter } from './api/routers/mortgage-applications';
 import { cachedParcelRouter } from './api/routers/cached-parcel';
 import { cachedTransactionRouter } from './api/routers/cached-transaction';
@@ -156,6 +157,7 @@ export const appRouter = router({
   geoAnalytics: geoAnalyticsRouter,
   geospatialIntelligence: geospatialIntelligenceRouter,
   geolibre: geolibreRouter,
+  geospatial: geospatialRouter,
   mortgageApplications: mortgageApplicationsRouter,
   cachedParcel: cachedParcelRouter,
   cachedTransaction: cachedTransactionRouter,
