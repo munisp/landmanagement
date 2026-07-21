@@ -14,7 +14,7 @@ sqlalchemy==2.0.25
 confluent-kafka==2.3.0
 
 # Geospatial analytics
-geopandas==0.14.2
+geopandas==1.1.4
 shapely==2.0.2
 pyproj==3.6.1
 pyspark==3.5.2
