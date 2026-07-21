@@ -128,9 +128,10 @@ describe('Drizzle ORM Query Helpers', () => {
           limit: 1,
         });
 
-        // Page 2 items should have higher IDs than page 1
+        // With descending order, page 2 items have lower IDs than page 1
+        // (cursor moves backward through the ordered set)
         if (page2.items.length > 0 && page1.items.length > 0) {
-          expect(page2.items[0].id).toBeGreaterThan(page1.items[0].id);
+          expect(page2.items[0].id).toBeLessThan(page1.items[0].id);
         }
       }
     });

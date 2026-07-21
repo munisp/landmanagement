@@ -1,0 +1,647 @@
+version: '3.9'
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# IDLR-PTS Production Docker Compose
+# ═══════════════════════════════════════════════════════════════════════════════
+# Full production stack including all middleware services.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
+#
+# Services:
+#   Core:        app, postgres, redis, nginx
+#   Auth:        keycloak, keycloak-db
+#   Auth-Z:      permify, permify-db
+#   Messaging:   kafka, zookeeper, kafka-ui, fluvio
+#   Workflow:    temporal, temporal-ui, temporal-db
+#   Gateway:     apisix, apisix-dashboard, etcd
+#   Security:    openappsec
+#   Observ:      opensearch, opensearch-dashboards, prometheus, grafana, jaeger
+#   Payments:    mojaloop (simulator)
+#   AI/ML:       lakehouse-api, mlflow
+#   Go Services: api-gateway, ops-bridge
+#   Rust:        tigerbeetle-bridge
+# ═══════════════════════════════════════════════════════════════════════════════
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+x-restart: &default-restart
+  restart: unless-stopped
+
+services:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Application
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-2026.07.20}
+    container_name: idlr-pts-app
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: ${SESSION_SECRET}
+      # Keycloak
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-idlr-pts}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-idlr-pts-app}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      # Permify
+      PERMIFY_URL: http://permify:3476
+      # APISIX
+      APISIX_ADMIN_URL: http://apisix:9180
+      APISIX_API_KEY: ${APISIX_API_KEY:-edd1c9f034335f136f87ad84b625c8f1}
+      # Kafka
+      KAFKA_BROKERS: kafka:9092
+      # Fluvio
+      FLUVIO_API_URL: http://fluvio:9003
+      # Temporal
+      TEMPORAL_ADDRESS: temporal:7233
+      # OpenSearch
+      OPENSEARCH_URL: http://opensearch:9200
+      ELASTICSEARCH_URL: http://opensearch:9200
+      # Dapr
+      DAPR_HTTP_URL: http://localhost:3500
+      DAPR_GRPC_PORT: 50001
+      # Lakehouse / ML
+      LAKEHOUSE_API_URL: http://lakehouse-api:8000
+      # Mojaloop
+      MOJALOOP_API_URL: http://mojaloop-simulator:3000
+      # OpenAppSec
+      OPENAPPSEC_URL: http://openappsec:8080
+      # TigerBeetle (via Rust bridge)
+      TIGERBEETLE_BRIDGE_URL: http://tigerbeetle-bridge:8090
+      TIGERBEETLE_CLUSTER_ID: ${TIGERBEETLE_CLUSTER_ID:-0}
+      TIGERBEETLE_REPLICAS: ${TIGERBEETLE_REPLICAS:-127.0.0.1:3000}
+      # Fabric
+      FABRIC_GATEWAY_URL: ${FABRIC_GATEWAY_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    volumes:
+      - ./server/data:/app/server/data
+    networks:
+      - idlr_net
+    labels:
+      - "traefik.enable=false"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Keycloak — Identity and Access Management
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  keycloak-db:
+    image: postgres:16-bookworm
+    container_name: idlr-keycloak-db
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: idlr-keycloak
+    <<: *default-restart
+    logging: *default-logging
+    command: start
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-keycloak.idlr-pts.local}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY: edge
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_secret}
+      KC_FEATURES: token-exchange,admin-fine-grained-authz
+    ports:
+      - "8180:8080"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Permify — Fine-grained Authorization
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  permify-db:
+    image: postgres:16-bookworm
+    container_name: idlr-permify-db
+    <<: *default-restart
+    environment:
+      POSTGRES_DB: permify
+      POSTGRES_USER: permify
+      POSTGRES_PASSWORD: ${PERMIFY_DB_PASSWORD:-permify_secret}
+    volumes:
+      - permify_db_data:/var/lib/postgresql/data
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U permify"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  permify:
+    image: ghcr.io/permify/permify:latest
+    container_name: idlr-permify
+    <<: *default-restart
+    logging: *default-logging
+    command: serve
+    environment:
+      PERMIFY_DATABASE_ENGINE: postgres
+      PERMIFY_DATABASE_URI: postgres://permify:${PERMIFY_DB_PASSWORD:-permify_secret}@permify-db:5432/permify
+      PERMIFY_DATABASE_MAX_OPEN_CONNECTIONS: 20
+      PERMIFY_SERVER_GRPC_PORT: 3478
+      PERMIFY_SERVER_HTTP_PORT: 3476
+    ports:
+      - "3476:3476"
+      - "3478:3478"
+    depends_on:
+      permify-db:
+        condition: service_healthy
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3476/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Kafka — Event Streaming
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: idlr-zookeeper
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - idlr_net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: idlr-kafka
+    <<: *default-restart
+    logging: *default-logging
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+    ports:
+      - "29092:29092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: idlr-kafka-ui
+    <<: *default-restart
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: idlr-pts
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "8082:8080"
+    networks:
+      - idlr_net
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Temporal — Workflow Orchestration
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  temporal-db:
+    image: postgres:16-bookworm
+    container_name: idlr-temporal-db
+    <<: *default-restart
+    environment:
+      POSTGRES_DB: temporal
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${TEMPORAL_DB_PASSWORD:-temporal_secret}
+    volumes:
+      - temporal_db_data:/var/lib/postgresql/data
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  temporal:
+    image: temporalio/auto-setup:1.24
+    container_name: idlr-temporal
+    <<: *default-restart
+    logging: *default-logging
+    depends_on:
+      temporal-db:
+        condition: service_healthy
+    environment:
+      DB: postgresql
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD:-temporal_secret}
+      POSTGRES_SEEDS: temporal-db
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+    ports:
+      - "7233:7233"
+    volumes:
+      - ./temporal/config:/etc/temporal/config/dynamicconfig
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "localhost:7233", "cluster", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  temporal-ui:
+    image: temporalio/ui:2.26.2
+    container_name: idlr-temporal-ui
+    <<: *default-restart
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8088:8080"
+    networks:
+      - idlr_net
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # APISIX — API Gateway
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  etcd:
+    image: bitnami/etcd:3.5
+    container_name: idlr-etcd
+    <<: *default-restart
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+    volumes:
+      - etcd_data:/bitnami/etcd
+    networks:
+      - idlr_net
+
+  apisix:
+    image: apache/apisix:3.9.0-debian
+    container_name: idlr-apisix
+    <<: *default-restart
+    logging: *default-logging
+    depends_on:
+      - etcd
+    volumes:
+      - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+    ports:
+      - "9080:9080"
+      - "9180:9180"
+      - "9443:9443"
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9080/apisix/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  apisix-dashboard:
+    image: apache/apisix-dashboard:3.0.1-alpine
+    container_name: idlr-apisix-dashboard
+    <<: *default-restart
+    depends_on:
+      - apisix
+    volumes:
+      - ./apisix/dashboard.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
+    ports:
+      - "9000:9000"
+    networks:
+      - idlr_net
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # OpenSearch — Full-text Search and Analytics
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  opensearch:
+    image: opensearchproject/opensearch:2.14.0
+    container_name: idlr-opensearch
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      cluster.name: idlr-pts-cluster
+      node.name: opensearch-node1
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.14.0
+    container_name: idlr-opensearch-dashboards
+    <<: *default-restart
+    depends_on:
+      - opensearch
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+    ports:
+      - "5601:5601"
+    networks:
+      - idlr_net
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Lakehouse API + MLflow
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  lakehouse-api:
+    build:
+      context: ./lakehouse
+      dockerfile: Dockerfile
+    container_name: idlr-lakehouse-api
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_WEIGHTS_DIR: /app/ml/weights
+      RAY_ADDRESS: auto
+    volumes:
+      - ./lakehouse/ml/weights:/app/ml/weights
+      - lakehouse_data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.13.0
+    container_name: idlr-mlflow
+    <<: *default-restart
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/mlflow
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - idlr_net
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Go API Gateway
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  go-api-gateway:
+    build:
+      context: ./go-services/api-gateway
+      dockerfile: Dockerfile
+    container_name: idlr-go-api-gateway
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      BACKEND_URL: http://app:3000
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-idlr-pts}
+      APISIX_ADMIN_URL: http://apisix:9180
+      APISIX_API_KEY: ${APISIX_API_KEY:-edd1c9f034335f136f87ad84b625c8f1}
+      REDIS_URL: redis://redis:6379
+      PORT: 8090
+    ports:
+      - "8090:8090"
+    depends_on:
+      - app
+      - keycloak
+    networks:
+      - idlr_net
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Rust TigerBeetle Bridge
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  tigerbeetle-bridge:
+    build:
+      context: ./rust-services/tigerbeetle-bridge
+      dockerfile: Dockerfile
+    container_name: idlr-tigerbeetle-bridge
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      TIGERBEETLE_CLUSTER_ID: ${TIGERBEETLE_CLUSTER_ID:-0}
+      TIGERBEETLE_REPLICAS: ${TIGERBEETLE_REPLICAS:-127.0.0.1:3000}
+      KAFKA_BROKERS: kafka:9092
+      PORT: 8090
+    ports:
+      - "8091:8090"
+    networks:
+      - idlr_net
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Mojaloop Simulator
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  mojaloop-simulator:
+    image: mojaloop/simulator:latest
+    container_name: idlr-mojaloop-simulator
+    <<: *default-restart
+    environment:
+      SIMULATOR_PORT: 3000
+      SIMULATOR_ENDPOINT: http://mojaloop-simulator:3000
+    ports:
+      - "3030:3000"
+    networks:
+      - idlr_net
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Dapr Sidecar (for app)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  dapr-sidecar:
+    image: daprio/daprd:1.13
+    container_name: idlr-dapr-sidecar
+    <<: *default-restart
+    command: >
+      ./daprd
+      --app-id idlr-pts
+      --app-port 3000
+      --dapr-http-port 3500
+      --dapr-grpc-port 50001
+      --components-path /components
+      --config /config/config.yaml
+    volumes:
+      - ./dapr/components:/components:ro
+      - ./dapr/config:/config:ro
+    network_mode: "service:app"
+    depends_on:
+      - app
+      - kafka
+      - redis
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Observability Stack
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: idlr-prometheus
+    <<: *default-restart
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - idlr_net
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: idlr-grafana
+    <<: *default-restart
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - idlr_net
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: idlr-jaeger
+    <<: *default-restart
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - idlr_net
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Volumes
+# ─────────────────────────────────────────────────────────────────────────────
+
+volumes:
+  postgres_data:
+  redis_data:
+  keycloak_db_data:
+  permify_db_data:
+  temporal_db_data:
+  kafka_data:
+  zookeeper_data:
+  zookeeper_logs:
+  etcd_data:
+  opensearch_data:
+  lakehouse_data:
+  mlflow_artifacts:
+  prometheus_data:
+  grafana_data:
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Networks
+# ─────────────────────────────────────────────────────────────────────────────
+
+networks:
+  idlr_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

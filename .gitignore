@@ -109,3 +109,12 @@ temp/
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
 storage/
+
+# Rust build artifacts
+rust-services/*/target/
+go-services/*/bin/
+
+# Python compiled files
+lakehouse/ml/**/__pycache__/
+lakehouse/ml/**/*.pyc
+lakehouse/ml/mlruns/

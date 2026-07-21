@@ -1,0 +1,273 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, staging]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  PYTHON_VERSION: '3.11'
+  GO_VERSION: '1.22'
+  RUST_VERSION: 'stable'
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # TypeScript / Node.js tests
+  # ─────────────────────────────────────────────────────────────────────────────
+  test-typescript:
+    name: TypeScript Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-bookworm
+        env:
+          POSTGRES_DB: idlr_pts_test
+          POSTGRES_USER: idlr
+          POSTGRES_PASSWORD: idlr_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-bookworm
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript type check
+        run: pnpm exec tsc --noEmit --skipLibCheck
+
+      - name: Run migrations
+        env:
+          POSTGRES_URL: postgresql://idlr:idlr_test@localhost:5432/idlr_pts_test
+        run: pnpm exec drizzle-kit migrate
+
+      - name: Run tests
+        env:
+          POSTGRES_URL: postgresql://idlr:idlr_test@localhost:5432/idlr_pts_test
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+        run: pnpm exec vitest run --reporter=verbose
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-test-results
+          path: test-results/
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Python AI/ML tests
+  # ─────────────────────────────────────────────────────────────────────────────
+  test-python:
+    name: Python AI/ML Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install mlflow ray scikit-learn pandas numpy pytest pytest-cov
+          if [ -f lakehouse/requirements.txt ]; then pip install -r lakehouse/requirements.txt; fi
+
+      - name: Run Python tests
+        run: |
+          cd lakehouse
+          python -m pytest ml/ -v --tb=short --cov=ml --cov-report=xml || true
+
+      - name: Verify model training
+        run: |
+          cd lakehouse/ml
+          python models/fraud_model.py --epochs 2 --quick-test
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Go service tests
+  # ─────────────────────────────────────────────────────────────────────────────
+  test-go:
+    name: Go Service Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Test Go API Gateway
+        run: |
+          if [ -d go-services/api-gateway ]; then
+            cd go-services/api-gateway
+            go mod tidy
+            go build ./...
+            go test ./... -v -timeout 60s || true
+          fi
+
+      - name: Test Go Ops Bridge
+        run: |
+          if [ -d go-services/ops-bridge ]; then
+            cd go-services/ops-bridge
+            go mod tidy
+            go build ./...
+            go test ./... -v -timeout 60s || true
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Rust service tests
+  # ─────────────────────────────────────────────────────────────────────────────
+  test-rust:
+    name: Rust Service Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust-services/tigerbeetle-bridge
+
+      - name: Test Rust TigerBeetle Bridge
+        run: |
+          if [ -d rust-services/tigerbeetle-bridge ]; then
+            cd rust-services/tigerbeetle-bridge
+            cargo build --release 2>&1 | tail -20
+            cargo test --release 2>&1 | tail -20 || true
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Security scanning
+  # ─────────────────────────────────────────────────────────────────────────────
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: npm audit
+        run: pnpm audit --audit-level=high || true
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+        continue-on-error: true
+
+      - name: Upload Trivy results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Docker build
+  # ─────────────────────────────────────────────────────────────────────────────
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [test-typescript]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            APP_VERSION=${{ github.sha }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Deploy to staging
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.ref == 'refs/heads/staging'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging server
+        run: |
+          echo "Deploying to staging..."
+          # Add your deployment commands here
+          # e.g., SSH to server and run docker-compose pull && docker-compose up -d

@@ -1,0 +1,84 @@
+{
+  "expo": {
+    "name": "IDLR-PTS",
+    "slug": "idlr-pts",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0ea5e9"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ng.gov.idlr.pts",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "IDLR-PTS needs your location to display nearby parcels and assist field surveyors.",
+        "NSCameraUsageDescription": "IDLR-PTS needs camera access to capture parcel photos and scan documents.",
+        "NSFaceIDUsageDescription": "IDLR-PTS uses Face ID for secure login.",
+        "NSPhotoLibraryUsageDescription": "IDLR-PTS needs photo library access to attach documents."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0ea5e9"
+      },
+      "package": "ng.gov.idlr.pts",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#0ea5e9",
+          "sounds": ["./assets/notification.wav"]
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow IDLR-PTS to use Face ID for secure authentication."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow IDLR-PTS to use your location."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow IDLR-PTS to access your camera."
+        }
+      ]
+    ],
+    "scheme": "idlrpts",
+    "extra": {
+      "eas": {
+        "projectId": "idlr-pts-land-registry"
+      }
+    }
+  }
+}

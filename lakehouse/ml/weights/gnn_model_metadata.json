@@ -1,0 +1,9 @@
+{
+  "model_type": "LandOwnershipGAT",
+  "node_features": 8,
+  "hidden_dim": 32,
+  "n_heads": 4,
+  "trained_at": "2026-07-21T00:12:32.682023",
+  "framework": "pytorch",
+  "version": "1.0.0"
+}

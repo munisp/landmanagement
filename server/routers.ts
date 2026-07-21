@@ -44,6 +44,7 @@ import { operationalEventsRouter } from './api/routers/operational-events';
 import { commandCenterRouter } from './api/routers/command-center';
 import { platformOperationsRouter } from './api/routers/platform-operations';
 import { publicSecurityRouter } from './api/routers/public-security';
+import { parcelSubscriptionsRouter, notificationPreferencesRouter, notificationInboxRouter } from './api/routers/parcel-subscriptions';
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { notificationService } from "./notifications";
@@ -173,6 +174,9 @@ export const appRouter = router({
   commandCenter: commandCenterRouter,
   platformOperations: platformOperationsRouter,
   publicSecurity: publicSecurityRouter,
+  parcelSubscriptions: parcelSubscriptionsRouter,
+  notificationPreferences: notificationPreferencesRouter,
+  notificationInbox: notificationInboxRouter,
 
   // Storage upload endpoint
   storage: router({

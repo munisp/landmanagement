@@ -85,6 +85,9 @@ const CommandCenter = lazy(() => import("./pages/CommandCenter"));
 const ParcelDigitalTwin = lazy(() => import("./pages/ParcelDigitalTwin"));
 const DroneProcessing = lazy(() => import("./pages/DroneProcessing"));
 const TaxAssessment = lazy(() => import("./pages/TaxAssessment"));
+const NotificationPreferences = lazy(() => import("./pages/NotificationPreferences"));
+const ParcelSubscriptions = lazy(() => import("./pages/ParcelSubscriptions"));
+const NotificationInbox = lazy(() => import("./pages/NotificationInbox"));
 const GeospatialSearchPage = lazy(() => import("./pages/GeospatialSearchPage"));
 const VerificationWorkflow = lazy(() => import('./pages/VerificationWorkflow'));
 const ReportingDashboard = lazy(() => import('./pages/ReportingDashboard'));
@@ -243,6 +246,9 @@ function Router() {
       <Route path="/digital-twin" component={ParcelDigitalTwin} />
       <Route path="/drone-processing" component={DroneProcessing} />
       <Route path="/tax-assessment" component={TaxAssessment} />
+      <Route path="/notification-preferences" component={NotificationPreferences} />
+      <Route path="/parcel-subscriptions" component={ParcelSubscriptions} />
+      <Route path="/notification-inbox" component={NotificationInbox} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

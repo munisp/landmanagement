@@ -1,0 +1,32 @@
+{
+  "model_type": "FraudDetectionMLP",
+  "input_dim": 18,
+  "hidden_dims": [
+    128,
+    64,
+    32
+  ],
+  "feature_names": [
+    "log_amount",
+    "amount_millions",
+    "price_deviation_ratio",
+    "hour_norm",
+    "day_of_week_norm",
+    "is_weekend",
+    "is_night",
+    "same_user",
+    "is_cash",
+    "is_transfer",
+    "is_mortgage",
+    "is_high_value_state",
+    "payment_risk",
+    "type_risk",
+    "land_risk",
+    "area_norm",
+    "from_user_hash",
+    "to_user_hash"
+  ],
+  "trained_at": "2026-07-21T00:10:52.654593",
+  "framework": "pytorch",
+  "version": "1.0.0"
+}

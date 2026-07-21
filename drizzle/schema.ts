@@ -1,4 +1,4 @@
-import { bigint, boolean, decimal, doublePrecision, integer, json, jsonb, index, pgEnum, pgTable, real, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { bigint, boolean, decimal, doublePrecision, integer, json, jsonb, index, uniqueIndex, pgEnum, pgTable, real, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
@@ -3143,3 +3143,94 @@ export const openappsecPolicyAudit = pgTable("openappsec_policy_audit", {
   appliedAt: timestamp("applied_at").defaultNow().notNull(),
   appliedBy: varchar("applied_by", { length: 128 }),
 });
+
+// ============================================
+// PARCEL SUBSCRIPTIONS & NOTIFICATION PREFERENCES
+// ============================================
+
+export const parcelSubscriptionEventEnum = pgEnum("parcel_subscription_event", [
+  "status_change",
+  "document_uploaded",
+  "transaction_initiated",
+  "transaction_approved",
+  "transaction_rejected",
+  "title_issued",
+  "dispute_filed",
+  "valuation_updated",
+  "survey_completed",
+  "all",
+]);
+
+export const parcelSubscriptions = pgTable("parcel_subscriptions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  parcelId: integer("parcel_id").notNull().references(() => parcels.id, { onDelete: "cascade" }),
+  events: json("events").$type<string[]>().default(["all"]).notNull(),
+  channels: json("channels").$type<string[]>().default(["push", "email"]).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userParcelUnique: uniqueIndex("parcel_subscriptions_user_parcel_unique").on(table.userId, table.parcelId),
+  userIdx: index("parcel_subscriptions_user_idx").on(table.userId),
+  parcelIdx: index("parcel_subscriptions_parcel_idx").on(table.parcelId),
+}));
+
+export type ParcelSubscription = typeof parcelSubscriptions.$inferSelect;
+export type InsertParcelSubscription = typeof parcelSubscriptions.$inferInsert;
+
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  transactionUpdates: json("transaction_updates").$type<string[]>().default(["push", "email", "in_app"]).notNull(),
+  documentEvents: json("document_events").$type<string[]>().default(["push", "in_app"]).notNull(),
+  disputeAlerts: json("dispute_alerts").$type<string[]>().default(["push", "email", "sms"]).notNull(),
+  systemAlerts: json("system_alerts").$type<string[]>().default(["push", "email"]).notNull(),
+  marketplaceUpdates: json("marketplace_updates").$type<string[]>().default(["in_app"]).notNull(),
+  parcelChanges: json("parcel_changes").$type<string[]>().default(["push", "in_app"]).notNull(),
+  mortgageAlerts: json("mortgage_alerts").$type<string[]>().default(["push", "email", "sms"]).notNull(),
+  quietHoursEnabled: boolean("quiet_hours_enabled").default(false).notNull(),
+  quietHoursStart: varchar("quiet_hours_start", { length: 5 }).default("22:00"),
+  quietHoursEnd: varchar("quiet_hours_end", { length: 5 }).default("07:00"),
+  pushEnabled: boolean("push_enabled").default(true).notNull(),
+  pushToken: text("push_token"),
+  pushPlatform: varchar("push_platform", { length: 20 }),
+  emailEnabled: boolean("email_enabled").default(true).notNull(),
+  emailDigest: varchar("email_digest", { length: 20 }).default("realtime"),
+  smsEnabled: boolean("sms_enabled").default(false).notNull(),
+  smsPhone: varchar("sms_phone", { length: 20 }),
+  webhookEnabled: boolean("webhook_enabled").default(false).notNull(),
+  webhookUrl: text("webhook_url"),
+  webhookSecret: text("webhook_secret"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("notification_preferences_user_idx").on(table.userId),
+}));
+
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
+
+export const notificationInbox = pgTable("notification_inbox", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 64 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  data: jsonb("data"),
+  isRead: boolean("is_read").default(false).notNull(),
+  isDismissed: boolean("is_dismissed").default(false).notNull(),
+  readAt: timestamp("read_at"),
+  dismissedAt: timestamp("dismissed_at"),
+  entityType: varchar("entity_type", { length: 64 }),
+  entityId: integer("entity_id"),
+  parcelSubscriptionId: integer("parcel_subscription_id").references(() => parcelSubscriptions.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("notification_inbox_user_idx").on(table.userId),
+  userReadIdx: index("notification_inbox_user_read_idx").on(table.userId, table.isRead),
+  createdAtIdx: index("notification_inbox_created_at_idx").on(table.createdAt),
+}));
+
+export type NotificationInboxItem = typeof notificationInbox.$inferSelect;
+export type InsertNotificationInboxItem = typeof notificationInbox.$inferInsert;

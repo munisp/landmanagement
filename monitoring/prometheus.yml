@@ -1,0 +1,57 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'idlr-pts'
+    environment: 'production'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files: []
+
+scrape_configs:
+  - job_name: 'idlr-pts-app'
+    static_configs:
+      - targets: ['app:3000']
+    metrics_path: '/api/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'apisix'
+    static_configs:
+      - targets: ['apisix:9091']
+    metrics_path: '/apisix/prometheus/metrics'
+
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+
+  - job_name: 'go-api-gateway'
+    static_configs:
+      - targets: ['go-api-gateway:8090']
+    metrics_path: '/metrics'
+
+  - job_name: 'lakehouse-api'
+    static_configs:
+      - targets: ['lakehouse-api:8000']
+    metrics_path: '/metrics'
+
+  - job_name: 'temporal'
+    static_configs:
+      - targets: ['temporal:8000']
+    metrics_path: '/metrics'
+
+  - job_name: 'dapr'
+    static_configs:
+      - targets: ['dapr-sidecar:9090']
+    metrics_path: '/metrics'

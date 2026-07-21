@@ -1,0 +1,87 @@
+version: 2
+updates:
+  # Node.js / pnpm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Africa/Lagos"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "munisp"
+    labels:
+      - "dependencies"
+      - "javascript"
+    groups:
+      drizzle:
+        patterns:
+          - "drizzle-*"
+      trpc:
+        patterns:
+          - "@trpc/*"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react*"
+
+  # Go
+  - package-ecosystem: "gomod"
+    directory: "/go-services/api-gateway"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "go"
+
+  - package-ecosystem: "gomod"
+    directory: "/go-services/ops-bridge"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "go"
+
+  # Rust
+  - package-ecosystem: "cargo"
+    directory: "/rust-services/tigerbeetle-bridge"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "rust"
+
+  # Python
+  - package-ecosystem: "pip"
+    directory: "/lakehouse"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "python"
+
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "github-actions"

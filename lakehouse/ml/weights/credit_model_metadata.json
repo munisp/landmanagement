@@ -1,0 +1,15 @@
+{
+  "model_type": "CreditScoringNet",
+  "input_dim": 20,
+  "hidden_dims": [
+    128,
+    64,
+    32
+  ],
+  "output_range": [
+    300,
+    850
+  ],
+  "trained_at": "2026-07-21T00:10:57.946351",
+  "version": "1.0.0"
+}

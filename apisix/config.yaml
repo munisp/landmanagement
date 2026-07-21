@@ -1,0 +1,112 @@
+apisix:
+  node_listen: 9080
+  enable_ipv6: false
+  enable_admin: true
+  admin_listen:
+    ip: 0.0.0.0
+    port: 9180
+  admin_key:
+    - name: admin
+      key: edd1c9f034335f136f87ad84b625c8f1
+      role: admin
+    - name: viewer
+      key: 4054f7cf07e344346cd3f287985e76a2
+      role: viewer
+
+etcd:
+  host:
+    - http://etcd:2379
+  prefix: /apisix
+  timeout: 30
+
+plugins:
+  - real-ip
+  - ai
+  - client-control
+  - proxy-control
+  - request-id
+  - zipkin
+  - ext-plugin-pre-req
+  - fault-injection
+  - mocking
+  - serverless-pre-function
+  - cors
+  - ip-restriction
+  - ua-restriction
+  - referer-restriction
+  - csrf
+  - uri-blocker
+  - request-validation
+  - openid-connect
+  - authz-keycloak
+  - wolf-rbac
+  - ldap-auth
+  - hmac-auth
+  - basic-auth
+  - jwt-auth
+  - key-auth
+  - consumer-restriction
+  - forward-auth
+  - opa
+  - authz-casbin
+  - authz-casdoor
+  - multi-auth
+  - body-transformer
+  - ai-proxy
+  - proxy-mirror
+  - proxy-cache
+  - proxy-rewrite
+  - workflow
+  - api-breaker
+  - limit-conn
+  - limit-count
+  - limit-req
+  - gzip
+  - server-info
+  - traffic-split
+  - redirect
+  - response-rewrite
+  - kafka-logger
+  - kafka-proxy
+  - http-logger
+  - splunk-hec-logging
+  - skywalking-logger
+  - google-cloud-logging
+  - sls-logger
+  - tcp-logger
+  - udp-logger
+  - rocketmq-logger
+  - syslog
+  - log-rotate
+  - error-log-logger
+  - skywalking
+  - opentelemetry
+  - prometheus
+  - datadog
+  - echo
+  - loggly
+  - elasticsearch-logger
+  - ext-plugin-post-req
+  - ext-plugin-post-resp
+
+plugin_attr:
+  prometheus:
+    export_uri: /apisix/prometheus/metrics
+    export_addr:
+      ip: 0.0.0.0
+      port: 9091
+  opentelemetry:
+    resource:
+      service.name: idlr-pts-apisix
+    collector:
+      address: jaeger:4318
+      request_timeout: 3
+
+nginx_config:
+  http:
+    enable_access_log: true
+    access_log_format: >-
+      "$remote_addr - $remote_user [$time_local] $http_host \"$request\"
+      $status $body_bytes_sent $request_time \"$http_referer\"
+      \"$http_user_agent\" $upstream_addr $upstream_status
+      $upstream_response_time \"$upstream_scheme://$upstream_host$upstream_uri\""
