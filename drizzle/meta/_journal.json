@@ -162,6 +162,20 @@
       "when": 1784594500388,
       "tag": "0022_postgis_spatial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1784598088143,
+      "tag": "0023_rls_tenant_isolation",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1784598088143,
+      "tag": "0024_legal_framework",
+      "breakpoints": true
     }
   ]
 }

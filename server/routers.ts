@@ -46,6 +46,8 @@ import { commandCenterRouter } from './api/routers/command-center';
 import { platformOperationsRouter } from './api/routers/platform-operations';
 import { publicSecurityRouter } from './api/routers/public-security';
 import { parcelSubscriptionsRouter, notificationPreferencesRouter, notificationInboxRouter } from './api/routers/parcel-subscriptions';
+import { identityRouter } from './api/routers/identity';
+import { legalRouter } from './api/routers/legal';
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { notificationService } from "./notifications";
@@ -3786,6 +3788,10 @@ export const appRouter = router({
   marketplace: marketplaceRouter,
   financial: financialRouter,
   mortgagePayment: mortgagePaymentRouter,
+  // Gap 2: NIMC/BVN Identity Verification
+  identity: identityRouter,
+  // Gap 5: Legal Framework — Digital Signatures & Gazette
+  legal: legalRouter,
 });
 
 export type AppRouter = typeof appRouter;

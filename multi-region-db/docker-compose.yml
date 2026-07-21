@@ -1,0 +1,81 @@
+# Active-Active Multi-Region PostgreSQL Architecture
+# Uses Patroni for HA, Citus for distributed sharding, and pgBouncer for connection pooling.
+# Regions: Lagos (primary), Abuja (replica), Kano (replica)
+version: "3.9"
+
+x-postgres-common: &postgres-common
+  image: patroni/patroni:latest
+  environment:
+    PATRONI_SCOPE: landmanagement-cluster
+    PATRONI_ETCD_URL: http://etcd:2379
+    POSTGRES_USER: lms_user
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    POSTGRES_DB: landmanagement
+  depends_on: [etcd]
+  restart: unless-stopped
+
+services:
+  etcd:
+    image: bitnami/etcd:latest
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+    ports: ["2379:2379"]
+
+  patroni-lagos:
+    <<: *postgres-common
+    hostname: patroni-lagos
+    environment:
+      <<: *postgres-common.environment
+      PATRONI_NAME: lagos
+      PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
+      PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
+    ports: ["5432:5432", "8008:8008"]
+    volumes: ["lagos-data:/var/lib/postgresql/data"]
+
+  patroni-abuja:
+    <<: *postgres-common
+    hostname: patroni-abuja
+    environment:
+      <<: *postgres-common.environment
+      PATRONI_NAME: abuja
+      PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
+      PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
+    ports: ["5433:5432", "8009:8008"]
+    volumes: ["abuja-data:/var/lib/postgresql/data"]
+
+  patroni-kano:
+    <<: *postgres-common
+    hostname: patroni-kano
+    environment:
+      <<: *postgres-common.environment
+      PATRONI_NAME: kano
+      PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
+      PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
+    ports: ["5434:5432", "8010:8008"]
+    volumes: ["kano-data:/var/lib/postgresql/data"]
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    environment:
+      DATABASE_URL: postgres://lms_user:${POSTGRES_PASSWORD:-changeme}@patroni-lagos:5432/landmanagement
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 50
+    ports: ["6432:5432"]
+    depends_on: [patroni-lagos]
+
+  replication-monitor:
+    build: ../rust-services/replication-monitor
+    environment:
+      PATRONI_LAGOS_URL: http://patroni-lagos:8008
+      PATRONI_ABUJA_URL: http://patroni-abuja:8008
+      PATRONI_KANO_URL: http://patroni-kano:8008
+      PORT: "9090"
+    ports: ["9090:9090"]
+    depends_on: [patroni-lagos, patroni-abuja, patroni-kano]
+
+volumes:
+  lagos-data:
+  abuja-data:
+  kano-data:

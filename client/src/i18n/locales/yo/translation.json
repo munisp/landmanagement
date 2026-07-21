@@ -1,0 +1,57 @@
+{
+  "nav": {
+    "dashboard": "Pẹpẹ Iṣakoso",
+    "parcels": "Ilẹ",
+    "titles": "Iwe Aṣẹ Ilẹ",
+    "transactions": "Awọn Iṣowo",
+    "disputes": "Awọn Ariyanjiyan",
+    "documents": "Awọn Iwe",
+    "reports": "Awọn Ìjábọ",
+    "settings": "Ètò",
+    "logout": "Jáde"
+  },
+  "common": {
+    "save": "Fipamọ",
+    "cancel": "Fagilé",
+    "delete": "Parẹ",
+    "edit": "Ṣatunkọ",
+    "view": "Wo",
+    "search": "Wa",
+    "loading": "Ẹ dúró...",
+    "error": "Aṣiṣe waye",
+    "success": "Aṣeyọri",
+    "confirm": "Jẹrisi"
+  },
+  "parcel": {
+    "title": "Ilẹ",
+    "number": "Nọmba Ilẹ",
+    "status": "Ipò",
+    "owner": "Olùní",
+    "area": "Agbègbè",
+    "location": "Ibi",
+    "register": "Forúkọ Ilẹ",
+    "verify": "Jẹrisi Ilẹ"
+  },
+  "auth": {
+    "login": "Wọlé",
+    "email": "Ìmèéèlì",
+    "password": "Ọrọ Aṣínà",
+    "signIn": "Wọlé Bayi",
+    "forgotPassword": "Gbagbe Ọrọ Aṣínà?"
+  },
+  "identity": {
+    "verifyNIN": "Jẹrisi NIN",
+    "verifyBVN": "Jẹrisi BVN",
+    "nin": "Nọmba Idanimọ Orilẹ-ede",
+    "bvn": "Nọmba Idaniloju Banki",
+    "verified": "Idanimọ Ti Jẹrisi",
+    "pending": "Nduro fun Jẹrisi"
+  },
+  "legal": {
+    "signDocument": "Fowo Iwe",
+    "gazetteNotice": "Ìkéde Ìjọba",
+    "auditChain": "Ẹwọn Ayẹwo",
+    "legallyBinding": "Ofin Dè",
+    "digitalSignature": "Ibuwọlu Dijitali"
+  }
+}

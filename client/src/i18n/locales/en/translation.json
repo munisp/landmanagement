@@ -1,0 +1,57 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "parcels": "Parcels",
+    "titles": "Titles",
+    "transactions": "Transactions",
+    "disputes": "Disputes",
+    "documents": "Documents",
+    "reports": "Reports",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "search": "Search",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Success",
+    "confirm": "Confirm"
+  },
+  "parcel": {
+    "title": "Parcel",
+    "number": "Parcel Number",
+    "status": "Status",
+    "owner": "Owner",
+    "area": "Area",
+    "location": "Location",
+    "register": "Register Parcel",
+    "verify": "Verify Parcel"
+  },
+  "auth": {
+    "login": "Login",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign In",
+    "forgotPassword": "Forgot Password?"
+  },
+  "identity": {
+    "verifyNIN": "Verify NIN",
+    "verifyBVN": "Verify BVN",
+    "nin": "National Identification Number",
+    "bvn": "Bank Verification Number",
+    "verified": "Identity Verified",
+    "pending": "Verification Pending"
+  },
+  "legal": {
+    "signDocument": "Sign Document",
+    "gazetteNotice": "Gazette Notice",
+    "auditChain": "Audit Chain",
+    "legallyBinding": "Legally Binding",
+    "digitalSignature": "Digital Signature"
+  }
+}

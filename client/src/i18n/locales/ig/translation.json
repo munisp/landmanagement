@@ -1,0 +1,57 @@
+{
+  "nav": {
+    "dashboard": "Ọnụ Ọgụgụ",
+    "parcels": "Ala",
+    "titles": "Akwụkwọ Nwe Ala",
+    "transactions": "Azụmahịa",
+    "disputes": "Esemokwu",
+    "documents": "Akwụkwọ",
+    "reports": "Ọkọlọtọ",
+    "settings": "Ntọala",
+    "logout": "Pụọ"
+  },
+  "common": {
+    "save": "Chekwaa",
+    "cancel": "Kagbuo",
+    "delete": "Hichapụ",
+    "edit": "Dezie",
+    "view": "Lee",
+    "search": "Chọọ",
+    "loading": "Na-ebu...",
+    "error": "Nsogbu mere",
+    "success": "Ọ dị mma",
+    "confirm": "Kwenye"
+  },
+  "parcel": {
+    "title": "Ala",
+    "number": "Nọmba Ala",
+    "status": "Ọnọdụ",
+    "owner": "Onye Nwe",
+    "area": "Mpaghara",
+    "location": "Ebe",
+    "register": "Debanye Ala",
+    "verify": "Nwee Ala"
+  },
+  "auth": {
+    "login": "Banye",
+    "email": "Ozi Eletronik",
+    "password": "Okwuntughe",
+    "signIn": "Banye Ugbu a",
+    "forgotPassword": "Chefuo Okwuntughe?"
+  },
+  "identity": {
+    "verifyNIN": "Nwee NIN",
+    "verifyBVN": "Nwee BVN",
+    "nin": "Nọmba Njirimara Mba",
+    "bvn": "Nọmba Nwee Ụlọ Akụ",
+    "verified": "Njirimara Ewere",
+    "pending": "Na-echere Nwee"
+  },
+  "legal": {
+    "signDocument": "Dezie Akwụkwọ",
+    "gazetteNotice": "Ọkwa Gọọmenti",
+    "auditChain": "Usoro Nyocha",
+    "legallyBinding": "Iwu Jidere",
+    "digitalSignature": "Mbinye Aka Dijitalụ"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "nav": {
+    "dashboard": "Allon Sarrafa",
+    "parcels": "Filaye",
+    "titles": "Takardun Mallakar Kasa",
+    "transactions": "Ma'amaloli",
+    "disputes": "Rigingimun",
+    "documents": "Takardu",
+    "reports": "Rahotanni",
+    "settings": "Saiti",
+    "logout": "Fita"
+  },
+  "common": {
+    "save": "Ajiye",
+    "cancel": "Soke",
+    "delete": "Share",
+    "edit": "Gyara",
+    "view": "Duba",
+    "search": "Nema",
+    "loading": "Ana lodawa...",
+    "error": "An samu kuskure",
+    "success": "An yi nasara",
+    "confirm": "Tabbatar"
+  },
+  "parcel": {
+    "title": "Fili",
+    "number": "Lambar Fili",
+    "status": "Matsayi",
+    "owner": "Mai Mallakar",
+    "area": "Yanki",
+    "location": "Wuri",
+    "register": "Yi Rajista na Fili",
+    "verify": "Tabbatar da Fili"
+  },
+  "auth": {
+    "login": "Shiga",
+    "email": "Imel",
+    "password": "Kalmar Sirri",
+    "signIn": "Shiga Yanzu",
+    "forgotPassword": "Manta Kalmar Sirri?"
+  },
+  "identity": {
+    "verifyNIN": "Tabbatar da NIN",
+    "verifyBVN": "Tabbatar da BVN",
+    "nin": "Lambar Shaida ta Kasa",
+    "bvn": "Lambar Tabbacin Banki",
+    "verified": "An Tabbatar da Asali",
+    "pending": "Ana Jiran Tabbatarwa"
+  },
+  "legal": {
+    "signDocument": "Sa Hannu kan Takarda",
+    "gazetteNotice": "Sanarwar Gwamnati",
+    "auditChain": "Sarkar Duba",
+    "legallyBinding": "Mai Ikon Doka",
+    "digitalSignature": "Sa Hannu na Dijital"
+  }
+}
