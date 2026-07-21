@@ -18,7 +18,7 @@ geopandas==0.14.2
 shapely==2.0.2
 pyproj==3.6.1
 pyspark==3.5.2
-apache-sedona==1.7.2
+apache-sedona==1.9.0
 
 # Machine learning
 scikit-learn==1.4.0
