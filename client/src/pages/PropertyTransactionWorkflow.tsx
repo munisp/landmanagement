@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
+import { useParams } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -26,7 +27,7 @@ export function PropertyTransactionWorkflow({
   const [formData, setFormData] = useState({
     amount: '',
     currency: 'NGN',
-    paymentMethod: 'mojaloop' as 'mojaloop' | 'card' | 'bank_transfer',
+    paymentMethod: 'mojaloop' as const,
     approvalCode: '',
   });
 
@@ -200,21 +201,10 @@ export function PropertyTransactionWorkflow({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="paymentMethod">Payment Method</Label>
-              <Select
-                value={formData.paymentMethod}
-                onValueChange={(value: any) => setFormData(prev => ({ ...prev, paymentMethod: value }))}
-                disabled={startMutation.isPending}
-              >
-                <SelectTrigger id="paymentMethod">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mojaloop">Mojaloop (Instant Payment)</SelectItem>
-                  <SelectItem value="card">Credit/Debit Card</SelectItem>
-                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Payment Rail</Label>
+              <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                Mojaloop instant payment is used for this settlement workflow. Other payment rails are unavailable until they have a configured, reconciled backend integration.
+              </div>
             </div>
 
             <Alert>
@@ -379,4 +369,19 @@ export function PropertyTransactionWorkflow({
       )}
     </div>
   );
+}
+
+
+/** Route wrapper: /transactions/workflow/:propertyId/:buyerId/:sellerId */
+export default function PropertyTransactionWorkflowPage() {
+  const { propertyId, buyerId, sellerId } = useParams<{ propertyId: string; buyerId: string; sellerId: string }>();
+  if (!propertyId || !buyerId || !sellerId) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>A property, buyer, and seller are required to start a transaction workflow.</AlertDescription>
+      </Alert>
+    );
+  }
+  return <PropertyTransactionWorkflow propertyId={propertyId} buyerId={buyerId} sellerId={sellerId} />;
 }

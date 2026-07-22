@@ -1,6 +1,5 @@
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
-import { parcelService, transactionService } from './db';
 import { searchParcels } from './parcelRepository';
 import { listTransactions } from './transactionRepository';
 
@@ -58,49 +57,39 @@ async function fetchReportData(config: ReportConfig): Promise<any[]> {
  * Fetch parcel data with filters
  */
 async function fetchParcelData(filters: Record<string, any>): Promise<any[]> {
-  try {
-    const response = await parcelService.get('/api/v1/parcels', { params: filters });
-    return response.parcels || [];
-  } catch (error) {
-    console.error('Error fetching parcel data:', error);
-    const offline = await searchParcels({
-      query: filters.query,
-      state: filters.state,
-      lga: filters.lga,
-      status: filters.status,
-      page: 1,
-      limit: 500,
-    });
-    return offline.parcels.map((parcel) => ({
-      ...parcel,
-      location: parcel.streetAddress ?? `${parcel.lga}, ${parcel.state}`,
-      ownerName: parcel.verifierId ?? parcel.surveyorId ?? 'Registry User',
-    }));
-  }
+  const result = await searchParcels({
+    query: filters.query,
+    state: filters.state,
+    lga: filters.lga,
+    status: filters.status,
+    page: 1,
+    limit: 500,
+  });
+  return result.parcels.map((parcel) => ({
+    ...parcel,
+    location: parcel.streetAddress ?? `${parcel.lga}, ${parcel.state}`,
+    // Identity names are intentionally omitted unless supplied by a joined
+    // repository query; do not fabricate a generic owner label.
+    ownerName: null,
+  }));
 }
 
 /**
  * Fetch transaction data with filters
  */
 async function fetchTransactionData(filters: Record<string, any>): Promise<any[]> {
-  try {
-    const response = await transactionService.get('/api/v1/transactions', { params: filters });
-    return response.transactions || [];
-  } catch (error) {
-    console.error('Error fetching transaction data:', error);
-    const offline = await listTransactions({
-      status: filters.status,
-      type: filters.type,
-      page: 1,
-      limit: 500,
-    });
-    return offline.transactions.map((transaction) => ({
-      ...transaction,
-      buyerName: transaction.counterpartyName ?? transaction.initiatorName,
-      amount: transaction.considerationAmount,
-      totalAmount: transaction.considerationAmount,
-    }));
-  }
+  const result = await listTransactions({
+    status: filters.status,
+    type: filters.type,
+    page: 1,
+    limit: 500,
+  });
+  return result.transactions.map((transaction) => ({
+    ...transaction,
+    buyerName: transaction.counterpartyName ?? null,
+    amount: transaction.considerationAmount,
+    totalAmount: transaction.considerationAmount,
+  }));
 }
 
 /**

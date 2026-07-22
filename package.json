@@ -5,6 +5,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
+    "worker:outbox": "tsx server/eventOutboxWorker.ts",
+    "worker:temporal": "tsx temporal/worker.ts",
     "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
@@ -22,6 +24,7 @@
     "@deck.gl/geo-layers": "^9.3.7",
     "@deck.gl/layers": "^9.3.7",
     "@elastic/elasticsearch": "^9.3.1",
+    "@fluvio/client": "^0.14.9",
     "@grpc/grpc-js": "^1.14.4",
     "@grpc/proto-loader": "^0.8.0",
     "@hookform/resolvers": "^5.2.2",
@@ -215,6 +218,7 @@
       "ws": "^8.21.0"
     },
     "onlyBuiltDependencies": [
+      "@fluvio/client",
       "puppeteer"
     ]
   }

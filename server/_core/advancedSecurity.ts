@@ -21,12 +21,7 @@ function resolveEncryptionKey(): string {
     return configuredKey;
   }
 
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('ENCRYPTION_KEY must be set in production');
-  }
-
-  logger.warn('ENCRYPTION_KEY not set; using deterministic development fallback key');
-  return crypto.createHash('sha256').update('idlr-pts-dev-encryption-key').digest('hex');
+  throw new Error('ENCRYPTION_KEY must be configured as a 64-character hexadecimal key before the application starts');
 }
 
 const ENCRYPTION_KEY = resolveEncryptionKey();
@@ -466,7 +461,7 @@ export function advancedSecurityHeaders(req: Request, res: Response, next: NextF
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https:",
-    "connect-src 'self' https://api.manus.im",
+    "connect-src 'self'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'"

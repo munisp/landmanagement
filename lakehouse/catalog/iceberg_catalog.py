@@ -10,6 +10,14 @@ from pyiceberg.catalog import load_catalog
 from pyiceberg.catalog.sql import SqlCatalog
 from typing import Optional
 
+
+def required_env(name: str) -> str:
+    value = os.getenv(name, "").strip()
+    if not value:
+        raise RuntimeError(f"{name} must be configured for the Iceberg catalog")
+    return value
+
+
 class IcebergCatalogManager:
     """
     Manages the Apache Iceberg catalog for the IDLR-PTS lakehouse.
@@ -25,23 +33,16 @@ class IcebergCatalogManager:
     def _initialize_catalog(self):
         """Initialize the Iceberg catalog with PostgreSQL backend."""
         
-        # Catalog configuration
+        # Catalog and object-store configuration must be supplied by deployment.
         catalog_config = {
             "type": "sql",
-            "uri": os.getenv(
-                "ICEBERG_CATALOG_URI",
-                "postgresql://temporal:temporal@localhost:5432/iceberg_catalog"
-            ),
-            "warehouse": os.getenv(
-                "ICEBERG_WAREHOUSE_PATH",
-                "s3://idlr-lakehouse/warehouse"
-            ),
-            # S3 configuration
-            "s3.endpoint": os.getenv("S3_ENDPOINT", "http://localhost:9000"),
-            "s3.access-key-id": os.getenv("S3_ACCESS_KEY", "minioadmin"),
-            "s3.secret-access-key": os.getenv("S3_SECRET_KEY", "minioadmin"),
-            "s3.path-style-access": "true",
-            # Additional configuration
+            "uri": required_env("ICEBERG_CATALOG_URI"),
+            "warehouse": required_env("ICEBERG_WAREHOUSE_PATH"),
+            "s3.endpoint": required_env("S3_ENDPOINT"),
+            "s3.access-key-id": required_env("S3_ACCESS_KEY"),
+            "s3.secret-access-key": required_env("S3_SECRET_KEY"),
+            "s3.region": required_env("S3_REGION"),
+            "s3.path-style-access": required_env("S3_PATH_STYLE_ACCESS"),
             "py-io-impl": "pyiceberg.io.pyarrow.PyArrowFileIO",
         }
         

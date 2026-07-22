@@ -128,7 +128,8 @@ async function getComparableSales(parcelNumber: string): Promise<ValuationCompar
       const sameState = parcel.state === subject.state;
       const sameUse = parcel.landUseType === subject.landUseType;
       const score = (sameLga ? 3 : 0) + (sameState ? 2 : 0) + (sameUse ? 2 : 0);
-      const salePrice = relatedTransaction?.considerationAmount || parcel.estimatedValue;
+      const salePrice = relatedTransaction?.considerationAmount ?? parcel.estimatedValue;
+      if (salePrice === null || salePrice <= 0) return null;
       return {
         parcelNumber: parcel.parcelNumber,
         address: parcel.streetAddress || `${parcel.lga}, ${parcel.state}`,
@@ -139,7 +140,7 @@ async function getComparableSales(parcelNumber: string): Promise<ValuationCompar
         score,
       };
     })
-    .filter((sale) => sale.score > 0)
+    .filter((sale): sale is ValuationComparableSale & { score: number } => sale !== null && sale.score > 0)
     .sort((a, b) => b.score - a.score || b.saleDate.localeCompare(a.saleDate));
 
   return ranked.slice(0, 4).map(({ score, ...sale }) => sale);
@@ -158,9 +159,12 @@ export async function calculatePropertyValuation(input: {
   }
 
   const comparableSales = await getComparableSales(input.parcelNumber);
+  if (comparableSales.length === 0 && subject.estimatedValue === null) {
+    throw new Error('A valuation requires either comparable registered sales or a persisted prior appraisal');
+  }
   const averageComparablePricePerSqm = comparableSales.length > 0
     ? comparableSales.reduce((sum, sale) => sum + sale.pricePerSqm, 0) / comparableSales.length
-    : subject.estimatedValue / Math.max(subject.areaSquareMeters, 1);
+    : (subject.estimatedValue as number) / Math.max(subject.areaSquareMeters, 1);
 
   const baseline = averageComparablePricePerSqm * subject.areaSquareMeters;
   const landUseAdjustment = subject.landUseType === 'commercial'
@@ -174,7 +178,8 @@ export async function calculatePropertyValuation(input: {
   const methodMultiplier = getMethodMultiplier(input.method);
   const purposeAdjustment = getPurposeAdjustment(input.purpose);
 
-  const estimatedValue = Math.round((baseline * landUseAdjustment * titleAdjustment * methodMultiplier * purposeAdjustment + subject.estimatedValue) / 2);
+  const calculatedValue = baseline * landUseAdjustment * titleAdjustment * methodMultiplier * purposeAdjustment;
+  const estimatedValue = Math.round(subject.estimatedValue === null ? calculatedValue : (calculatedValue + subject.estimatedValue) / 2);
   const pricePerSqm = Math.round(estimatedValue / Math.max(subject.areaSquareMeters, 1));
   const confidence = Math.max(68, Math.min(94, 72 + comparableSales.length * 4 + (subject.status === 'registered' ? 6 : subject.status === 'verified' ? 4 : 0)));
 
@@ -231,11 +236,12 @@ export async function getMarketInsights(parcelNumber?: string) {
   const parcels = (await searchParcels({ page: 1, limit: 1000 })).parcels;
   const history = (await loadStore()).history;
   const subject = parcelNumber ? await getParcelByNumber(parcelNumber) : null;
-  const locationParcels = subject ? parcels.filter((parcel) => parcel.state === subject.state && parcel.lga === subject.lga) : parcels;
+  const locationParcels = (subject ? parcels.filter((parcel) => parcel.state === subject.state && parcel.lga === subject.lga) : parcels)
+    .filter((parcel) => parcel.estimatedValue !== null);
 
   const averagePricePerSqm = locationParcels.length > 0
-    ? Math.round(locationParcels.reduce((sum, parcel) => sum + parcel.estimatedValue / Math.max(parcel.areaSquareMeters, 1), 0) / locationParcels.length)
-    : 0;
+    ? Math.round(locationParcels.reduce((sum, parcel) => sum + (parcel.estimatedValue ?? 0) / Math.max(parcel.areaSquareMeters, 1), 0) / locationParcels.length)
+    : null;
 
   const valuationsThisMonth = history.filter((record) => {
     const recordDate = new Date(record.date);

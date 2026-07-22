@@ -279,11 +279,14 @@ export async function getPlatformOperationsOverview(): Promise<PlatformOperation
   };
 
   const allowedOrigins = [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'http://localhost:3000',
-    'http://localhost:5173',
-    ...(process.env.ALLOWED_ORIGINS?.split(',').map((entry) => entry.trim()).filter(Boolean) || []),
-  ];
+    process.env.FRONTEND_URL,
+    ...(process.env.ALLOWED_ORIGINS?.split(',') ?? []),
+  ]
+    .map((entry) => entry?.trim())
+    .filter((entry): entry is string => Boolean(entry));
+  if (allowedOrigins.length === 0) {
+    throw new Error('FRONTEND_URL or ALLOWED_ORIGINS must be configured for operational security posture');
+  }
 
   const abuseDefensePosture = {
     blockedSubjects: rateLimitStats.blockedKeys,
@@ -293,7 +296,7 @@ export async function getPlatformOperationsOverview(): Promise<PlatformOperation
       : rateLimitStats.blockedKeys > 0
         ? 'degraded' as const
         : 'unhealthy' as const,
-    corsMode: allowedOrigins.length > 3 ? 'permissive' as const : 'strict' as const,
+    corsMode: allowedOrigins.length > 1 ? 'permissive' as const : 'strict' as const,
     captchaConfigured: Boolean(process.env.RECAPTCHA_SECRET_KEY || process.env.TURNSTILE_SECRET_KEY),
     bruteForceProtection: true,
     summary: (process.env.RECAPTCHA_SECRET_KEY || process.env.TURNSTILE_SECRET_KEY)

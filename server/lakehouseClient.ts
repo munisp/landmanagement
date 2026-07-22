@@ -1,13 +1,23 @@
 import axios, { AxiosInstance } from 'axios';
 
-const LAKEHOUSE_URL = process.env.LAKEHOUSE_API_URL || 'http://localhost:8000';
+const LAKEHOUSE_URL = process.env.LAKEHOUSE_API_URL?.trim();
+const LAKEHOUSE_API_KEY = process.env.LAKEHOUSE_API_KEY?.trim();
 
-// Create axios instance with default config
+if (!LAKEHOUSE_URL) {
+  throw new Error('LAKEHOUSE_API_URL must be configured for lakehouse integration');
+}
+if (!LAKEHOUSE_API_KEY) {
+  throw new Error('LAKEHOUSE_API_KEY must be configured for lakehouse integration');
+}
+
+// Create the authenticated internal-service client. The lakehouse rejects calls
+// that do not present the shared deployment secret.
 const lakehouseApi: AxiosInstance = axios.create({
   baseURL: LAKEHOUSE_URL,
-  timeout: 30000, // 30 seconds
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
+    'X-Lakehouse-Api-Key': LAKEHOUSE_API_KEY,
   },
 });
 

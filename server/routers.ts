@@ -1014,7 +1014,7 @@ export const appRouter = router({
         try {
           return await parcelService.put(`/api/v1/parcels/${input.id}`, input.data);
         } catch (error) {
-          const updated = updateParcelInRepository(input.id, input.data);
+          const updated = await updateParcelInRepository(input.id, input.data);
           const { invalidateParcelQueryCaches } = await import('./productionQueryCache');
           await invalidateParcelQueryCaches(updated.id, updated.parcelNumber);
           return updated;
@@ -1029,7 +1029,7 @@ export const appRouter = router({
             verifierId: ctx.user.id,
           });
         } catch (error) {
-          const verified = verifyParcelInRepository(input.id, String(ctx.user.id));
+          const verified = await verifyParcelInRepository(input.id, String(ctx.user.id));
           const { invalidateParcelQueryCaches } = await import('./productionQueryCache');
           await invalidateParcelQueryCaches(verified.id, verified.parcelNumber);
           return verified;
@@ -1045,7 +1045,7 @@ export const appRouter = router({
         try {
           return await parcelService.post('/api/v1/parcels/batch/assign', input);
         } catch (error) {
-          const updated = batchAssignParcels(input.parcelIds, input.surveyorId);
+          const updated = await batchAssignParcels(input.parcelIds, input.surveyorId);
           const { invalidateParcelQueryCaches } = await import('./productionQueryCache');
           for (const parcel of updated) {
             await invalidateParcelQueryCaches(parcel.id, parcel.parcelNumber);
@@ -1065,7 +1065,7 @@ export const appRouter = router({
             verifierId: ctx.user.id,
           });
         } catch (error) {
-          const updated = batchVerifyParcels(input.parcelIds, String(ctx.user.id));
+          const updated = await batchVerifyParcels(input.parcelIds, String(ctx.user.id));
           const { invalidateParcelQueryCaches } = await import('./productionQueryCache');
           for (const parcel of updated) {
             await invalidateParcelQueryCaches(parcel.id, parcel.parcelNumber);
@@ -1085,16 +1085,20 @@ export const appRouter = router({
         try {
           return await parcelService.get('/api/v1/parcels/geospatial/search', input);
         } catch (error) {
-          return geospatialParcelSearch(input);
+          return await geospatialParcelSearch(input);
         }
       }),
 
     recordOnBlockchain: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        return await blockchainService.post('/api/v1/blockchain/record/parcel', {
-          parcelId: input.id,
-        });
+        try {
+          return await blockchainService.post('/api/v1/blockchain/record/parcel', {
+            parcelId: input.id,
+          });
+        } catch (error) {
+          throw new Error(`Blockchain service failed to record parcel ${input.id}: ${error instanceof Error ? error.message : String(error)}`);
+        }
       }),
   }),
 
@@ -1515,8 +1519,12 @@ export const appRouter = router({
       .query(async ({ input }) => {
         try {
           return await fabricClient.verifyTransaction(input.txHash);
-        } catch (error) {
-          return await blockchainService.get(`/api/v1/blockchain/verify/${input.txHash}`);
+        } catch (fabricError) {
+          try {
+            return await blockchainService.get(`/api/v1/blockchain/verify/${encodeURIComponent(input.txHash)}`);
+          } catch (serviceError) {
+            throw new Error(`Blockchain service verification failed: ${serviceError instanceof Error ? serviceError.message : String(serviceError)}`);
+          }
         }
       }),
 
@@ -1679,11 +1687,11 @@ export const appRouter = router({
         try {
           return await odmService.extractBuildingFootprints(input.orthophotoUrl);
         } catch (error) {
-          // Return mock data when AI service is not available
-          return {
-            detections: [],
-            message: 'Building detection service unavailable',
-          };
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Building-footprint inference is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+            cause: error,
+          });
         }
       }),
   }),

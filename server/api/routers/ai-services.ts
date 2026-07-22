@@ -2,20 +2,33 @@ import { z } from 'zod';
 import { publicProcedure, protectedProcedure, router } from '../../_core/trpc';
 import { TRPCError } from '@trpc/server';
 
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8001';
-const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL || `${AI_SERVICE_URL}/ocr`;
-const FRAUD_SERVICE_URL = process.env.FRAUD_SERVICE_URL || `${AI_SERVICE_URL}/fraud`;
+function requiredServiceUrl(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} must be configured for AI services`);
+  return value.replace(/\/$/, '');
+}
+
+function aiServiceUrls() {
+  const base = requiredServiceUrl('AI_SERVICE_URL');
+  return {
+    ocr: (process.env.OCR_SERVICE_URL?.trim() || `${base}/ocr`).replace(/\/$/, ''),
+    fraud: (process.env.FRAUD_SERVICE_URL?.trim() || `${base}/fraud`).replace(/\/$/, ''),
+    health: (process.env.AI_HEALTH_URL?.trim() || `${base}/health`).replace(/\/$/, ''),
+  };
+}
 
 /**
  * Governance-owned block decision. The Python service scores; the platform
  * decides what score blocks a transaction. Operators tune the cutoff via
  * FRAUD_SCORE_BLOCK_THRESHOLD without redeploying the model.
  */
-const FRAUD_SCORE_BLOCK_THRESHOLD = (() => {
-  const raw = parseInt(process.env.FRAUD_SCORE_BLOCK_THRESHOLD || '80', 10);
-  return Number.isFinite(raw) && raw >= 0 && raw <= 100 ? raw : 80;
-})();
-const AI_HEALTH_URL = process.env.AI_HEALTH_URL || `${AI_SERVICE_URL}/health`;
+function fraudScoreBlockThreshold(): number {
+  const raw = Number(process.env.FRAUD_SCORE_BLOCK_THRESHOLD);
+  if (!Number.isFinite(raw) || raw < 0 || raw > 100) {
+    throw new Error('FRAUD_SCORE_BLOCK_THRESHOLD must be configured as a number from 0 to 100');
+  }
+  return raw;
+}
 
 export const aiServicesRouter = router({
   /**
@@ -31,7 +44,7 @@ export const aiServicesRouter = router({
     .mutation(async ({ input }) => {
       try {
         // Call Python OCR service
-        const response = await fetch(`${OCR_SERVICE_URL}/process`, {
+        const response = await fetch(`${aiServiceUrls().ocr}/process`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -92,7 +105,7 @@ export const aiServicesRouter = router({
         }
 
         // Call Python fraud detection service
-        const response = await fetch(`${FRAUD_SERVICE_URL}/analyze`, {
+        const response = await fetch(`${aiServiceUrls().fraud}/analyze`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -102,7 +115,7 @@ export const aiServicesRouter = router({
             transactionType: transaction.type,
             createdAt: transaction.createdAt,
             fromUserId: transaction.initiatorId,
-            toUserId: 0, // registry transactions track counterparty by name, not user id
+            counterpartyName: transaction.counterpartyName ?? null,
             parcelId: transaction.parcelId,
           }),
         });
@@ -112,10 +125,11 @@ export const aiServicesRouter = router({
         }
 
         const result = await response.json();
-        const fraudScore = Number(result.fraud_score) || 0;
-        // Platform policy: the score threshold — not the model's own flag —
-        // decides whether a transaction is blocked.
-        const blocked = fraudScore >= FRAUD_SCORE_BLOCK_THRESHOLD;
+        const fraudScore = Number(result.fraud_score);
+        if (!Number.isFinite(fraudScore)) throw new Error('Fraud service returned an invalid fraud_score');
+        // Platform policy: the configured score threshold — not the model's own
+        // flag — decides whether a transaction is blocked.
+        const blocked = fraudScore >= fraudScoreBlockThreshold();
         return {
           success: true,
           isFraudulent: Boolean(result.is_fraudulent) || blocked,
@@ -124,7 +138,7 @@ export const aiServicesRouter = router({
           anomalies: result.anomalies,
           recommendation: blocked ? 'block' : result.recommendation,
           blocked,
-          blockThreshold: FRAUD_SCORE_BLOCK_THRESHOLD,
+          blockThreshold: fraudScoreBlockThreshold(),
         };
       } catch (error) {
         console.error('Fraud analysis error:', error);
@@ -179,7 +193,7 @@ export const aiServicesRouter = router({
           .limit(input.limit);
 
         // Call Python fraud detection service for batch analysis
-        const response = await fetch(`${FRAUD_SERVICE_URL}/scan-batch`, {
+        const response = await fetch(`${aiServiceUrls().fraud}/scan-batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -190,7 +204,7 @@ export const aiServicesRouter = router({
               transactionType: tx.type,
               createdAt: tx.createdAt,
               fromUserId: tx.initiatorId,
-              toUserId: 0, // registry transactions track counterparty by name, not user id
+              counterpartyName: tx.counterpartyName ?? null,
               parcelId: tx.parcelId,
             })),
           }),
@@ -223,7 +237,7 @@ export const aiServicesRouter = router({
    */
   getOCRStatus: publicProcedure.query(async () => {
     try {
-      const response = await fetch(AI_HEALTH_URL, {
+      const response = await fetch(aiServiceUrls().health, {
         method: 'GET',
       });
 
@@ -234,8 +248,8 @@ export const aiServicesRouter = router({
       const result = await response.json();
       return {
         status: 'online',
-        version: result.version || '1.0.0',
-        uptime: result.uptime || 0,
+        version: result.version ?? null,
+        uptime: result.uptime ?? null,
       };
     } catch (error) {
       return { status: 'offline', message: 'OCR service is not reachable' };
@@ -247,7 +261,7 @@ export const aiServicesRouter = router({
    */
   getFraudDetectionStatus: publicProcedure.query(async () => {
     try {
-      const response = await fetch(AI_HEALTH_URL, {
+      const response = await fetch(aiServiceUrls().health, {
         method: 'GET',
       });
 
@@ -258,8 +272,8 @@ export const aiServicesRouter = router({
       const result = await response.json();
       return {
         status: 'online',
-        version: result.version || '1.0.0',
-        modelAccuracy: result.model_accuracy || 0,
+        version: result.version ?? null,
+        modelAccuracy: result.model_accuracy ?? null,
       };
     } catch (error) {
       return { status: 'offline', message: 'Fraud detection service is not reachable' };

@@ -1,0 +1,287 @@
+server/_core/cache.ts:16:const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+server/_core/cookies.ts:3:const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+server/_core/cookies.ts:32:  //   hostname !== "127.0.0.1" &&
+server/_core/database.ts:17:const connectionString = process.env.POSTGRES_URL || 'postgresql://idlr_user:idlr_password@localhost:5432/idlr_pts';
+server/_core/env.ts:15:const WEAK_SECRET_MARKERS = ["change-me", "placeholder", "example", "dev-only"];
+server/_core/healthCheck.ts:46:const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+server/_core/index.ts:188:    console.log(`Server running on http://localhost:${port}/`);
+server/_core/mockGuard.ts:5: * returned synthetic "mock" payloads whenever the upstream provider was
+server/_core/security.ts:22:const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+server/_core/security.ts:77:    'http://localhost:3000',
+server/_core/security.ts:78:    'http://localhost:5173',
+server/_core/tracing.ts:14:  endpoint: process.env.JAEGER_ENDPOINT || 'http://localhost:14268/api/traces',
+server/api/routers/ai-services.ts:5:const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8001';
+server/api/routers/geospatial.ts:858:        modelEndpoint: `${process.env.LAKEHOUSE_API_URL ?? 'http://localhost:8000'}/api/v1/boundary-detection`,
+server/api/routers/identity.ts:9:const IDENTITY_SERVICE_URL = process.env.IDENTITY_SERVICE_URL ?? "http://localhost:8091";
+server/api/routers/legal.ts:10:const CRYPTO_SERVICE_URL = process.env.CRYPTO_AUDIT_SERVICE_URL ?? "http://localhost:8092";
+server/api/routers/legal.ts:11:const GAZETTE_SERVICE_URL = process.env.GAZETTE_SERVICE_URL ?? "http://localhost:8093";
+server/caseConciergeService.ts:7: * (in-memory with TTL); the assembled case payload is the durable output,
+server/dataAggregationScheduler.ts:8:const connectionString = process.env.POSTGRES_URL || 'postgresql://idlr_user:idlr_password@localhost:5432/idlr_pts';
+server/db.ts:120:      parcel: process.env.PARCEL_SERVICE_URL || 'http://localhost:8081',
+server/db.ts:121:      title: process.env.TITLE_SERVICE_URL || 'http://localhost:8082',
+server/db.ts:122:      transaction: process.env.TRANSACTION_SERVICE_URL || 'http://localhost:8083',
+server/db.ts:123:      payment: process.env.PAYMENT_SERVICE_URL || 'http://localhost:8084',
+server/db.ts:124:      document: process.env.DOCUMENT_SERVICE_URL || 'http://localhost:8085',
+server/db.ts:125:      blockchain: process.env.BLOCKCHAIN_SERVICE_URL || 'http://localhost:8086',
+server/db.ts:170:      'parcel': process.env.PARCEL_SERVICE_URL || 'http://localhost:8081',
+server/db.ts:171:      'title': process.env.TITLE_SERVICE_URL || 'http://localhost:8082',
+server/db.ts:172:      'transaction': process.env.TRANSACTION_SERVICE_URL || 'http://localhost:8083',
+server/db.ts:173:      'payment': process.env.PAYMENT_SERVICE_URL || 'http://localhost:8084',
+server/db.ts:174:      'document': process.env.DOCUMENT_SERVICE_URL || 'http://localhost:8085',
+server/db.ts:175:      'blockchain': process.env.BLOCKCHAIN_SERVICE_URL || 'http://localhost:8086',
+server/db.ts:177:    this.baseURL = serviceURLs[serviceName] || 'http://localhost:8080';
+server/documentAIService.ts:316:    /fake/i,
+server/elasticsearch.ts:5:  node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
+server/elasticsearchService.ts:530:      node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
+server/escrowSettlementService.ts:9: * Offline-capable: falls back to in-memory settlement state when PostgreSQL
+server/fabricClient.ts:64:      console.warn('[Fabric] Connection profile not found. Using mock mode.');
+server/fabricClient.ts:99:      console.warn('[Fabric] Gateway not available, using mock response');
+server/fabricClient.ts:102:        txId: `mock-tx-${Date.now()}`,
+server/fabricClient.ts:147:      console.warn('[Fabric] Gateway not available, using mock response');
+server/fabricClient.ts:187:      console.warn('[Fabric] Gateway not available, using mock response');
+server/fabricClient.ts:219:      console.warn('[Fabric] Gateway not available, using mock response');
+server/fabricClient.ts:222:          txId: `mock-tx-${Date.now()}`,
+server/fabricClient.ts:254:      console.warn('[Fabric] Gateway not available, using mock response');
+server/fabricClient.ts:286:      console.warn('[Fabric] Gateway not available, using mock response');
+server/jsonStore.ts:6: * server/data/*.json file stores and process-local in-memory state with
+server/kafkaClient.ts:11:const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+server/mfa.ts:135:    // Send SMS (mock - in production use Twilio)
+server/mortgageApplicationRepository.ts:361:    // Identity-derived public code: insert with a unique placeholder, then
+server/mortgageExplainabilityService.ts:9: * Offline-capable: composes in-memory repositories when PostgreSQL is down.
+server/mortgagePaymentService.ts:161:  // Insert mandate with a unique placeholder, then derive the final code
+server/mortgagePaymentService.ts:291:      // Record successful payment (placeholder id finalized from row identity below)
+server/mortgagePaymentService.ts:424:  // Record payment transaction (placeholder id finalized from row identity below)
+server/mortgagePaymentService.ts:518:      authorization_url: 'https://checkout.paystack.com/mock',
+server/mortgagePaymentService.ts:585:    // Development-only fake mandate code — throws in production.
+server/ocr-integration.ts:8:const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL || 'http://localhost:8003';
+server/odm.ts:9:const ODM_API_URL = process.env.ODM_API_URL || 'http://localhost:3000/api/odm';
+server/odm.ts:173:    const response = await axios.post('http://localhost:8004/detect', {
+server/operationalEventStreamService.ts:10: * available; an in-memory ring buffer keeps the stream alive offline.
+server/paymentRepository.ts:160:  // Insert with a placeholder unique reference, then assign the canonical
+server/platformOperationsRepository.ts:282:    process.env.FRONTEND_URL || 'http://localhost:3000',
+server/platformOperationsRepository.ts:283:    'http://localhost:3000',
+server/platformOperationsRepository.ts:284:    'http://localhost:5173',
+server/rateLimit.ts:9:const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+server/registryIntegrityService.ts:9: * Offline-capable: uses in-memory repositories when PostgreSQL is unavailable.
+server/registryIntegrityService.ts:119:      // FK violation: parcel_id from in-memory store not yet persisted to DB.
+server/routers.ts:1682:          // Return mock data when AI service is not available
+server/securityIntegrationService.ts:63:    // Return mock data if service unavailable
+server/temporalClient.ts:26:      address: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
+server/testUtils/setupTestDb.ts:8:process.env.POLYGON_RPC_URL ??= "http://127.0.0.1:18545";
+server/testUtils/setupTestDb.ts:12:process.env.LAKEHOUSE_API_URL ??= "http://127.0.0.1:18000";
+server/testUtils/setupTestDb.ts:14:process.env.KEYCLOAK_URL ??= "http://127.0.0.1:18080";
+server/testUtils/setupTestDb.ts:21:process.env.PERMIFY_URL ??= "http://127.0.0.1:13476";
+server/tigerBeetleClient.ts:28:const TIGERBEETLE_GRPC_URL = process.env.TIGERBEETLE_GRPC_URL || 'localhost:50051';
+server/titleRepository.ts:4: * Persists to the `titles` table (migration 0012). No in-memory or file-store
+server/titleRiskService.ts:9: * Offline-capable: composes the in-memory repositories when PostgreSQL is
+server/transactionRepository.ts:7: * There is no in-memory or file-store fallback.
+client/src/components/AIChatBox.tsx:38:  placeholder?: string;
+client/src/components/AIChatBox.tsx:117:  placeholder = "Type your message...",
+client/src/components/AIChatBox.tsx:316:          placeholder={placeholder}
+client/src/components/AdvancedMapWorkbench.tsx:501:          geometry: { type: 'Point', coordinates: [3.3792, 6.5244] }, // placeholder
+client/src/components/AdvancedMapWorkbench.tsx:1104:                  placeholder="-- Spatial SQL query will appear here..."
+client/src/components/CommentThread.tsx:33:  placeholder?: string;
+client/src/components/CommentThread.tsx:43:  placeholder = 'Add a comment...',
+client/src/components/CommentThread.tsx:205:            placeholder={placeholder}
+client/src/components/ConnectedCommentThread.tsx:99:      placeholder="Add a comment..."
+client/src/components/FacetedFilter.tsx:108:          <CommandInput placeholder={searchPlaceholder} />
+client/src/components/GeospatialSearchWithBatch.tsx:424:                  placeholder="surveyor-1"
+client/src/components/ParcelMapView.tsx:115:    // Show nearby parcels (mock data - in production, fetch from API)
+client/src/components/ReportBuilder.tsx:342:                          placeholder={`Enter ${filter.label.toLowerCase()}`}
+client/src/components/ReportBuilder.tsx:353:                            <SelectValue placeholder={`Select ${filter.label.toLowerCase()}`} />
+client/src/components/ReportBuilder.tsx:368:                            placeholder="Start date"
+client/src/components/ReportBuilder.tsx:379:                            placeholder="End date"
+client/src/components/ReportBuilder.tsx:394:                            placeholder="Min"
+client/src/components/ReportBuilder.tsx:405:                            placeholder="Max"
+client/src/components/ReportBuilder.tsx:484:                          <SelectValue placeholder="Select field" />
+client/src/components/SavedSearches.tsx:90:              placeholder="e.g., Lagos Residential Properties"
+client/src/components/SearchBar.tsx:36:  placeholder?: string;
+client/src/components/SearchBar.tsx:42:  placeholder = 'Search parcels, transactions, documents...',
+client/src/components/SearchBar.tsx:123:            placeholder={placeholder}
+client/src/components/SearchBar.tsx:224:                        placeholder="Enter city"
+client/src/components/SearchBar.tsx:233:                        placeholder="Enter state"
+client/src/components/SearchBar.tsx:292:                          placeholder="0"
+client/src/components/SearchBar.tsx:301:                          placeholder="Any"
+client/src/components/SkeletonLoaders.tsx:24:          <Skeleton className="h-48 w-full" /> {/* Map placeholder */}
+client/src/components/ui/command.tsx:76:          "placeholder:text-muted-foreground flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+client/src/components/ui/input.tsx:57:        "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+client/src/components/ui/select.tsx:38:        "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 flex w-fit items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+client/src/components/ui/textarea.tsx:56:        "border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex field-sizing-content min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+client/src/const.ts:1:const DEFAULT_OAUTH_PORTAL_URL = "http://localhost:3100";
+client/src/const.ts:7:    return "http://localhost:3000";
+client/src/pages/AdminUserManagement.tsx:422:                placeholder="Enter the reason for suspending this account..."
+client/src/pages/ApiDocs.tsx:207:                    placeholder="Production Integration"
+client/src/pages/ApiKeyManagement.tsx:230:                placeholder={t('apiKeys.keyNamePlaceholder')}
+client/src/pages/AuditTrail.tsx:153:                    placeholder="Search by action, entity ID, user, or details..."
+client/src/pages/AuditTrail.tsx:162:                  <SelectValue placeholder="Filter by action" />
+client/src/pages/AuditTrail.tsx:177:                  <SelectValue placeholder="Filter by entity" />
+client/src/pages/BackupRecovery.tsx:243:                  <Input id="drill-time" value={drillRecoveryTime} onChange={(e) => setDrillRecoveryTime(e.target.value)} placeholder="e.g. 18m" />
+client/src/pages/BackupRecovery.tsx:247:                  <Input id="drill-notes" value={drillNotes} onChange={(e) => setDrillNotes(e.target.value)} placeholder="Summarize what was validated during the drill" />
+client/src/pages/BlockchainExplorer.tsx:80:                  placeholder="Enter transaction hash or parcel ID..."
+client/src/pages/BlockchainTransactions.tsx:119:                placeholder="Enter parcel ID"
+client/src/pages/BlockchainTransactions.tsx:128:                placeholder="0x..."
+client/src/pages/BlockchainTransactions.tsx:137:                placeholder="SHA256 hash of transfer document"
+client/src/pages/BlockchainTransactions.tsx:172:                placeholder="Enter parcel ID"
+client/src/pages/BlockchainTransactions.tsx:181:                placeholder="0x..."
+client/src/pages/BlockchainTransactions.tsx:190:                placeholder="0x..."
+client/src/pages/BlockchainTransactions.tsx:199:                placeholder="0.0"
+client/src/pages/BlockchainVerify.tsx:66:                  placeholder="0x1234567890abcdef..."
+client/src/pages/BorrowerPaymentPortal.tsx:173:                <SelectValue placeholder="Select a mortgage" />
+client/src/pages/BorrowerPaymentPortal.tsx:406:                              placeholder="10000"
+client/src/pages/BrokerDashboard.tsx:284:                          placeholder="John Doe"
+client/src/pages/BrokerDashboard.tsx:294:                          placeholder="john@example.com"
+client/src/pages/BrokerDashboard.tsx:303:                          placeholder="+234 800 000 0000"
+client/src/pages/BrokerDashboard.tsx:312:                          placeholder="12345678901"
+client/src/pages/BrokerDashboard.tsx:321:                          placeholder="Additional information about the client"
+client/src/pages/BrokerDashboard.tsx:343:                    placeholder="Search clients by name or email..."
+client/src/pages/CivicComplianceCenter.tsx:184:                  <div className="space-y-2"><Label>Compare survey A</Label><Select value={surveyCompareA} onValueChange={setSurveyCompareA}><SelectTrigger><SelectValue placeholder="Select survey" /></SelectTrigger><SelectContent>{(surveysQuery.data || []).map((item: any) => <SelectItem key={item.surveyId} value={item.surveyId}>{item.surveyId}</SelectItem>)}</SelectContent></Select></div>
+client/src/pages/CivicComplianceCenter.tsx:185:                  <div className="space-y-2"><Label>Compare survey B</Label><Select value={surveyCompareB} onValueChange={setSurveyCompareB}><SelectTrigger><SelectValue placeholder="Select survey" /></SelectTrigger><SelectContent>{(surveysQuery.data || []).map((item: any) => <SelectItem key={item.surveyId} value={item.surveyId}>{item.surveyId}</SelectItem>)}</SelectContent></Select></div>
+client/src/pages/CivicComplianceCenter.tsx:287:                  <Select value={selectedNoticeId} onValueChange={setSelectedNoticeId}><SelectTrigger><SelectValue placeholder="Select notice" /></SelectTrigger><SelectContent>{(noticesQuery.data || []).map((item: any) => <SelectItem key={item.noticeId} value={item.noticeId}>{item.noticeId}</SelectItem>)}</SelectContent></Select>
+client/src/pages/CivicComplianceCenter.tsx:288:                  <Input value={objectionName} onChange={(e) => setObjectionName(e.target.value)} placeholder="Objector name" />
+client/src/pages/CivicComplianceCenter.tsx:289:                  <Input value={objectionContact} onChange={(e) => setObjectionContact(e.target.value)} placeholder="Objector contact" />
+client/src/pages/Collaboration.tsx:265:                      placeholder="Type a message..."
+client/src/pages/CommissionManagementDashboard.tsx:127:                placeholder="Enter Broker ID"
+client/src/pages/CommissionManagementDashboard.tsx:301:                            placeholder="Explain why you're disputing this commission..."
+client/src/pages/CommunityEngagementCenter.tsx:122:                  <Input value={proposalTitle} onChange={(e) => setProposalTitle(e.target.value)} placeholder="Proposal title" />
+client/src/pages/CommunityEngagementCenter.tsx:123:                  <Input value={proposalProposer} onChange={(e) => setProposalProposer(e.target.value)} placeholder="Proposer" />
+client/src/pages/CommunityEngagementCenter.tsx:124:                  <Input value={proposalArea} onChange={(e) => setProposalArea(e.target.value)} placeholder="Affected area" />
+client/src/pages/CommunityEngagementCenter.tsx:146:                  <Input value={budgetInitiative} onChange={(e) => setBudgetInitiative(e.target.value)} placeholder="Initiative" />
+client/src/pages/CommunityEngagementCenter.tsx:147:                  <Input type="number" value={budgetAmount} onChange={(e) => setBudgetAmount(Number(e.target.value))} placeholder="Allocated amount" />
+client/src/pages/CommunityEngagementCenter.tsx:148:                  <Input value={budgetStatus} onChange={(e) => setBudgetStatus(e.target.value as typeof budgetStatus)} placeholder="Status" />
+client/src/pages/ComponentShowcase.tsx:413:                  <Input id="email" type="email" placeholder="Email" />
+client/src/pages/ComponentShowcase.tsx:419:                    placeholder="Type your message here."
+client/src/pages/ComponentShowcase.tsx:426:                      <SelectValue placeholder="Select a fruit" />
+client/src/pages/ComponentShowcase.tsx:562:                        <CommandInput placeholder="Search frameworks..." />
+client/src/pages/ComponentShowcase.tsx:630:                          <SelectValue placeholder="MM" />
+client/src/pages/ComponentShowcase.tsx:655:                          <SelectValue placeholder="YYYY" />
+client/src/pages/ComponentShowcase.tsx:1039:                            placeholder="Type something..."
+client/src/pages/ComponentShowcase.tsx:1413:                    placeholder="Try sending a message..."
+client/src/pages/DisputeResolution.tsx:152:                      placeholder="Enter parcel number"
+client/src/pages/DisputeResolution.tsx:161:                        <SelectValue placeholder="Select type" />
+client/src/pages/DisputeResolution.tsx:178:                    placeholder="Name of the other party"
+client/src/pages/DisputeResolution.tsx:188:                    placeholder="Provide detailed description of the dispute..."
+client/src/pages/DisputeResolution.tsx:199:                    placeholder="Describe the determination or relief you are seeking..."
+client/src/pages/DroneProcessing.tsx:144:                  placeholder="e.g., Abuja District Survey 2026"
+client/src/pages/DroneProcessing.tsx:155:                    placeholder="https://storage.example.com/drone/image001.jpg"
+client/src/pages/ExecutiveAnalyticsDashboard.tsx:170:              <SelectValue placeholder="Select time range" />
+client/src/pages/ExecutiveDashboard.tsx:103:            <SelectValue placeholder="Select time range" />
+client/src/pages/FieldSurveyor.tsx:533:              placeholder="Enter parcel number"
+client/src/pages/FieldSurveyor.tsx:566:              placeholder="Enter area"
+client/src/pages/FieldSurveyor.tsx:576:              placeholder="Describe boundaries"
+client/src/pages/FieldSurveyor.tsx:587:              placeholder="Additional notes"
+client/src/pages/FieldSurveyor.tsx:663:              placeholder="Search by parcel number or notes..."
+client/src/pages/GovernmentIntegration.tsx:112:                <Input placeholder="Enter 11-digit NIN" value={ninNumber} onChange={(e) => setNinNumber(e.target.value)} maxLength={11} />
+client/src/pages/GovernmentIntegration.tsx:130:                <Input placeholder="Enter 11-digit BVN" value={bvnNumber} onChange={(e) => setBvnNumber(e.target.value)} maxLength={11} />
+client/src/pages/GovernmentIntegration.tsx:148:                <Input placeholder="Enter RC Number" value={cacNumber} onChange={(e) => setCacNumber(e.target.value)} />
+client/src/pages/GovernmentIntegration.tsx:166:                <Input placeholder="Enter TIN" value={tinNumber} onChange={(e) => setTinNumber(e.target.value)} />
+client/src/pages/IdentityVerification.tsx:269:                          placeholder="12345678901"
+client/src/pages/IdentityVerification.tsx:321:                          placeholder="22345678901"
+client/src/pages/IdentityVerification.tsx:370:                        placeholder="proof-of-address.pdf"
+client/src/pages/InitiateTransaction.tsx:263:                          placeholder="Enter recipient's full name"
+client/src/pages/InitiateTransaction.tsx:273:                          placeholder="Enter recipient's email address"
+client/src/pages/InitiateTransaction.tsx:284:                      placeholder="Add any additional notes or comments about this transaction..."
+client/src/pages/InitiateTransaction.tsx:302:                        placeholder="0.00"
+client/src/pages/InvestorDashboard.tsx:218:                  <Input id="max-investment" type="number" value={registrationForm.maxInvestmentAmount} onChange={(e) => setRegistrationForm({ ...registrationForm, maxInvestmentAmount: e.target.value })} placeholder="Optional" />
+client/src/pages/InvestorDashboard.tsx:318:              <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filter by risk" /></SelectTrigger>
+client/src/pages/InvestorDashboard.tsx:471:                <Input id="investmentAmount" type="number" value={investmentAmount} onChange={(e) => setInvestmentAmount(e.target.value)} placeholder="Enter amount" min={investor.minInvestmentAmount / 100} max={investor.maxInvestmentAmount ? investor.maxInvestmentAmount / 100 : undefined} />
+client/src/pages/IoTOperations.tsx:143:                <div className="space-y-2"><Label>Device</Label><Select value={environmentalForm.deviceId ? String(environmentalForm.deviceId) : ''} onValueChange={(value) => setEnvironmentalForm((current) => ({ ...current, deviceId: Number(value) }))}><SelectTrigger><SelectValue placeholder="Select device" /></SelectTrigger><SelectContent>{devices.filter((d: any) => d.category === 'environmental_sensor').map((device: any) => <SelectItem key={device.id} value={String(device.id)}>{device.name}</SelectItem>)}</SelectContent></Select></div>
+client/src/pages/IoTOperations.tsx:169:                <div className="space-y-2"><Label>Device</Label><Select value={accessForm.deviceId ? String(accessForm.deviceId) : ''} onValueChange={(value) => setAccessForm((current) => ({ ...current, deviceId: Number(value) }))}><SelectTrigger><SelectValue placeholder="Select access-control device" /></SelectTrigger><SelectContent>{devices.filter((d: any) => d.category === 'access_control').map((device: any) => <SelectItem key={device.id} value={String(device.id)}>{device.name}</SelectItem>)}</SelectContent></Select></div>
+client/src/pages/IoTOperations.tsx:195:                <div className="space-y-2"><Label>Device</Label><Select value={meterForm.deviceId ? String(meterForm.deviceId) : ''} onValueChange={(value) => setMeterForm((current) => ({ ...current, deviceId: Number(value) }))}><SelectTrigger><SelectValue placeholder="Select utility meter" /></SelectTrigger><SelectContent>{devices.filter((d: any) => d.category === 'utility_meter').map((device: any) => <SelectItem key={device.id} value={String(device.id)}>{device.name}</SelectItem>)}</SelectContent></Select></div>
+client/src/pages/IoTOperations.tsx:217:                <div className="space-y-2"><Label>Device</Label><Select value={maintenanceForm.deviceId ? String(maintenanceForm.deviceId) : ''} onValueChange={(value) => setMaintenanceForm((current) => ({ ...current, deviceId: Number(value) }))}><SelectTrigger><SelectValue placeholder="Select device" /></SelectTrigger><SelectContent>{devices.map((device: any) => <SelectItem key={device.id} value={String(device.id)}>{device.name}</SelectItem>)}</SelectContent></Select></div>
+client/src/pages/LegalDocumentCenter.tsx:203:                    <SelectTrigger><SelectValue placeholder="Select processed document" /></SelectTrigger>
+client/src/pages/LoanOfficerDashboard.tsx:402:                  placeholder="Provide a detailed reason for rejection..."
+client/src/pages/LoanOfficerDashboard.tsx:414:                placeholder="Add any internal notes about this review..."
+client/src/pages/MarketplaceListing.tsx:87:                placeholder="Min price"
+client/src/pages/MarketplaceListing.tsx:97:                placeholder="Max price"
+client/src/pages/MortgageApplication.tsx:317:                            <SelectTrigger className="mt-2"><SelectValue placeholder="Select processed document" /></SelectTrigger>
+client/src/pages/NotificationPreferences.tsx:341:                placeholder="https://your-server.com/webhook"
+client/src/pages/ParcelDigitalTwin.tsx:72:            <Input value={parcelId} onChange={(e) => setParcelId(e.target.value)} placeholder="e.g. 1" />
+client/src/pages/ParcelSubscriptions.tsx:106:              placeholder="e.g. 1042"
+client/src/pages/PaymentInitiation.tsx:149:                  placeholder="1000.00"
+client/src/pages/PaymentInitiation.tsx:180:                placeholder="+2348012345678"
+client/src/pages/PaymentInitiation.tsx:194:                placeholder="+2348087654321"
+client/src/pages/PaymentInitiation.tsx:204:                placeholder="PROP-001"
+client/src/pages/PaymentInitiation.tsx:214:                placeholder="Property purchase payment"
+client/src/pages/PaymentInitiation.tsx:224:                placeholder="Additional notes about this payment..."
+client/src/pages/PaymentProcessing.tsx:216:                            <SelectValue placeholder="Select payment method" />
+client/src/pages/PaymentProcessing.tsx:234:                          placeholder="Enter amount"
+client/src/pages/PaymentProcessing.tsx:262:                            <Input id="cardNumber" placeholder="1234 5678 9012 3456" />
+client/src/pages/PaymentProcessing.tsx:267:                              <Input id="expiry" placeholder="MM/YY" />
+client/src/pages/PaymentProcessing.tsx:271:                              <Input id="cvv" placeholder="123" type="password" />
+client/src/pages/PoolingSchedulerDashboard.tsx:183:                placeholder="0 0 2 * * *"
+client/src/pages/PropertyDetails.tsx:299:                      placeholder={`Min: ${Math.max(currentBid, minimumBid) + 1}`}
+client/src/pages/PropertyDetails.tsx:308:                      placeholder="Add a message with your bid..."
+client/src/pages/PropertyDetails.tsx:349:                            placeholder="Enter escrow terms..."
+client/src/pages/PropertyTransactionWorkflow.tsx:176:                  placeholder="1000000"
+client/src/pages/PropertyTransactionWorkflow.tsx:304:                          placeholder="Enter approval code"
+client/src/pages/PropertyValuation.tsx:161:                      placeholder="Enter parcel number (e.g., LG-VI-2024-001)"
+client/src/pages/PropertyValuation.tsx:186:                        <SelectValue placeholder="Select purpose" />
+client/src/pages/PropertyValuation.tsx:202:                      placeholder="Any additional information about the property..."
+client/src/pages/ReportHistoryDashboard.tsx:217:              placeholder="Search reports..."
+client/src/pages/ReportSchedulerDashboard.tsx:349:                  placeholder="Monthly Analytics Report"
+client/src/pages/ReportSchedulerDashboard.tsx:359:                  placeholder="Describe the purpose of this report"
+client/src/pages/ReportSchedulerDashboard.tsx:427:                  placeholder="user@example.com, admin@example.com"
+client/src/pages/ReportSchedulerDashboard.tsx:437:                  placeholder='{"startDate": "2026-01-01", "endDate": "2026-01-31"}'
+client/src/pages/ReportSchedulerDashboard.tsx:705:                        placeholder="Monthly Report Email"
+client/src/pages/ReportSchedulerDashboard.tsx:715:                        placeholder="Describe the purpose of this template"
+client/src/pages/ReportSchedulerDashboard.tsx:745:                        placeholder="Your {{reportType}} Report is Ready"
+client/src/pages/ReportSchedulerDashboard.tsx:758:                        placeholder="Hello {{recipientName}},\n\nYour {{reportType}} report for {{date}} is ready.\n\nDownload: {{downloadUrl}}"
+client/src/pages/ReportSchedulerDashboard.tsx:945:              Preview with sample data. Actual emails will use real report data.
+client/src/pages/ReportSchedulerDashboard.tsx:988:                  placeholder="admin@example.com, manager@example.com"
+client/src/pages/ReportingDashboard.tsx:235:                    placeholder="e.g., Monthly Parcel Registry"
+client/src/pages/ReportingDashboard.tsx:244:                    placeholder="Optional description"
+client/src/pages/SearchParcels.tsx:162:                        placeholder={t('searchParcels.basicSearch.parcelNumberPlaceholder')}
+client/src/pages/SearchParcels.tsx:172:                          <SelectValue placeholder={t('searchParcels.basicSearch.statePlaceholder')} />
+client/src/pages/SearchParcels.tsx:189:                        placeholder={t('searchParcels.basicSearch.lgaPlaceholder')}
+client/src/pages/SearchParcels.tsx:199:                          <SelectValue placeholder={t('searchParcels.basicSearch.statusPlaceholder')} />
+client/src/pages/SearchParcels.tsx:218:                        <Input type="number" placeholder={t('searchParcels.advancedFilters.minPrice')} value={priceMin} onChange={(e) => setPriceMin(e.target.value)} />
+client/src/pages/SearchParcels.tsx:219:                        <Input type="number" placeholder={t('searchParcels.advancedFilters.maxPrice')} value={priceMax} onChange={(e) => setPriceMax(e.target.value)} />
+client/src/pages/SearchParcels.tsx:226:                        <Input type="number" placeholder={t('searchParcels.advancedFilters.minArea')} value={areaMin} onChange={(e) => setAreaMin(e.target.value)} />
+client/src/pages/SearchParcels.tsx:227:                        <Input type="number" placeholder={t('searchParcels.advancedFilters.maxArea')} value={areaMax} onChange={(e) => setAreaMax(e.target.value)} />
+client/src/pages/SearchParcels.tsx:235:                          <SelectValue placeholder={t('searchParcels.advancedFilters.landUsePlaceholder')} />
+client/src/pages/SearchParcels.tsx:279:                    placeholder={challengeConfig.siteKeyConfigured ? `Enter ${challengeConfig.provider} token` : 'Challenge provider is not fully configured in this environment'}
+client/src/pages/SecurityMonitoring.tsx:176:              <SelectValue placeholder="Select time range" />
+client/src/pages/SecurityMonitoring.tsx:221:                    <SelectTrigger className="w-[180px]"><SelectValue placeholder="Event type" /></SelectTrigger>
+client/src/pages/SecurityMonitoring.tsx:231:                    <SelectTrigger className="w-[140px]"><SelectValue placeholder="Severity" /></SelectTrigger>
+client/src/pages/SecurityMonitoring.tsx:450:            <div><Label htmlFor="ip">IP Address</Label><Input id="ip" placeholder="192.168.1.1" value={selectedIP} onChange={(e) => setSelectedIP(e.target.value)} /></div>
+client/src/pages/SecurityMonitoring.tsx:451:            <div><Label htmlFor="reason">Reason</Label><Input id="reason" placeholder="Suspicious activity detected" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} /></div>
+client/src/pages/SecurityMonitoring.tsx:452:            <div><Label htmlFor="duration">Duration (minutes)</Label><Input id="duration" type="number" placeholder="60" value={blockDuration} onChange={(e) => setBlockDuration(e.target.value)} disabled={isPermanent} /></div>
+client/src/pages/Settings.tsx:312:                  placeholder="John Doe"
+client/src/pages/Settings.tsx:323:                  placeholder="john@example.com"
+client/src/pages/Settings.tsx:334:                  placeholder="+234 XXX XXX XXXX"
+client/src/pages/TaxAssessment.tsx:173:                    placeholder="e.g., FCT-ABJ-001234"
+client/src/pages/TaxAssessment.tsx:183:                    placeholder="e.g., 50000000"
+client/src/pages/TaxAssessment.tsx:196:                    placeholder="e.g., 500"
+client/src/pages/TaxAssessment.tsx:223:                    placeholder="e.g., FCT"
+client/src/pages/TaxAssessment.tsx:232:                    placeholder="e.g., Abuja Municipal"
+client/src/pages/TaxAssessment.tsx:316:                  placeholder="Enter Parcel ID"
+client/src/pages/TaxAssessment.tsx:405:                    placeholder="e.g., FCT-ABJ-001234"
+client/src/pages/TaxAssessment.tsx:414:                    placeholder="e.g., 12345678-0001"
+client/src/pages/TaxAssessment.tsx:464:                    placeholder="Enter Certificate ID"
+client/src/pages/TaxAssessment.tsx:516:                  placeholder="e.g., 12345678-0001"
+client/src/pages/TitleRiskCopilot.tsx:93:              placeholder="e.g. 1"
+client/src/pages/UserProfile.tsx:186:                        <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+234 XXX XXX XXXX" className="pl-10" />
+client/src/pages/UserProfile.tsx:194:                        <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Enter your address" className="pl-10" />
+client/src/pages/UtilityConnectionCenter.tsx:158:                <div className="space-y-2"><Label>Connection</Label><Select value={paymentForm.connectionId ? String(paymentForm.connectionId) : ''} onValueChange={(value) => setPaymentForm((c) => ({ ...c, connectionId: Number(value) }))}><SelectTrigger><SelectValue placeholder="Select connection" /></SelectTrigger><SelectContent>{connections.map((connection: any) => <SelectItem key={connection.id} value={String(connection.id)}>{connection.providerName} • {connection.utilityType}</SelectItem>)}</SelectContent></Select></div>
+client/src/pages/VerificationAnalytics.tsx:55:            <SelectValue placeholder="Select time range" />
+client/src/pages/VerificationWorkflow.tsx:212:                  placeholder="e.g., LG-VI-2024-001"
+client/src/pages/VerificationWorkflow.tsx:221:                  placeholder="Additional information about this verification request"
+client/src/pages/VerificationWorkflow.tsx:479:              placeholder="Enter user ID"
+client/src/pages/VerificationWorkflow.tsx:519:              placeholder="Explain why this request is being rejected"
+client/src/pages/VerificationWorkflow.tsx:557:                  <SelectValue placeholder="Select document type" />
+client/src/pages/WebhookManagementDashboard.tsx:215:                  placeholder="https://api.example.com/webhooks"
+client/src/pages/WebhookManagementDashboard.tsx:225:                  placeholder="Enter a secret key for signature verification"
+client/src/pages/WebhookManagementDashboard.tsx:265:                  placeholder="Optional description"
+client/src/pages/WebhookTestingDashboard.tsx:250:                placeholder="https://example.com/webhook"
+client/src/pages/WebhookTestingDashboard.tsx:278:                placeholder="Optional description"
+client/src/pages/WorkflowDesigner.tsx:112:                      placeholder="e.g., Land Registration - Lagos Zone A"
+temporal/worker.ts:15:    address: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
+temporal/worker.ts:39:  console.log(`   Address: ${process.env.TEMPORAL_ADDRESS || 'localhost:7233'}`);
+lakehouse/api/main.py:7:of degrading to static mock payloads.
+lakehouse/catalog/iceberg_catalog.py:33:                "postgresql://temporal:temporal@localhost:5432/iceberg_catalog"
+lakehouse/catalog/iceberg_catalog.py:40:            "s3.endpoint": os.getenv("S3_ENDPOINT", "http://localhost:9000"),
+lakehouse/ml/training/ray_trainer.py:185:        lakehouse_url: str = "http://localhost:8888",
+rust-services/middleware-control-plane/src/main.rs:226:        &host_port.parse().unwrap_or_else(|_| "127.0.0.1:9".parse().unwrap()),
+rust-services/production-meter/src/main.rs:10:    // For now, this is a placeholder to demonstrate the architecture.
+rust-services/royalty-ledger/src/main.rs:10:    // For now, this is a placeholder to demonstrate the architecture.
+rust-services/tigerbeetle-bridge/src/main.rs:47:                transfer_id: "mock-tb-transfer-123".to_string(),

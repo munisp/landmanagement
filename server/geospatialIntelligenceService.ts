@@ -22,10 +22,10 @@ function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(value)));
 }
 
-function nearestNeighborRoute(parcels: ParcelRecord[]) {
+function nearestNeighborRoute(parcels: Array<ParcelRecord & { coordinates: { lat: number; lng: number } }>) {
   if (parcels.length === 0) return [] as Array<{ id: number; parcelNumber: string; stopOrder: number }>;
   const remaining = [...parcels];
-  const ordered: ParcelRecord[] = [remaining.shift()!];
+  const ordered: Array<ParcelRecord & { coordinates: { lat: number; lng: number } }> = [remaining.shift()!];
   while (remaining.length > 0) {
     const current = ordered[ordered.length - 1];
     let bestIndex = 0;
@@ -49,19 +49,22 @@ function nearestNeighborRoute(parcels: ParcelRecord[]) {
 export async function getParcelGeospatialWorkbench(parcelId: number) {
   const parcel = await getParcelById(parcelId);
   if (!parcel) throw new Error(`Parcel ${parcelId} not found`);
+  const anchorCoordinates = parcel.coordinates;
+  if (!anchorCoordinates) throw new Error(`Parcel ${parcelId} lacks persisted coordinates required for geospatial analysis`);
+  const anchoredParcel: ParcelRecord & { coordinates: { lat: number; lng: number } } = { ...parcel, coordinates: anchorCoordinates };
 
   const [digitalTwin, allParcelsResult, disputesResult, transactionsResult] = await Promise.all([
     buildDigitalTwin(parcelId),
-    Promise.resolve(searchParcels({ page: 1, limit: 1000 })),
+    searchParcels({ page: 1, limit: 1000 }),
     listDisputes({ limit: 1000 }),
     listTransactions({ page: 1, limit: 1000 }),
   ]);
 
-  const allParcels = allParcelsResult.parcels.filter((candidate) => candidate.id !== parcelId);
+  const allParcels = allParcelsResult.parcels.filter((candidate): candidate is ParcelRecord & { coordinates: { lat: number; lng: number } } => candidate.id !== parcelId && candidate.coordinates !== null);
   const nearbyParcels = allParcels
     .map((candidate) => ({
       ...candidate,
-      distanceKm: Number(distanceKm(parcel.coordinates, candidate.coordinates).toFixed(2)),
+      distanceKm: Number(distanceKm(anchorCoordinates, candidate.coordinates).toFixed(2)),
     }))
     .filter((candidate) => candidate.distanceKm <= 25)
     .sort((a, b) => a.distanceKm - b.distanceKm)
@@ -70,8 +73,8 @@ export async function getParcelGeospatialWorkbench(parcelId: number) {
   const localDisputes = disputesResult.disputes.filter((dispute) => dispute.parcelId === parcelId);
   const nearbyDisputes = disputesResult.disputes.filter((dispute) => {
     if (!dispute.parcelId || dispute.parcelId === parcelId) return false;
-    const matchedParcel = allParcelsResult.parcels.find((candidate) => candidate.id === dispute.parcelId);
-    return matchedParcel ? distanceKm(parcel.coordinates, matchedParcel.coordinates) <= 15 : false;
+    const matchedParcel = allParcels.find((candidate) => candidate.id === dispute.parcelId);
+    return matchedParcel ? distanceKm(anchorCoordinates, matchedParcel.coordinates) <= 15 : false;
   });
   const openLocalDisputes = localDisputes.filter((dispute) => OPEN_DISPUTE_STATUSES.has(String(dispute.status)));
   const openNearbyDisputes = nearbyDisputes.filter((dispute) => OPEN_DISPUTE_STATUSES.has(String(dispute.status)));
@@ -79,13 +82,13 @@ export async function getParcelGeospatialWorkbench(parcelId: number) {
   const parcelTransactions = transactionsResult.transactions.filter((transaction) => transaction.parcelId === parcelId);
   const activeTransactions = parcelTransactions.filter((transaction) => ACTIVE_TRANSACTION_STATUSES.has(String(transaction.status)));
 
-  const sameUseNearby = nearbyParcels.filter((candidate) => candidate.landUseType === parcel.landUseType);
+  const sameUseNearby = nearbyParcels.filter((candidate) => candidate.landUseType === parcel.landUseType && candidate.estimatedValue !== null);
   const comparableAverageValue = sameUseNearby.length > 0
-    ? Math.round(sameUseNearby.reduce((sum, candidate) => sum + candidate.estimatedValue, 0) / sameUseNearby.length)
-    : parcel.estimatedValue;
-  const relativeValuePct = comparableAverageValue > 0
+    ? Math.round(sameUseNearby.reduce((sum, candidate) => sum + (candidate.estimatedValue ?? 0), 0) / sameUseNearby.length)
+    : null;
+  const relativeValuePct = parcel.estimatedValue !== null && comparableAverageValue !== null && comparableAverageValue > 0
     ? Number((((parcel.estimatedValue - comparableAverageValue) / comparableAverageValue) * 100).toFixed(1))
-    : 0;
+    : null;
 
   const developmentScenarios = await compareScenarios(parcelId, [
     { name: 'Residential optimization', zoningTarget: 'residential', solarIrradianceKwhM2Day: 5.1, floodRiskLevel: 'low', infrastructureInvestmentPct: 10, interestRatePct: 14 },
@@ -215,7 +218,7 @@ export async function getParcelGeospatialWorkbench(parcelId: number) {
       fieldMissionPack: {
         title: 'Field mission pack and route plan',
         complexityScore: fieldMissionComplexity,
-        recommendedStops: nearestNeighborRoute([parcel, ...nearbyParcels.slice(0, 4)]),
+        recommendedStops: nearestNeighborRoute([anchoredParcel, ...nearbyParcels.slice(0, 4)]),
         checklist: [
           'Confirm boundary markers and visible access conditions',
           'Capture updated frontage and right-of-way photos',
@@ -249,7 +252,7 @@ export async function getParcelGeospatialWorkbench(parcelId: number) {
 }
 
 export async function getGeospatialPortfolioHotspots() {
-  const parcels = searchParcels({ page: 1, limit: 1000 }).parcels;
+  const parcels = (await searchParcels({ page: 1, limit: 1000 })).parcels;
   const disputes = (await listDisputes({ limit: 1000 })).disputes;
   const transactions = (await listTransactions({ page: 1, limit: 1000 })).transactions;
 
@@ -259,7 +262,7 @@ export async function getGeospatialPortfolioHotspots() {
     const activeTransactions = parcelTransactions.filter((transaction) => ACTIVE_TRANSACTION_STATUSES.has(String(transaction.status)));
     const opportunityScore = clamp(
       (parcel.status === 'verified' || parcel.status === 'registered' ? 30 : 15) +
-      Math.round((parcel.estimatedValue / Math.max(1, 300000000)) * 25) +
+      (parcel.estimatedValue === null ? 0 : Math.round((parcel.estimatedValue / Math.max(1, 300000000)) * 25)) +
       Math.round((parcel.areaSquareMeters / Math.max(1, 3000)) * 20) -
       parcelDisputes.length * 15
     );

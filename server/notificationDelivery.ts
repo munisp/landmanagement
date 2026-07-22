@@ -23,6 +23,17 @@ interface NotificationDeliveryResult {
   error?: string;
 }
 
+function configured(name: string): string | null {
+  const value = process.env[name]?.trim();
+  return value || null;
+}
+
+function platformUrl(path: string): string {
+  const base = configured('FRONTEND_URL');
+  if (!base) throw new Error('FRONTEND_URL must be configured before rendering notification links');
+  return new URL(path, base).toString();
+}
+
 // Email Templates
 export const emailTemplates = {
   transactionApproved: (data: { parcelNumber: string; transactionType: string; userName: string }) => ({
@@ -49,7 +60,7 @@ export const emailTemplates = {
             <p>Dear ${data.userName},</p>
             <p>Your ${data.transactionType} transaction for parcel <strong>${data.parcelNumber}</strong> has been approved.</p>
             <p>You can now proceed with the next steps in the process.</p>
-            <a href="${process.env.FRONTEND_URL || 'https://idlr-pts.manus.space'}/transactions" class="button">View Transaction</a>
+            <a href="${platformUrl('/transactions')}" class="button">View Transaction</a>
           </div>
           <div class="footer">
             <p>IDLR-PTS - Integrated Digital Land Registry & Property Title System</p>
@@ -59,7 +70,7 @@ export const emailTemplates = {
       </body>
       </html>
     `,
-    text: `Dear ${data.userName},\n\nYour ${data.transactionType} transaction for parcel ${data.parcelNumber} has been approved.\n\nYou can view your transaction at: ${process.env.FRONTEND_URL || 'https://idlr-pts.manus.space'}/transactions\n\nIDLR-PTS Team`,
+    text: `Dear ${data.userName},\n\nYour ${data.transactionType} transaction for parcel ${data.parcelNumber} has been approved.\n\nYou can view your transaction at: ${platformUrl('/transactions')}\n\nIDLR-PTS Team`,
   }),
 
   transactionRejected: (data: { parcelNumber: string; transactionType: string; userName: string; reason: string }) => ({
@@ -90,7 +101,7 @@ export const emailTemplates = {
               <strong>Reason:</strong> ${data.reason}
             </div>
             <p>Please review the rejection reason and contact support if you need assistance.</p>
-            <a href="${process.env.FRONTEND_URL || 'https://idlr-pts.manus.space'}/transactions" class="button">View Transaction</a>
+            <a href="${platformUrl('/transactions')}" class="button">View Transaction</a>
           </div>
           <div class="footer">
             <p>IDLR-PTS - Integrated Digital Land Registry & Property Title System</p>
@@ -144,7 +155,7 @@ export const emailTemplates = {
               </div>
             </div>
             <p>A receipt has been sent to your email. Please keep this for your records.</p>
-            <a href="${process.env.FRONTEND_URL || 'https://idlr-pts.manus.space'}/transactions" class="button">View Transaction</a>
+            <a href="${platformUrl('/transactions')}" class="button">View Transaction</a>
           </div>
           <div class="footer">
             <p>IDLR-PTS - Integrated Digital Land Registry & Property Title System</p>
@@ -179,15 +190,15 @@ export const smsTemplates = {
 export async function sendEmail(notification: EmailNotification): Promise<NotificationDeliveryResult> {
   try {
     // In production, use actual SendGrid API
-    const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-    
-    if (!SENDGRID_API_KEY) {
-      console.warn('[Email] SendGrid API key not configured, skipping email send');
-      return { success: false, error: 'Email service not configured' };
+    const SENDGRID_API_KEY = configured('SENDGRID_API_KEY');
+    const SENDGRID_FROM_EMAIL = configured('FROM_EMAIL');
+    const SENDGRID_API_BASE_URL = configured('SENDGRID_API_BASE_URL');
+    if (!SENDGRID_API_KEY || !SENDGRID_FROM_EMAIL || !SENDGRID_API_BASE_URL) {
+      return { success: false, error: 'SendGrid requires SENDGRID_API_KEY, FROM_EMAIL, and SENDGRID_API_BASE_URL' };
     }
 
     const response = await axios.post(
-      'https://api.sendgrid.com/v3/mail/send',
+      `${SENDGRID_API_BASE_URL.replace(/\/$/, '')}/v3/mail/send`,
       {
         personalizations: [
           {
@@ -196,7 +207,7 @@ export async function sendEmail(notification: EmailNotification): Promise<Notifi
           },
         ],
         from: {
-          email: process.env.FROM_EMAIL || 'noreply@idlr-pts.gov.ng',
+          email: SENDGRID_FROM_EMAIL,
           name: 'IDLR-PTS System',
         },
         content: [
@@ -232,17 +243,15 @@ export async function sendEmail(notification: EmailNotification): Promise<Notifi
  */
 export async function sendSMS(notification: SMSNotification): Promise<NotificationDeliveryResult> {
   try {
-    // In production, use actual Africa's Talking API
-    const AT_API_KEY = process.env.AFRICAS_TALKING_API_KEY;
-    const AT_USERNAME = process.env.AFRICAS_TALKING_USERNAME || 'sandbox';
-    
-    if (!AT_API_KEY) {
-      console.warn('[SMS] Africa\'s Talking API key not configured, skipping SMS send');
-      return { success: false, error: 'SMS service not configured' };
+const AT_API_KEY = configured('AFRICAS_TALKING_API_KEY');
+    const AT_USERNAME = configured('AFRICAS_TALKING_USERNAME');
+    const AT_API_BASE_URL = configured('AFRICAS_TALKING_API_BASE_URL');
+    if (!AT_API_KEY || !AT_USERNAME || !AT_API_BASE_URL) {
+      return { success: false, error: 'Africa\'s Talking requires AFRICAS_TALKING_API_KEY, AFRICAS_TALKING_USERNAME, and AFRICAS_TALKING_API_BASE_URL' };
     }
 
     const response = await axios.post(
-      'https://api.africastalking.com/version1/messaging',
+      `${AT_API_BASE_URL.replace(/\/$/, '')}/version1/messaging`,
       new URLSearchParams({
         username: AT_USERNAME,
         to: notification.to,

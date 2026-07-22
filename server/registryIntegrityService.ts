@@ -6,7 +6,8 @@
  * jumps, repeated document fingerprints, and abnormal transaction timing.
  * Findings land in an operator review queue (open → acknowledged → resolved).
  *
- * Offline-capable: uses in-memory repositories when PostgreSQL is unavailable.
+ * Findings and source records are read and persisted through PostgreSQL; data
+ * outages are surfaced rather than substituted with process-local state.
  */
 
 import { createHash } from 'crypto';
@@ -51,6 +52,7 @@ export interface ScanSummary {
   documentsScanned: number;
   newFindings: number;
   deduplicated: number;
+  staleSkipped: number;
   byCheckType: Record<string, number>;
   startedAt: string;
   finishedAt: string;
@@ -87,9 +89,17 @@ function median(values: number[]): number {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-async function persistFindings(findings: IntegrityFinding[]): Promise<{ inserted: number; deduplicated: number }> {
+function isStaleParcelForeignKey(error: unknown): boolean {
+  const candidate = error as { code?: string; constraint_name?: string; cause?: { code?: string; constraint_name?: string } };
+  const databaseError = candidate.cause ?? candidate;
+  return databaseError.code === '23503'
+    && databaseError.constraint_name === 'registry_integrity_findings_parcel_id_parcels_id_fk';
+}
+
+async function persistFindings(findings: IntegrityFinding[]): Promise<{ inserted: number; deduplicated: number; staleSkipped: number }> {
   let inserted = 0;
   let deduplicated = 0;
+  let staleSkipped = 0;
   const db = await requireDb();
 
   for (const finding of findings) {
@@ -115,34 +125,18 @@ async function persistFindings(findings: IntegrityFinding[]): Promise<{ inserted
         scanRunId: finding.scanRunId ?? null,
       });
       inserted += 1;
-    } catch (err: any) {
-      // FK violation: parcel_id from in-memory store not yet persisted to DB.
-      // Retry without the FK-constrained parcel_id, storing it in relatedEntityId instead.
-      // Drizzle wraps the PG error; check both err and err.cause for the FK code.
-      const pgErr = err?.cause ?? err;
-      const isFkViolation = (pgErr?.code === '23503' || err?.code === '23503') &&
-        (String(pgErr?.constraint ?? err?.constraint ?? '').includes('parcel_id') ||
-         String(pgErr?.detail ?? err?.detail ?? '').includes('parcel_id'));
-      if (isFkViolation) {
-        await db.insert(registryIntegrityFindings).values({
-          checkType: finding.checkType,
-          severity: finding.severity,
-          status: 'open',
-          parcelId: null,
-          relatedEntityType: finding.relatedEntityType ?? 'parcel',
-          relatedEntityId: finding.parcelId ?? null,
-          description: finding.description,
-          evidence: finding.evidence ?? null,
-          detectedBy: finding.detectedBy,
-          scanRunId: finding.scanRunId ?? null,
-        });
-        inserted += 1;
-      } else {
-        throw err;
+    } catch (error) {
+      // The scan works on a point-in-time read. A transient test/admin parcel
+      // can be deleted before its finding is inserted; never recreate or
+      // orphan a finding just to satisfy the reference.
+      if (finding.parcelId != null && isStaleParcelForeignKey(error)) {
+        staleSkipped += 1;
+        continue;
       }
+      throw error;
     }
   }
-  return { inserted, deduplicated };
+  return { inserted, deduplicated, staleSkipped };
 }
 
 /** Run a full registry integrity scan; returns a summary and persists findings. */
@@ -228,13 +222,13 @@ export async function runIntegrityScan(opts: { detectedBy?: string } = {}): Prom
   const stateMedians = new Map<string, number>();
   const byState = new Map<string, number[]>();
   for (const p of parcels) {
-    if (!p.estimatedValue) continue;
+    if (p.estimatedValue === null || p.estimatedValue <= 0) continue;
     byState.set(p.state, [...(byState.get(p.state) ?? []), p.estimatedValue]);
   }
   for (const [state, values] of byState) stateMedians.set(state, median(values));
   for (const p of parcels) {
     const stateMedian = stateMedians.get(p.state) ?? 0;
-    if (stateMedian > 0 && p.estimatedValue > stateMedian * VALUATION_JUMP_FACTOR) {
+    if (p.estimatedValue !== null && stateMedian > 0 && p.estimatedValue > stateMedian * VALUATION_JUMP_FACTOR) {
       findings.push({
         ...base,
         checkType: 'valuation_jump',
@@ -292,7 +286,7 @@ export async function runIntegrityScan(opts: { detectedBy?: string } = {}): Prom
     }
   }
 
-  const { inserted, deduplicated } = await persistFindings(findings);
+  const { inserted, deduplicated, staleSkipped } = await persistFindings(findings);
   const byCheckType: Record<string, number> = {};
   for (const f of findings) byCheckType[f.checkType] = (byCheckType[f.checkType] ?? 0) + 1;
 
@@ -303,6 +297,7 @@ export async function runIntegrityScan(opts: { detectedBy?: string } = {}): Prom
     documentsScanned: documents.length,
     newFindings: inserted,
     deduplicated,
+    staleSkipped,
     byCheckType,
     startedAt: startedAt.toISOString(),
     finishedAt: new Date().toISOString(),

@@ -25,6 +25,24 @@ from torch.utils.data import DataLoader, TensorDataset
 
 logger = logging.getLogger(__name__)
 
+
+def required_training_env(name: str) -> str:
+    value = os.getenv(name, "").strip()
+    if not value:
+        raise RuntimeError(f"{name} must be configured for verified continuous training")
+    return value
+
+
+def required_positive_int_env(name: str) -> int:
+    value = required_training_env(name)
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise RuntimeError(f"{name} must be a positive integer") from error
+    if parsed < 1:
+        raise RuntimeError(f"{name} must be a positive integer")
+    return parsed
+
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -175,36 +193,24 @@ def run_hyperparameter_search(n_trials: int = 20) -> Dict:
 
 
 class LakehouseDataPipeline:
-    """
-    Pipeline to pull training data from the Lakehouse (Delta Lake / Iceberg).
-    In production, this connects to the actual Lakehouse API.
-    In development/testing, it generates synthetic data.
-    """
-    def __init__(
-        self,
-        lakehouse_url: str = "http://localhost:8888",
-        use_synthetic: bool = True,
-    ):
-        self.lakehouse_url = lakehouse_url
-        self.use_synthetic = use_synthetic
-        self.cache_dir = Path("/home/ubuntu/landmanagement/lakehouse/ml/data_cache")
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+    """Pull verified labeled training examples from the authenticated Lakehouse API."""
+
+    def __init__(self, lakehouse_url: Optional[str] = None):
+        self.lakehouse_url = (lakehouse_url or os.getenv("LAKEHOUSE_API_URL", "")).strip().rstrip("/")
+        self.api_key = os.getenv("LAKEHOUSE_API_KEY", "").strip()
+        if not self.lakehouse_url or not self.api_key:
+            raise RuntimeError("LAKEHOUSE_API_URL and LAKEHOUSE_API_KEY are required for continuous training")
 
     def fetch_fraud_training_data(
         self,
-        start_date: str = "2023-01-01",
-        end_date: str = "2024-12-31",
-        min_labeled: int = 1000,
+        start_date: str,
+        end_date: str,
+        min_labeled: int,
     ) -> Dict:
-        """
-        Fetch labeled fraud training data from the Lakehouse.
-        Falls back to synthetic data if Lakehouse is unavailable.
-        """
-        if self.use_synthetic:
-            return self._generate_synthetic_data()
+        """Fetch verified labeled fraud examples; never synthesize replacements."""
+        import requests
 
         try:
-            import requests
             response = requests.get(
                 f"{self.lakehouse_url}/api/v1/training-data/fraud",
                 params={
@@ -212,36 +218,22 @@ class LakehouseDataPipeline:
                     "end_date": end_date,
                     "min_labeled": min_labeled,
                 },
+                headers={"X-API-Key": self.api_key},
                 timeout=30,
             )
             response.raise_for_status()
             data = response.json()
-            logger.info(f"Fetched {len(data['transactions'])} transactions from Lakehouse")
-            return data
-        except Exception as e:
-            logger.warning(f"Lakehouse unavailable ({e}), using synthetic data")
-            return self._generate_synthetic_data()
+        except Exception as error:
+            raise RuntimeError(f"Verified Lakehouse fraud-training data is unavailable: {error}") from error
 
-    def _generate_synthetic_data(self) -> Dict:
-        """Generate synthetic training data as fallback."""
-        from models.fraud_model import generate_nigerian_training_data
-        transactions, labels = generate_nigerian_training_data(
-            n_legitimate=8000, n_fraudulent=2000
-        )
-        return {
-            "transactions": transactions,
-            "labels": labels,
-            "source": "synthetic",
-            "generated_at": datetime.utcnow().isoformat(),
-            "n_samples": len(transactions),
-        }
-
-    def save_to_cache(self, data: Dict, name: str):
-        """Cache training data locally."""
-        cache_path = self.cache_dir / f"{name}_{datetime.utcnow().strftime('%Y%m%d')}.json"
-        with open(cache_path, "w") as f:
-            json.dump(data, f)
-        logger.info(f"Cached {len(data.get('transactions', []))} samples to {cache_path}")
+        transactions = data.get("transactions")
+        labels = data.get("labels")
+        if not isinstance(transactions, list) or not isinstance(labels, list) or len(transactions) != len(labels):
+            raise RuntimeError("Lakehouse returned invalid fraud-training examples")
+        if len(transactions) < min_labeled:
+            raise RuntimeError(f"Lakehouse returned {len(transactions)} labeled examples; at least {min_labeled} are required")
+        logger.info(f"Fetched {len(transactions)} verified fraud-training examples from Lakehouse")
+        return data
 
 
 class ContinuousTrainingOrchestrator:
@@ -255,8 +247,11 @@ class ContinuousTrainingOrchestrator:
     6. Promote if better
     """
     def __init__(self):
-        self.pipeline = LakehouseDataPipeline(use_synthetic=True)
-        self.weights_dir = Path("/home/ubuntu/landmanagement/lakehouse/ml/weights")
+        self.pipeline = LakehouseDataPipeline()
+        artifact_dir = os.getenv("MODEL_ARTIFACT_DIR", "").strip()
+        if not artifact_dir:
+            raise RuntimeError("MODEL_ARTIFACT_DIR must be configured for continuous training")
+        self.weights_dir = Path(artifact_dir)
         self.weights_dir.mkdir(parents=True, exist_ok=True)
 
     def run_full_pipeline(self, force_retrain: bool = False) -> Dict:
@@ -267,7 +262,11 @@ class ContinuousTrainingOrchestrator:
 
         # 1. Fetch data
         logger.info("Step 1: Fetching training data from Lakehouse...")
-        data = self.pipeline.fetch_fraud_training_data()
+        data = self.pipeline.fetch_fraud_training_data(
+            start_date=required_training_env("FRAUD_TRAINING_START_DATE"),
+            end_date=required_training_env("FRAUD_TRAINING_END_DATE"),
+            min_labeled=required_positive_int_env("FRAUD_TRAINING_MIN_LABELED"),
+        )
         transactions = data["transactions"]
         labels = data["labels"]
         logger.info(f"  Got {len(transactions)} samples ({sum(labels)} fraud)")
@@ -279,29 +278,12 @@ class ContinuousTrainingOrchestrator:
         fraud_results = trainer.train(transactions, labels)
         logger.info(f"  Fraud model AUC: {fraud_results['test_metrics']['auc']:.4f}")
 
-        # 3. Train credit model
-        logger.info("Step 3: Training credit scoring model...")
-        from models.credit_model import CreditModelTrainer, generate_credit_training_data
-        applicants, scores = generate_credit_training_data(n_samples=5000)
-        credit_trainer = CreditModelTrainer(model_dir=str(self.weights_dir))
-        credit_results = credit_trainer.train(applicants, scores)
-        logger.info(f"  Credit model MAE: {credit_results['test_mae']:.2f}")
-
-        # 4. Train GNN model
-        logger.info("Step 4: Training GNN ownership model...")
-        from models.gnn_model import GNNTrainer, generate_ownership_graph
-        node_features, adj, gnn_labels = generate_ownership_graph(n_users=500)
-        gnn_trainer = GNNTrainer(model_dir=str(self.weights_dir))
-        gnn_results = gnn_trainer.train(node_features, adj, gnn_labels)
-        logger.info(f"  GNN model AUC: {gnn_results['test_auc']:.4f}")
-
-        # 5. Save pipeline state
+        # Persist only the model trained from verified Lakehouse examples.
         pipeline_state = {
             "run_at": datetime.utcnow().isoformat(),
             "n_samples": len(transactions),
+            "training_source": "verified_lakehouse",
             "fraud_model": fraud_results["test_metrics"],
-            "credit_model": credit_results,
-            "gnn_model": {"test_auc": gnn_results["test_auc"]},
         }
         state_path = self.weights_dir / "pipeline_state.json"
         with open(state_path, "w") as f:
@@ -310,8 +292,6 @@ class ContinuousTrainingOrchestrator:
         logger.info("=" * 60)
         logger.info("Pipeline complete!")
         logger.info(f"  Fraud AUC:    {fraud_results['test_metrics']['auc']:.4f}")
-        logger.info(f"  Credit MAE:   {credit_results['test_mae']:.2f}")
-        logger.info(f"  GNN AUC:      {gnn_results['test_auc']:.4f}")
         logger.info("=" * 60)
 
         return pipeline_state

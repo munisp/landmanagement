@@ -346,10 +346,20 @@ export async function refundEscrowOnPaymentFailure(params: {
  * In production, this should be loaded from environment variables or database
  */
 export function getDefaultContractConfig(): SmartContractConfig {
-  return {
-    rpcUrl: process.env.POLYGON_RPC_URL || 'https://rpc-mumbai.maticvigil.com',
-    chainId: 80001, // Mumbai testnet
-    escrowContractAddress: process.env.ESCROW_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000',
-    privateKey: process.env.DEPLOYER_PRIVATE_KEY,
-  };
+  const rpcUrl = process.env.POLYGON_RPC_URL?.trim();
+  const chainId = Number(process.env.POLYGON_CHAIN_ID);
+  const escrowContractAddress = process.env.ESCROW_CONTRACT_ADDRESS?.trim();
+  const privateKey = process.env.DEPLOYER_PRIVATE_KEY?.trim();
+
+  if (!rpcUrl || !Number.isSafeInteger(chainId) || chainId <= 0 || !escrowContractAddress) {
+    throw new Error("POLYGON_RPC_URL, POLYGON_CHAIN_ID, and ESCROW_CONTRACT_ADDRESS must be configured for blockchain escrow operations");
+  }
+  if (!ethers.isAddress(escrowContractAddress) || escrowContractAddress === ethers.ZeroAddress) {
+    throw new Error("ESCROW_CONTRACT_ADDRESS must be a non-zero EVM address");
+  }
+  if (privateKey && !/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
+    throw new Error("DEPLOYER_PRIVATE_KEY must be a 32-byte hexadecimal private key");
+  }
+
+  return { rpcUrl, chainId, escrowContractAddress, privateKey };
 }

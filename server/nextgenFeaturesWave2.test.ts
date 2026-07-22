@@ -48,27 +48,27 @@ describe('Parcel Digital Twin & Scenario Lab', () => {
 });
 
 describe('Citizen Self-Service Case Concierge', () => {
-  it('walks a dispute filing flow end to end with dynamic adaptation', () => {
-    const { session, step } = caseConciergeService.startSession({ userId: 1, caseType: 'dispute_filing' });
+  it('walks a dispute filing flow end to end with dynamic adaptation', async () => {
+    const { session, step } = await caseConciergeService.startSession({ userId: 1, caseType: 'dispute_filing' });
     expect(step.stepId).toBe('parcel_reference');
 
-    let next = caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'parcel_reference', answer: 'LG-VI-2024-001' });
+    let next = await caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'parcel_reference', answer: 'LG-VI-2024-001' });
     expect(next.nextStep?.stepId).toBe('dispute_category');
 
-    next = caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'dispute_category', answer: 'boundary' });
+    next = await caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'dispute_category', answer: 'boundary' });
     expect(next.nextStep?.stepId).toBe('respondent_known');
 
     // Say "no" — the respondent_details step must be skipped dynamically
-    next = caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'respondent_known', answer: 'no' });
+    next = await caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'respondent_known', answer: 'no' });
     expect(next.nextStep?.stepId).toBe('prior_attempts');
 
-    next = caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'prior_attempts', answer: 'community mediation failed' });
+    next = await caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'prior_attempts', answer: 'community mediation failed' });
     expect(next.nextStep?.stepId).toBe('evidence_checklist');
 
-    next = caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'evidence_checklist', answer: ['proof_of_ownership', 'survey_plan'] });
+    next = await caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'evidence_checklist', answer: ['proof_of_ownership', 'survey_plan'] });
     expect(next.nextStep?.stepId).toBe('contact');
 
-    const final = caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'contact', answer: 'citizen@example.ng' });
+    const final = await caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'contact', answer: 'citizen@example.ng' });
     expect(final.result).toBeDefined();
     expect(final.result!.targetWorkflow).toBe('disputes.create');
     expect(final.result!.assembledPayload.parcelReference).toBe('LG-VI-2024-001');
@@ -76,14 +76,14 @@ describe('Citizen Self-Service Case Concierge', () => {
     expect(final.session.status).toBe('completed');
   });
 
-  it('enforces step ordering and required answers', () => {
-    const { session } = caseConciergeService.startSession({ userId: 2, caseType: 'payment_issue' });
-    expect(() =>
+  it('enforces step ordering and required answers', async () => {
+    const { session } = await caseConciergeService.startSession({ userId: 2, caseType: 'payment_issue' });
+    await expect(
       caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'amount', answer: 5000 })
-    ).toThrow();
-    expect(() =>
+    ).rejects.toThrow();
+    await expect(
       caseConciergeService.answerStep({ sessionId: session.sessionId, stepId: 'payment_reference', answer: '' })
-    ).toThrow();
+    ).rejects.toThrow();
   });
 });
 

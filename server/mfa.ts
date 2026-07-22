@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 import { secureNumericCode } from './security/random';
+import { sendSMS } from './notificationDelivery';
 
 export interface MFAConfig {
   userId: number;
@@ -126,21 +127,19 @@ export class MFAService {
     // Generate 6-digit code
     const code = secureNumericCode(6);
 
-    // Store with 5-minute expiration
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+    const delivery = await sendSMS({
+      to: config.phone,
+      message: `Your IDLR verification code is: ${code}. Valid for 5 minutes.`,
+    });
+    if (!delivery.success) {
+      throw new Error(`MFA SMS delivery failed: ${delivery.error ?? 'provider returned no message identifier'}`);
+    }
 
+    // Store the challenge only after the provider accepted delivery; codes are
+    // never written to logs or returned to callers.
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
     this.pendingSMSCodes.set(userId, { code, expiresAt });
-
-    // Send SMS (mock - in production use Twilio)
-    console.log(`[MFA] SMS OTP sent to user ${userId}: ${code}`);
-
-    // In production:
-    // await twilioClient.messages.create({
-    //   to: config.phone,
-    //   from: TWILIO_PHONE_NUMBER,
-    //   body: `Your IDLR verification code is: ${code}. Valid for 5 minutes.`,
-    // });
+    console.info(`[MFA] SMS OTP accepted by provider for user ${userId}`);
   }
 
   /**

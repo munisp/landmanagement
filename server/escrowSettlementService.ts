@@ -6,8 +6,8 @@
  * clearance, mortgage approval, insurance readiness, and document validation
  * checkpoints. Release decisions are deterministic, reviewable, and audited.
  *
- * Offline-capable: falls back to in-memory settlement state when PostgreSQL
- * is unavailable.
+ * Settlement state is persisted exclusively in PostgreSQL. Database outages
+ * are surfaced to callers and never replaced with in-memory state.
  */
 
 import { asc, eq } from 'drizzle-orm';

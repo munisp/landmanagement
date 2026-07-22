@@ -181,13 +181,41 @@ describe('Privacy-Aware Data Exchange Gateway', () => {
 });
 
 
+let clearanceFixtureSequence = 0;
+
 async function createTestRegistryTransaction(): Promise<number> {
-  const { createTransaction } = await import('./transactionRepository');
+  const [{ createTransaction }, { requireDb }, { users, parcels }] = await Promise.all([
+    import('./transactionRepository'),
+    import('./db'),
+    import('../drizzle/schema'),
+  ]);
+  const db = await requireDb();
+  const sequence = ++clearanceFixtureSequence;
+  const [user] = await db.insert(users).values({
+    openId: `clearance-test-user-${sequence}`,
+    name: 'Clearance Test Initiator',
+    email: `clearance-test-${sequence}@example.test`,
+    role: 'registrar',
+  }).returning();
+  const [parcel] = await db.insert(parcels).values({
+    parcelId: `CLR-TEST-${sequence}`,
+    parcelNumber: `CLR-TEST-${sequence}`,
+    surveyPlanNumber: `SP-CLR-${sequence}`,
+    ownerId: user.id,
+    country: 'Nigeria',
+    state: 'Lagos',
+    lga: 'Eti-Osa',
+    area: 1000,
+    landUse: 'residential',
+    latitude: '6.4281',
+    longitude: '3.4219',
+    status: 'draft',
+  }).returning();
   const tx = await createTransaction({
     type: 'transfer',
-    parcelId: 1,
-    initiatorId: 101,
-    initiatorName: 'Clearance Test Initiator',
+    parcelId: parcel.id,
+    initiatorId: user.id,
+    initiatorName: user.name ?? 'Clearance Test Initiator',
     considerationAmount: 1000000,
   });
   return tx.id;

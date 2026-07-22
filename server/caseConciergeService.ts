@@ -3,12 +3,12 @@
  *
  * Guided case intake that dynamically adapts questions based on case type,
  * dispute stage, and missing evidence — reducing front-desk load and improving
- * citizen completion rates. Sessions are deliberately ephemeral UX state
- * (in-memory with TTL); the assembled case payload is the durable output,
- * ready to hand to the disputes / verification / documents workflows.
+ * citizen completion rates. Session state is stored durably in PostgreSQL so
+ * concurrent application replicas and restarts preserve an in-progress case.
  */
 
-import { createHash } from 'crypto';
+import { randomUUID } from 'crypto';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
 export type CaseType = 'dispute_filing' | 'document_submission' | 'verification_request' | 'payment_issue' | 'general_inquiry';
 
@@ -45,8 +45,23 @@ export interface ConciergeResult {
   nextSteps: string[];
 }
 
-const SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
-const sessions = new Map<string, ConciergeSession>();
+const CONCIERGE_COLLECTION = 'case_concierge_sessions';
+
+interface ConciergeStore {
+  sessions: Record<string, ConciergeSession>;
+}
+
+function sessionTtlMs(): number {
+  const seconds = Number(process.env.CASE_CONCIERGE_SESSION_TTL_SECONDS);
+  if (!Number.isInteger(seconds) || seconds < 1) {
+    throw new Error('CASE_CONCIERGE_SESSION_TTL_SECONDS must be configured as a positive integer');
+  }
+  return seconds * 1000;
+}
+
+async function loadStore(): Promise<ConciergeStore> {
+  return readJsonStore<ConciergeStore>(CONCIERGE_COLLECTION, () => ({ sessions: {} }));
+}
 
 const REQUIRED_EVIDENCE: Record<CaseType, string[]> = {
   dispute_filing: ['proof_of_ownership', 'supporting_documents', 'respondent_details'],
@@ -205,13 +220,17 @@ function buildSteps(caseType: CaseType): ConciergeStep[] {
   }
 }
 
-function pruneExpiredSessions() {
+async function pruneExpiredSessions(store: ConciergeStore): Promise<void> {
   const now = Date.now();
-  for (const [id, session] of sessions) {
-    if (session.status === 'in_progress' && now - new Date(session.updatedAt).getTime() > SESSION_TTL_MS) {
+  let changed = false;
+  for (const session of Object.values(store.sessions)) {
+    if (session.status === 'in_progress' && now - new Date(session.updatedAt).getTime() > sessionTtlMs()) {
       session.status = 'abandoned';
+      session.updatedAt = new Date(now).toISOString();
+      changed = true;
     }
   }
+  if (changed) await writeJsonStore(CONCIERGE_COLLECTION, store);
 }
 
 function stepsFor(session: ConciergeSession): ConciergeStep[] {
@@ -225,16 +244,13 @@ function stepsFor(session: ConciergeSession): ConciergeStep[] {
   });
 }
 
-/** Start a new concierge session; returns the first step. */
-export function startSession(params: { userId?: number; caseType: CaseType }): { session: ConciergeSession; step: ConciergeStep } {
-  pruneExpiredSessions();
-  const sessionId = createHash('sha256')
-    .update(`${params.userId ?? 'anon'}|${params.caseType}|${Date.now()}|${Math.random()}`)
-    .digest('hex')
-    .slice(0, 20);
+/** Start a durable concierge session; returns the first applicable step. */
+export async function startSession(params: { userId?: number; caseType: CaseType }): Promise<{ session: ConciergeSession; step: ConciergeStep }> {
+  const store = await loadStore();
+  await pruneExpiredSessions(store);
   const now = new Date().toISOString();
   const session: ConciergeSession = {
-    sessionId,
+    sessionId: randomUUID(),
     userId: params.userId,
     caseType: params.caseType,
     status: 'in_progress',
@@ -244,24 +260,28 @@ export function startSession(params: { userId?: number; caseType: CaseType }): {
     startedAt: now,
     updatedAt: now,
   };
-  sessions.set(sessionId, session);
   const first = stepsFor(session)[0];
+  if (!first) throw new Error(`No concierge steps are configured for ${params.caseType}`);
   session.currentStepId = first.stepId;
+  store.sessions[session.sessionId] = session;
+  await writeJsonStore(CONCIERGE_COLLECTION, store);
   return { session, step: first };
 }
 
 /** Submit an answer; returns the next step or the completed result. */
-export function answerStep(params: {
+export async function answerStep(params: {
   sessionId: string;
   stepId: string;
   answer: any;
-}): { session: ConciergeSession; nextStep?: ConciergeStep; result?: ConciergeResult } {
-  const session = sessions.get(params.sessionId);
+}): Promise<{ session: ConciergeSession; nextStep?: ConciergeStep; result?: ConciergeResult }> {
+  const store = await loadStore();
+  await pruneExpiredSessions(store);
+  const session = store.sessions[params.sessionId];
   if (!session) throw new Error('Session not found or expired');
   if (session.status !== 'in_progress') throw new Error(`Session is ${session.status}`);
 
   const steps = stepsFor(session);
-  const step = steps.find((s) => s.stepId === params.stepId);
+  const step = steps.find((candidate) => candidate.stepId === params.stepId);
   if (!step) throw new Error(`Step "${params.stepId}" is not applicable in the current flow`);
   if (step.stepId !== session.currentStepId) throw new Error(`Expected answer for step "${session.currentStepId}"`);
   if (step.required && (params.answer == null || params.answer === '' || (Array.isArray(params.answer) && params.answer.length === 0))) {
@@ -271,22 +291,21 @@ export function answerStep(params: {
   session.answers[step.stepId] = params.answer;
   session.answeredSteps.push(step.stepId);
   session.updatedAt = new Date().toISOString();
-
-  // Re-evaluate flow (answering may unlock/skip conditional steps)
   const flow = stepsFor(session);
-  const currentIndex = flow.findIndex((s) => s.stepId === step.stepId);
+  const currentIndex = flow.findIndex((candidate) => candidate.stepId === step.stepId);
   const next = flow[currentIndex + 1];
 
   if (next) {
     session.currentStepId = next.stepId;
+    await writeJsonStore(CONCIERGE_COLLECTION, store);
     return { session, nextStep: next };
   }
 
-  // Flow complete — assemble the case result
   const result = assembleResult(session);
   session.status = 'completed';
   session.completedAt = new Date().toISOString();
   session.result = result;
+  await writeJsonStore(CONCIERGE_COLLECTION, store);
   return { session, result };
 }
 
@@ -373,17 +392,20 @@ function assembleResult(session: ConciergeSession): ConciergeResult {
   }
 }
 
-/** Fetch a session by id. */
-export function getSession(sessionId: string): ConciergeSession | null {
-  pruneExpiredSessions();
-  return sessions.get(sessionId) ?? null;
+/** Fetch a durable session by id. */
+export async function getSession(sessionId: string): Promise<ConciergeSession | null> {
+  const store = await loadStore();
+  await pruneExpiredSessions(store);
+  return store.sessions[sessionId] ?? null;
 }
 
-/** List sessions (optionally for one user). */
-export function listSessions(filter: { userId?: number; status?: string; limit?: number } = {}) {
-  pruneExpiredSessions();
-  return Array.from(sessions.values())
-    .filter((s) => (filter.userId == null || s.userId === filter.userId) && (!filter.status || s.status === filter.status))
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, filter.limit ?? 50);
+/** List durable sessions (optionally for one user). */
+export async function listSessions(filter: { userId?: number; status?: string; limit?: number } = {}): Promise<ConciergeSession[]> {
+  const store = await loadStore();
+  await pruneExpiredSessions(store);
+  const limit = Math.min(100, Math.max(1, filter.limit ?? 50));
+  return Object.values(store.sessions)
+    .filter((session) => (filter.userId == null || session.userId === filter.userId) && (!filter.status || session.status === filter.status))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    .slice(0, limit);
 }

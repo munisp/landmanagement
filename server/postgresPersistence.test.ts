@@ -54,7 +54,7 @@ describe('parcel repository (PostgreSQL)', () => {
 
     expect(created.id).toBeGreaterThan(0);
     expect(created.status).toBe('pending_verification');
-    expect(created.parcelNumber).toMatch(/^LA-ET-\d{4}-\d{3}$/);
+    expect(created.parcelNumber).toMatch(/^LAGOS-ETIOSA-\d{4}-[A-F0-9]{8}$/);
 
     const byId = await getParcelById(created.id);
     expect(byId?.parcelNumber).toBe(created.parcelNumber);
@@ -86,10 +86,8 @@ describe('parcel repository (PostgreSQL)', () => {
   });
 
   it('rejects updates to registered parcels (amendment workflow rule)', async () => {
-    // Parcel 2 is seeded as 'registered' in the file-based JSON store.
-    // The parcelRepository uses a file-backed store, so parcel 2 should always be present.
-    // We verify the amendment workflow rule is enforced.
-    expect(() => updateParcel(2, { notes: 'illegal edit' })).toThrow(/amendment/i);
+    // Parcel 2 is seeded as registered by the production migration chain.
+    await expect(updateParcel(2, { notes: 'illegal edit' })).rejects.toThrow(/amendment/i);
   });
     
   it('searches with filters and pagination', async () => {
@@ -98,7 +96,7 @@ describe('parcel repository (PostgreSQL)', () => {
     expect(lagos.parcels.every((p) => p.state === 'Lagos')).toBe(true);
 
     const expensive = await searchParcels({ priceMin: 200000000, limit: 50 });
-    expect(expensive.parcels.every((p) => p.estimatedValue >= 200000000)).toBe(true);
+    expect(expensive.parcels.every((p) => p.estimatedValue !== null && p.estimatedValue >= 200000000)).toBe(true);
 
     const paged = await searchParcels({ page: 2, limit: 2 });
     expect(paged.parcels.length).toBeLessThanOrEqual(2);
@@ -119,7 +117,7 @@ describe('transaction repository (PostgreSQL)', () => {
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: 1,
-      initiatorId: 101,
+      initiatorId: 1,
       initiatorName: 'Amina Bello',
       counterpartyName: 'Test Buyer',
       considerationAmount: 50000000,
@@ -160,14 +158,14 @@ describe('payment repository (PostgreSQL)', () => {
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: 1,
-      initiatorId: 101,
+      initiatorId: 1,
       initiatorName: 'Amina Bello',
       considerationAmount: 10000000,
     });
 
     const payment = await processPaymentRecord({
       transactionId: tx.id,
-      payerId: 101,
+      payerId: 1,
       amount: 10000000,
       method: 'card',
     });
@@ -183,14 +181,14 @@ describe('payment repository (PostgreSQL)', () => {
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: 1,
-      initiatorId: 101,
+      initiatorId: 1,
       initiatorName: 'Amina Bello',
       considerationAmount: 8000000,
     });
 
     const payment = await processPaymentRecord({
       transactionId: tx.id,
-      payerId: 101,
+      payerId: 1,
       amount: 8000000,
       method: 'bank_transfer',
     });
@@ -214,14 +212,14 @@ describe('payment repository (PostgreSQL)', () => {
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: 1,
-      initiatorId: 101,
+      initiatorId: 1,
       initiatorName: 'Amina Bello',
       considerationAmount: 6000000,
     });
 
-    const first = await processPaymentRecord({ transactionId: tx.id, payerId: 101, amount: 6000000, method: 'card' });
+    const first = await processPaymentRecord({ transactionId: tx.id, payerId: 1, amount: 6000000, method: 'card' });
     await confirmPaymentRecord(first.id);
-    const second = await processPaymentRecord({ transactionId: tx.id, payerId: 101, amount: 6000000, method: 'card' });
+    const second = await processPaymentRecord({ transactionId: tx.id, payerId: 1, amount: 6000000, method: 'card' });
     expect(second.id).toBe(first.id);
   });
 
@@ -229,11 +227,11 @@ describe('payment repository (PostgreSQL)', () => {
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: 1,
-      initiatorId: 101,
+      initiatorId: 1,
       initiatorName: 'Amina Bello',
       considerationAmount: 4000000,
     });
-    const payment = await processPaymentRecord({ transactionId: tx.id, payerId: 101, amount: 4000000, method: 'mojaloop' });
+    const payment = await processPaymentRecord({ transactionId: tx.id, payerId: 1, amount: 4000000, method: 'mojaloop' });
     expect(payment.channelReference).toMatch(/^txn_\d+_[0-9a-f]{16}$/);
     expect(payment.status).toBe('pending');
   });
@@ -242,11 +240,11 @@ describe('payment repository (PostgreSQL)', () => {
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: 1,
-      initiatorId: 101,
+      initiatorId: 1,
       initiatorName: 'Amina Bello',
       considerationAmount: 3000000,
     });
-    const payment = await processPaymentRecord({ transactionId: tx.id, payerId: 101, amount: 3000000, method: 'ussd' });
+    const payment = await processPaymentRecord({ transactionId: tx.id, payerId: 1, amount: 3000000, method: 'ussd' });
     expect(payment.ussdCode).toMatch(/^\*737\*000\*\d+#$/);
 
     const list = await listPaymentsByTransaction(tx.id);
@@ -262,7 +260,7 @@ describe('title repository (PostgreSQL)', () => {
   it('persists titles with generated numbers and verifies them', async () => {
     const title = await createTitle({
       parcelId: 1,
-      ownerId: 101,
+      ownerId: 1,
       ownershipType: 'sole',
       ownershipPercentage: 100,
       titleType: 'certificate_of_occupancy',

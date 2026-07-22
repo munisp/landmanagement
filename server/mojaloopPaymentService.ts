@@ -350,3 +350,126 @@ export async function reconcilePaymentWithEscrow(
     })
     .where(eq(mojaloopTransactions.transactionId, transactionId));
 }
+
+
+/**
+ * Execute a full Mojaloop refund as a new, linked transfer. Mojaloop settlement
+ * is immutable, so a completed payment is reversed by sending a compensating
+ * transfer from the original payee back to the original payer.
+ */
+export async function refundCompletedPayment(params: {
+  transactionId: string;
+  reason: string;
+}): Promise<{ refundTransactionId: string; transferId: string; status: "completed" }> {
+  const db = await requireDb();
+  const originals = await db
+    .select()
+    .from(mojaloopTransactions)
+    .where(eq(mojaloopTransactions.transactionId, params.transactionId))
+    .limit(1);
+  const original = originals[0];
+  if (!original) throw new Error("Original Mojaloop transaction was not found");
+  if (original.status !== "completed") {
+    throw new Error(`Only completed Mojaloop transactions can be refunded; current status is ${original.status}`);
+  }
+
+  const existing = await db
+    .select()
+    .from(mojaloopTransactions)
+    .where(eq(mojaloopTransactions.reversalOfTransactionId, original.transactionId))
+    .limit(1);
+  if (existing[0]?.status === "completed" && existing[0].transferId) {
+    return { refundTransactionId: existing[0].transactionId, transferId: existing[0].transferId, status: "completed" };
+  }
+  if (existing[0]) {
+    throw new Error(`A refund transaction already exists in status ${existing[0].status}; inspect it before retrying`);
+  }
+
+  const client = await getMojaloopClient();
+  const refundTransactionId = generateTransactionId();
+  const quoteId = generateQuoteId();
+  const amount = original.quoteAmount?.toString() || original.amount.toString();
+  const expiration = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  const quote = await client.requestQuote({
+    quoteId,
+    transactionId: refundTransactionId,
+    payer: {
+      partyIdType: original.payeePartyIdType as PartyIdentifier["partyIdType"],
+      partyIdentifier: original.payeePartyIdentifier,
+      personalInfo: { name: original.payeeName || undefined },
+    },
+    payee: {
+      partyIdType: original.payerPartyIdType as PartyIdentifier["partyIdType"],
+      partyIdentifier: original.payerPartyIdentifier,
+      personalInfo: { name: original.payerName || undefined },
+    },
+    amountType: "SEND",
+    amount: { currency: original.currency, amount },
+    transactionType: { scenario: "REFUND", initiator: "PAYEE", initiatorType: "BUSINESS" },
+    note: `Refund for ${original.transactionId}: ${params.reason}`,
+    expiration,
+  });
+
+  const transferId = generateTransferId();
+  const { ilpPacket, fulfilment } = client.generateIlpPacketAndCondition(
+    { currency: original.currency, amount: quote.transferAmount.amount },
+    { partyIdType: original.payerPartyIdType as PartyIdentifier["partyIdType"], partyIdentifier: original.payerPartyIdentifier },
+  );
+
+  await db.insert(mojaloopTransactions).values({
+    transactionId: refundTransactionId,
+    reversalOfTransactionId: original.transactionId,
+    quoteId,
+    userId: original.userId,
+    propertyId: original.propertyId,
+    escrowContractAddress: original.escrowContractAddress,
+    amount: Number(quote.transferAmount.amount),
+    currency: original.currency,
+    payerFspId: original.payeeFspId,
+    payerPartyIdType: original.payeePartyIdType,
+    payerPartyIdentifier: original.payeePartyIdentifier,
+    payerName: original.payeeName,
+    payeeFspId: original.payerFspId,
+    payeePartyIdType: original.payerPartyIdType,
+    payeePartyIdentifier: original.payerPartyIdentifier,
+    payeeName: original.payerName,
+    status: "pending",
+    quoteAmount: Number(quote.transferAmount.amount),
+    quoteFees: quote.payeeFspFee ? Number(quote.payeeFspFee.amount) : null,
+    quoteExpiration: new Date(quote.expiration),
+    transferCondition: quote.condition,
+    note: `Refund for ${original.transactionId}: ${params.reason}`,
+    transactionType: "transfer",
+    purpose: "property_payment_refund",
+  });
+
+  const transferRequest: TransferRequest = {
+    transferId,
+    payerFsp: original.payeeFspId,
+    payeeFsp: original.payerFspId,
+    amount: { currency: original.currency, amount: quote.transferAmount.amount },
+    ilpPacket,
+    condition: quote.condition,
+    expiration: quote.expiration,
+  };
+  await client.prepareTransfer(transferRequest);
+  await db
+    .update(mojaloopTransactions)
+    .set({ transferId, status: "reserved", transferState: "RESERVED", transferFulfilment: fulfilment, updatedAt: new Date() })
+    .where(eq(mojaloopTransactions.transactionId, refundTransactionId));
+
+  const response = await client.commitTransfer(transferId, fulfilment);
+  if (response.transferState !== "COMMITTED") {
+    await db
+      .update(mojaloopTransactions)
+      .set({ status: "failed", transferState: response.transferState, errorDescription: "Mojaloop refund was not committed", updatedAt: new Date() })
+      .where(eq(mojaloopTransactions.transactionId, refundTransactionId));
+    throw new Error(`Mojaloop refund was not committed: ${response.transferState}`);
+  }
+  await db
+    .update(mojaloopTransactions)
+    .set({ status: "completed", transferState: response.transferState, completedAt: new Date(), updatedAt: new Date() })
+    .where(eq(mojaloopTransactions.transactionId, refundTransactionId));
+
+  return { refundTransactionId, transferId, status: "completed" };
+}

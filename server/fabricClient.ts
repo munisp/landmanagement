@@ -1,15 +1,15 @@
-import { Gateway, Wallets, X509Identity } from 'fabric-network';
-import * as path from 'path';
-import * as fs from 'fs';
+import { Gateway, Wallets } from "fabric-network";
+import * as fs from "node:fs";
 
 /**
- * Hyperledger Fabric Client for IDLR-PTS
- * Integrates with the blockchain network for title transfers and escrow
+ * Hyperledger Fabric client for title transfers and escrow. Every operation is
+ * submitted to or queried from the configured Fabric network; unavailable
+ * configuration or gateways are surfaced as errors and never synthesized.
  */
 
-const CHANNEL_NAME = 'idlr-channel';
-const CHAINCODE_NAME_TITLE = 'title-transfer';
-const CHAINCODE_NAME_ESCROW = 'escrow';
+const CHANNEL_NAME = "idlr-channel";
+const CHAINCODE_NAME_TITLE = "title-transfer";
+const CHAINCODE_NAME_ESCROW = "escrow";
 
 interface FabricConfig {
   connectionProfile: string;
@@ -18,294 +18,151 @@ interface FabricConfig {
   orgMSP: string;
 }
 
-// Default configuration (can be overridden via environment variables)
-const fabricConfig: FabricConfig = {
-  connectionProfile: process.env.FABRIC_CONNECTION_PROFILE || '/home/ubuntu/idlr-blockchain/network/connection-profile.json',
-  walletPath: process.env.FABRIC_WALLET_PATH || '/home/ubuntu/idlr-blockchain/wallet',
-  userId: process.env.FABRIC_USER_ID || 'admin',
-  orgMSP: process.env.FABRIC_ORG_MSP || 'GovernmentMSP',
-};
-
-/**
- * Initialize Fabric wallet with admin identity
- */
-export async function initializeFabricWallet() {
-  try {
-    const wallet = await Wallets.newFileSystemWallet(fabricConfig.walletPath);
-    
-    // Check if admin identity exists
-    const identity = await wallet.get(fabricConfig.userId);
-    if (!identity) {
-      console.log('[Fabric] Admin identity not found in wallet. Please enroll admin first.');
-      return null;
-    }
-    
-    console.log('[Fabric] Wallet initialized successfully');
-    return wallet;
-  } catch (error) {
-    console.error('[Fabric] Failed to initialize wallet:', error);
-    return null;
+function fabricConfig(): FabricConfig {
+  const config = {
+    connectionProfile: process.env.FABRIC_CONNECTION_PROFILE?.trim() ?? "",
+    walletPath: process.env.FABRIC_WALLET_PATH?.trim() ?? "",
+    userId: process.env.FABRIC_USER_ID?.trim() ?? "",
+    orgMSP: process.env.FABRIC_ORG_MSP?.trim() ?? "",
+  };
+  const missing = Object.entries(config).filter(([, value]) => !value).map(([key]) => key);
+  if (missing.length) {
+    throw new Error(`Fabric integration is not configured: ${missing.join(", ")}`);
   }
+  return config;
 }
 
-/**
- * Connect to Fabric Gateway
- */
-async function connectToGateway() {
+async function initializeFabricWallet() {
+  const config = fabricConfig();
+  const wallet = await Wallets.newFileSystemWallet(config.walletPath);
+  const identity = await wallet.get(config.userId);
+  if (!identity) {
+    throw new Error(`Fabric identity ${config.userId} is not present in the configured wallet`);
+  }
+  return { wallet, config };
+}
+
+async function connectToGateway(): Promise<Gateway> {
+  const { wallet, config } = await initializeFabricWallet();
+  if (!fs.existsSync(config.connectionProfile)) {
+    throw new Error(`Fabric connection profile does not exist: ${config.connectionProfile}`);
+  }
+
+  const connectionProfile = JSON.parse(fs.readFileSync(config.connectionProfile, "utf8"));
+  const gateway = new Gateway();
   try {
-    const wallet = await initializeFabricWallet();
-    if (!wallet) {
-      throw new Error('Failed to initialize wallet');
-    }
-
-    // Load connection profile
-    const ccpPath = fabricConfig.connectionProfile;
-    if (!fs.existsSync(ccpPath)) {
-      console.warn('[Fabric] Connection profile not found. Using mock mode.');
-      return null;
-    }
-
-    const ccp = JSON.parse(fs.readFileSync(ccpPath, 'utf8'));
-
-    // Create gateway instance
-    const gateway = new Gateway();
-    await gateway.connect(ccp, {
+    await gateway.connect(connectionProfile, {
       wallet,
-      identity: fabricConfig.userId,
+      identity: config.userId,
       discovery: { enabled: true, asLocalhost: false },
     });
-
-    console.log('[Fabric] Connected to gateway successfully');
     return gateway;
   } catch (error) {
-    console.error('[Fabric] Failed to connect to gateway:', error);
-    return null;
+    gateway.disconnect();
+    throw new Error(`Fabric gateway connection failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
-/**
- * Submit a title transfer transaction to the blockchain
- */
+async function withGateway<T>(operation: (gateway: Gateway) => Promise<T>): Promise<T> {
+  const gateway = await connectToGateway();
+  try {
+    return await operation(gateway);
+  } finally {
+    gateway.disconnect();
+  }
+}
+
+function parseContractJson(payload: Uint8Array, operation: string): any {
+  try {
+    return JSON.parse(Buffer.from(payload).toString("utf8"));
+  } catch (error) {
+    throw new Error(`Fabric ${operation} returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 export async function submitTitleTransfer(
   parcelId: string,
   fromOwner: string,
   toOwner: string,
   transactionId: string,
-  amount: number
-) {
-  try {
-    const gateway = await connectToGateway();
-    if (!gateway) {
-      console.warn('[Fabric] Gateway not available, using mock response');
-      return {
-        success: true,
-        txId: `mock-tx-${Date.now()}`,
-        blockNumber: Math.floor(Math.random() * 10000),
-        timestamp: new Date().toISOString(),
-      };
-    }
-
-    // Get network and contract
+  amount: number,
+): Promise<any> {
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Title transfer amount must be positive");
+  return withGateway(async (gateway) => {
     const network = await gateway.getNetwork(CHANNEL_NAME);
     const contract = network.getContract(CHAINCODE_NAME_TITLE);
-
-    // Submit transaction
     const result = await contract.submitTransaction(
-      'TransferTitle',
+      "TransferTitle",
       parcelId,
       fromOwner,
       toOwner,
       transactionId,
-      amount.toString()
+      amount.toString(),
     );
-
-    await gateway.disconnect();
-
-    const response = JSON.parse(result.toString());
-    console.log('[Fabric] Title transfer submitted:', response);
-    return response;
-  } catch (error) {
-    console.error('[Fabric] Failed to submit title transfer:', error);
-    throw error;
-  }
+    return parseContractJson(result, "TransferTitle");
+  });
 }
 
-/**
- * Create an escrow account on the blockchain
- */
 export async function createEscrow(
   escrowId: string,
   parcelId: string,
   buyer: string,
   seller: string,
   amount: number,
-  releaseConditions: string[]
-) {
-  try {
-    const gateway = await connectToGateway();
-    if (!gateway) {
-      console.warn('[Fabric] Gateway not available, using mock response');
-      return {
-        success: true,
-        escrowId: escrowId,
-        status: 'CREATED',
-        timestamp: new Date().toISOString(),
-      };
-    }
-
+  releaseConditions: string[],
+): Promise<any> {
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Escrow amount must be positive");
+  if (!releaseConditions.length) throw new Error("Escrow release conditions are required");
+  return withGateway(async (gateway) => {
     const network = await gateway.getNetwork(CHANNEL_NAME);
     const contract = network.getContract(CHAINCODE_NAME_ESCROW);
-
     const result = await contract.submitTransaction(
-      'CreateEscrow',
+      "CreateEscrow",
       escrowId,
       parcelId,
       buyer,
       seller,
       amount.toString(),
-      JSON.stringify(releaseConditions)
+      JSON.stringify(releaseConditions),
     );
-
-    await gateway.disconnect();
-
-    const response = JSON.parse(result.toString());
-    console.log('[Fabric] Escrow created:', response);
-    return response;
-  } catch (error) {
-    console.error('[Fabric] Failed to create escrow:', error);
-    throw error;
-  }
+    return parseContractJson(result, "CreateEscrow");
+  });
 }
 
-/**
- * Release funds from escrow
- */
-export async function releaseEscrow(escrowId: string, approver: string) {
-  try {
-    const gateway = await connectToGateway();
-    if (!gateway) {
-      console.warn('[Fabric] Gateway not available, using mock response');
-      return {
-        success: true,
-        escrowId: escrowId,
-        status: 'RELEASED',
-        timestamp: new Date().toISOString(),
-      };
-    }
-
+export async function releaseEscrow(escrowId: string, approver: string): Promise<any> {
+  return withGateway(async (gateway) => {
     const network = await gateway.getNetwork(CHANNEL_NAME);
     const contract = network.getContract(CHAINCODE_NAME_ESCROW);
-
-    const result = await contract.submitTransaction('ReleaseEscrow', escrowId, approver);
-
-    await gateway.disconnect();
-
-    const response = JSON.parse(result.toString());
-    console.log('[Fabric] Escrow released:', response);
-    return response;
-  } catch (error) {
-    console.error('[Fabric] Failed to release escrow:', error);
-    throw error;
-  }
+    const result = await contract.submitTransaction("ReleaseEscrow", escrowId, approver);
+    return parseContractJson(result, "ReleaseEscrow");
+  });
 }
 
-/**
- * Query title history from the blockchain
- */
-export async function queryTitleHistory(parcelId: string) {
-  try {
-    const gateway = await connectToGateway();
-    if (!gateway) {
-      console.warn('[Fabric] Gateway not available, using mock response');
-      return [
-        {
-          txId: `mock-tx-${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          fromOwner: 'Previous Owner',
-          toOwner: 'Current Owner',
-          amount: 50000000,
-        },
-      ];
-    }
-
+export async function queryTitleHistory(parcelId: string): Promise<any[]> {
+  return withGateway(async (gateway) => {
     const network = await gateway.getNetwork(CHANNEL_NAME);
     const contract = network.getContract(CHAINCODE_NAME_TITLE);
-
-    const result = await contract.evaluateTransaction('QueryTitleHistory', parcelId);
-
-    await gateway.disconnect();
-
-    const history = JSON.parse(result.toString());
-    console.log('[Fabric] Title history retrieved:', history);
+    const result = await contract.evaluateTransaction("QueryTitleHistory", parcelId);
+    const history = parseContractJson(result, "QueryTitleHistory");
+    if (!Array.isArray(history)) throw new Error("Fabric QueryTitleHistory returned a non-array response");
     return history;
-  } catch (error) {
-    console.error('[Fabric] Failed to query title history:', error);
-    throw error;
-  }
+  });
 }
 
-/**
- * Verify a transaction on the blockchain
- */
-export async function verifyTransaction(txId: string) {
-  try {
-    const gateway = await connectToGateway();
-    if (!gateway) {
-      console.warn('[Fabric] Gateway not available, using mock response');
-      return {
-        valid: true,
-        txId: txId,
-        blockNumber: Math.floor(Math.random() * 10000),
-        timestamp: new Date().toISOString(),
-      };
-    }
-
+export async function verifyTransaction(txId: string): Promise<any> {
+  return withGateway(async (gateway) => {
     const network = await gateway.getNetwork(CHANNEL_NAME);
     const contract = network.getContract(CHAINCODE_NAME_TITLE);
-
-    const result = await contract.evaluateTransaction('VerifyTransaction', txId);
-
-    await gateway.disconnect();
-
-    const verification = JSON.parse(result.toString());
-    console.log('[Fabric] Transaction verified:', verification);
-    return verification;
-  } catch (error) {
-    console.error('[Fabric] Failed to verify transaction:', error);
-    throw error;
-  }
+    const result = await contract.evaluateTransaction("VerifyTransaction", txId);
+    return parseContractJson(result, "VerifyTransaction");
+  });
 }
 
-/**
- * Get escrow status
- */
-export async function getEscrowStatus(escrowId: string) {
-  try {
-    const gateway = await connectToGateway();
-    if (!gateway) {
-      console.warn('[Fabric] Gateway not available, using mock response');
-      return {
-        escrowId: escrowId,
-        status: 'ACTIVE',
-        amount: 50000000,
-        buyer: 'Buyer Name',
-        seller: 'Seller Name',
-        createdAt: new Date().toISOString(),
-      };
-    }
-
+export async function getEscrowStatus(escrowId: string): Promise<any> {
+  return withGateway(async (gateway) => {
     const network = await gateway.getNetwork(CHANNEL_NAME);
     const contract = network.getContract(CHAINCODE_NAME_ESCROW);
-
-    const result = await contract.evaluateTransaction('GetEscrowStatus', escrowId);
-
-    await gateway.disconnect();
-
-    const status = JSON.parse(result.toString());
-    console.log('[Fabric] Escrow status retrieved:', status);
-    return status;
-  } catch (error) {
-    console.error('[Fabric] Failed to get escrow status:', error);
-    throw error;
-  }
+    const result = await contract.evaluateTransaction("GetEscrowStatus", escrowId);
+    return parseContractJson(result, "GetEscrowStatus");
+  });
 }

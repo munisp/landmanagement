@@ -1,5 +1,4 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { readFileSync } from 'fs';
 import {
   createMortgageApplication,
   getMortgageApplicationById,
@@ -17,7 +16,6 @@ import {
   getPaymentStatsForApplication,
   getPaymentHistory,
 } from './mortgagePaymentService';
-import { assertMockFallbackAllowed } from './_core/mockGuard';
 import { requireDb } from './db';
 import { mortgageApplications } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
@@ -196,30 +194,5 @@ describe('Mortgage payments — real schedule and outstanding-balance sync', () 
     const history = await getPaymentHistory(created.id);
     expect(history.length).toBe(1);
     expect(history[0].status).toBe('completed');
-  });
-});
-
-describe('Gateway mock-fallback guard', () => {
-  const originalEnv = process.env.NODE_ENV;
-
-  afterAll(() => {
-    process.env.NODE_ENV = originalEnv;
-  });
-
-  it('throws in production, allows in development/test', () => {
-    process.env.NODE_ENV = 'production';
-    expect(() => assertMockFallbackAllowed('test-context')).toThrow('Mock fallback blocked');
-    delete process.env.ALLOW_MOCK_FALLBACKS;
-    process.env.NODE_ENV = 'test';
-    expect(() => assertMockFallbackAllowed('test-context')).not.toThrow();
-  });
-
-  it('all four payment-gateway helpers are guarded (regression tripwire)', () => {
-    const source = readFileSync(__dirname + '/mortgagePaymentService.ts', 'utf8');
-    const guards = source.match(/assertMockFallbackAllowed\('/g) ?? [];
-    expect(guards.length).toBeGreaterThanOrEqual(4);
-    for (const helper of ['paystack-mandate-creation', 'chargePaystackMandate', 'createFlutterwaveMandate', 'chargeFlutterwaveMandate']) {
-      expect(source).toContain(`assertMockFallbackAllowed('${helper}')`);
-    }
   });
 });

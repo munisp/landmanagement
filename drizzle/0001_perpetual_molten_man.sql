@@ -1,4 +1,4 @@
-CREATE TYPE "public"."parcel_status" AS ENUM('draft', 'registered', 'transferred', 'disputed', 'archived');--> statement-breakpoint
+CREATE TYPE "public"."parcel_status" AS ENUM('draft', 'registered', 'transferred', 'disputed', 'archived', 'pending_verification', 'verified');--> statement-breakpoint
 CREATE TYPE "public"."transaction_status" AS ENUM('initiated', 'pending', 'completed', 'failed', 'cancelled');--> statement-breakpoint
 CREATE TYPE "public"."transaction_type" AS ENUM('sale', 'transfer', 'lease', 'mortgage', 'gift');--> statement-breakpoint
 CREATE TABLE "parcels" (

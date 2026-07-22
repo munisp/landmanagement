@@ -4,7 +4,12 @@
  */
 
 import axios from 'axios';
-import { assertMockFallbackAllowed } from './_core/mockGuard';
+
+function requiredFinancialConfig(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} must be configured for financial integrations`);
+  return value;
+}
 
 // ============================================
 // BANK API INTEGRATION
@@ -440,28 +445,19 @@ interface CreditScoreResponse {
  */
 export async function getCreditScore(userId: number): Promise<CreditScoreResponse> {
   try {
-    const response = await axios.get(
-      `${process.env.CREDIT_BUREAU_API_URL}/score/${userId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.CREDIT_BUREAU_API_KEY}`,
-        },
-      }
-    );
-
+    const baseUrl = requiredFinancialConfig('CREDIT_BUREAU_API_URL').replace(/\/$/, '');
+    const apiKey = requiredFinancialConfig('CREDIT_BUREAU_API_KEY');
+    const response = await axios.get(`${baseUrl}/score/${userId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      timeout: 15_000,
+    });
     return {
       score: response.data.score,
       rating: response.data.rating,
       factors: response.data.factors,
     };
   } catch (error: any) {
-    // Mock credit data must never silently drive production underwriting.
-    assertMockFallbackAllowed('credit-bureau-score');
-    return {
-      score: 650,
-      rating: 'Fair',
-      factors: ['Limited credit history', 'No recent defaults'],
-    };
+    throw new Error(`Credit-bureau lookup failed: ${error.message}`);
   }
 }
 

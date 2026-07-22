@@ -47,6 +47,9 @@ importers:
       '@elastic/elasticsearch':
         specifier: ^9.3.1
         version: 9.3.1
+      '@fluvio/client':
+        specifier: ^0.14.9
+        version: 0.14.9
       '@grpc/grpc-js':
         specifier: ^1.14.4
         version: 1.14.4
@@ -1467,6 +1470,9 @@ packages:
 
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
+
+  '@fluvio/client@0.14.9':
+    resolution: {integrity: sha512-1ls958lJu9o+PA+Pc9nvPwoD2wPB9ju9k3Mq6X4oMK2BKYnLm/OWu3qS6s9ixA7ADh9MWE8FFe2ZvdoF0vE/8g==}
 
   '@grpc/grpc-js@1.14.4':
     resolution: {integrity: sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ==}
@@ -11249,6 +11255,8 @@ snapshots:
       react-dom: 19.2.1(react@19.2.1)
 
   '@floating-ui/utils@0.2.10': {}
+
+  '@fluvio/client@0.14.9': {}
 
   '@grpc/grpc-js@1.14.4':
     dependencies:

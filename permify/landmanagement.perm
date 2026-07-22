@@ -1,0 +1,142 @@
+// Land-management platform authorization model.
+//
+// Every authenticated subject receives platform:global#member. Role-specific
+// tuples are synchronized from the application's Keycloak-derived role. Resource
+// owners and delegated reviewers are written by the owning service when records
+// are created or assigned.
+
+entity user {}
+
+entity platform {
+    relation member @user
+    relation admin @user
+    relation registrar @user
+    relation surveyor @user
+    relation broker @user
+    relation investor @user
+
+    action view = member or admin or registrar or surveyor or broker or investor
+    action create = member or admin or registrar or surveyor or broker
+    action update = admin or registrar or surveyor or broker
+    action delete = admin
+    action approve = admin or registrar
+    action manage = admin
+}
+
+entity parcel {
+    relation platform @platform
+    relation owner @user
+    relation editor @user
+    relation approver @user
+
+    action view = owner or editor or approver or platform.view
+    action create = platform.create
+    action update = owner or editor or approver or platform.update
+    action delete = platform.delete
+    action approve = approver or platform.approve
+    action manage = platform.manage
+}
+
+entity transaction {
+    relation platform @platform
+    relation initiator @user
+    relation counterparty @user
+    relation reviewer @user
+
+    action view = initiator or counterparty or reviewer or platform.view
+    action create = platform.create
+    action update = initiator or reviewer or platform.update
+    action delete = platform.delete
+    action approve = reviewer or platform.approve
+    action manage = platform.manage
+}
+
+entity title {
+    relation platform @platform
+    relation owner @user
+    relation registrar @user
+
+    action view = owner or registrar or platform.view
+    action create = platform.create
+    action update = owner or registrar or platform.update
+    action delete = platform.delete
+    action approve = registrar or platform.approve
+    action manage = platform.manage
+}
+
+entity document {
+    relation platform @platform
+    relation owner @user
+    relation editor @user
+    relation reviewer @user
+
+    action view = owner or editor or reviewer or platform.view
+    action create = platform.create
+    action update = owner or editor or reviewer or platform.update
+    action delete = owner or platform.delete
+    action approve = reviewer or platform.approve
+    action manage = platform.manage
+}
+
+entity workflow {
+    relation platform @platform
+    relation requester @user
+    relation operator @user
+    relation approver @user
+
+    action view = requester or operator or approver or platform.view
+    action create = platform.create
+    action update = requester or operator or approver or platform.update
+    action delete = requester or platform.delete
+    action approve = approver or platform.approve
+    action manage = platform.manage
+}
+
+entity report {
+    relation platform @platform
+    relation owner @user
+    relation editor @user
+
+    action view = owner or editor or platform.view
+    action create = platform.create
+    action update = owner or editor or platform.update
+    action delete = owner or platform.delete
+    action approve = platform.approve
+    action manage = platform.manage
+}
+
+entity marketplace_listing {
+    relation platform @platform
+    relation seller @user
+    relation buyer @user
+    relation moderator @user
+
+    action view = seller or buyer or moderator or platform.view
+    action create = platform.create
+    action update = seller or moderator or platform.update
+    action delete = seller or moderator or platform.delete
+    action approve = moderator or platform.approve
+    action manage = platform.manage
+}
+
+entity admin_surface {
+    relation platform @platform
+
+    action view = platform.admin
+    action create = platform.admin
+    action update = platform.admin
+    action delete = platform.admin
+    action approve = platform.admin
+    action manage = platform.admin
+}
+
+entity system {
+    relation platform @platform
+
+    action view = platform.admin
+    action create = platform.admin
+    action update = platform.admin
+    action delete = platform.admin
+    action approve = platform.admin
+    action manage = platform.admin
+}

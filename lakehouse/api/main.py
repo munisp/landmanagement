@@ -11,14 +11,16 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+import hmac
 import os
 import sys
 import json
 
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json, execute_values
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 # Add parent directory to path for imports
@@ -29,19 +31,51 @@ try:
 except ImportError:
     get_catalog = None
 
+from ml.title_risk_model import (
+    FEATURE_NAMES,
+    MODEL_NAME,
+    ModelUnavailableError,
+    active_model_metadata,
+    predict_title_risk,
+    train_verified_examples,
+)
+
 app = FastAPI(
     title="IDLR Lakehouse API",
     description="Data analytics and ingestion API for IDLR platform",
     version="1.1.0",
 )
 
+def configured_cors_origins() -> List[str]:
+    raw_origins = os.getenv("LAKEHOUSE_CORS_ORIGINS", "")
+    origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+    if "*" in origins:
+        raise RuntimeError("LAKEHOUSE_CORS_ORIGINS must name explicit origins; wildcard origins are not permitted")
+    return origins
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=configured_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-Lakehouse-Api-Key"],
 )
+
+
+@app.middleware("http")
+async def require_lakehouse_service_key(request: Request, call_next):
+    # Health remains probeable by the container platform; every data, model, and
+    # analytics endpoint requires the internal service credential.
+    if request.url.path == "/health":
+        return await call_next(request)
+    expected = os.getenv("LAKEHOUSE_API_KEY", "").strip()
+    if not expected:
+        return JSONResponse(status_code=503, content={"detail": "LAKEHOUSE_API_KEY is not configured"})
+    provided = request.headers.get("X-Lakehouse-Api-Key", "")
+    if not hmac.compare_digest(provided, expected):
+        return JSONResponse(status_code=401, content={"detail": "Invalid lakehouse service credential"})
+    return await call_next(request)
 
 
 class ParcelAnalyticsRequest(BaseModel):
@@ -63,7 +97,10 @@ class DataIngestionRequest(BaseModel):
 
 
 def get_postgres_url() -> str:
-    return os.getenv("POSTGRES_URL") or os.getenv("DATABASE_URL") or "postgresql://idlr_user:idlr_password@localhost:5432/idlr_pts"
+    database_url = (os.getenv("POSTGRES_URL") or os.getenv("DATABASE_URL") or "").strip()
+    if not database_url:
+        raise RuntimeError("POSTGRES_URL or DATABASE_URL must be configured for lakehouse access")
+    return database_url
 
 
 def get_connection():
@@ -416,66 +453,122 @@ async def execute_sql_query(query: str = Body(..., embed=True), params: Optional
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-if __name__ == "__main__":
-    import uvicorn
-
-    port = int(os.getenv("LAKEHOUSE_API_PORT", "8000"))
-    host = os.getenv("LAKEHOUSE_API_HOST", "0.0.0.0")
-    uvicorn.run(app, host=host, port=port, log_level="info", access_log=True)
-
-
 class TitleRiskAnalyticsRequest(BaseModel):
-    dispute_count: int = 0
-    encumbrance_count: int = 0
-    document_mismatch_count: int = 0
-    verification_gap_count: int = 0
-    ownership_change_count: int = 0
-    transaction_value: float = 0.0
+    dispute_count: int = Field(default=0, ge=0)
+    encumbrance_count: int = Field(default=0, ge=0)
+    document_mismatch_count: int = Field(default=0, ge=0)
+    verification_gap_count: int = Field(default=0, ge=0)
+    ownership_change_count: int = Field(default=0, ge=0)
+    transaction_value: float = Field(default=0.0, ge=0)
+
+
+class TitleRiskTrainingExampleRequest(TitleRiskAnalyticsRequest):
+    label: bool
+    source_reference: str = Field(min_length=1, max_length=255)
+    source_event_id: Optional[int] = Field(default=None, ge=1)
+    verified_by: Optional[int] = Field(default=None, ge=1)
+
+
+def title_risk_features(request: TitleRiskAnalyticsRequest) -> Dict[str, Any]:
+    return {feature: getattr(request, feature) for feature in FEATURE_NAMES}
+
+
+@app.post("/ml/title-risk/examples")
+async def record_title_risk_training_example(request: TitleRiskTrainingExampleRequest):
+    if not table_exists("ml_training_examples"):
+        raise HTTPException(status_code=503, detail="Machine-learning schema has not been migrated")
+    features = title_risk_features(request)
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO ml_training_examples
+              (model_name, feature_vector, label, source_reference, source_event_id, verified_by)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (model_name, source_reference)
+            DO UPDATE SET
+              feature_vector = EXCLUDED.feature_vector,
+              label = EXCLUDED.label,
+              source_event_id = EXCLUDED.source_event_id,
+              verified_by = EXCLUDED.verified_by,
+              created_at = NOW()
+            RETURNING id, created_at
+            """,
+            (MODEL_NAME, Json(features), request.label, request.source_reference, request.source_event_id, request.verified_by),
+        )
+        row = cur.fetchone()
+        conn.commit()
+    return {"id": row["id"], "model_name": MODEL_NAME, "created_at": row["created_at"], "status": "verified_example_recorded"}
+
+
+@app.post("/ml/title-risk/train")
+async def train_title_risk_model(trained_by: Optional[int] = Body(default=None, embed=True)):
+    if not table_exists("ml_training_examples") or not table_exists("ml_model_runs"):
+        raise HTTPException(status_code=503, detail="Machine-learning schema has not been migrated")
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT feature_vector, label
+            FROM ml_training_examples
+            WHERE model_name = %s
+            ORDER BY created_at ASC
+            """,
+            (MODEL_NAME,),
+        )
+        examples = cur.fetchall()
+
+    try:
+        result = train_verified_examples(examples)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("UPDATE ml_model_runs SET is_active = FALSE WHERE model_name = %s AND is_active = TRUE", (MODEL_NAME,))
+        cur.execute(
+            """
+            INSERT INTO ml_model_runs
+              (model_name, model_version, artifact_uri, feature_schema, metrics, training_rows, positive_rows, trained_by, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+            """,
+            (
+                MODEL_NAME,
+                result.model_version,
+                result.artifact_uri,
+                Json(result.feature_schema),
+                Json(result.metrics),
+                result.training_rows,
+                result.positive_rows,
+                trained_by,
+            ),
+        )
+        conn.commit()
+    return {
+        "status": "trained",
+        "model_name": MODEL_NAME,
+        "model_version": result.model_version,
+        "artifact_uri": result.artifact_uri,
+        "training_rows": result.training_rows,
+        "positive_rows": result.positive_rows,
+        "metrics": result.metrics,
+    }
+
+
+@app.get("/ml/title-risk/model")
+async def get_title_risk_model_status():
+    try:
+        return {"available": True, **active_model_metadata()}
+    except ModelUnavailableError as exc:
+        return {"available": False, "model_name": MODEL_NAME, "reason": str(exc)}
 
 
 @app.post("/analytics/title-risk/score")
 async def score_title_risk(request: TitleRiskAnalyticsRequest):
-    score = 12
-    score += min(request.dispute_count * 12, 30)
-    score += min(request.encumbrance_count * 10, 25)
-    score += min(request.document_mismatch_count * 14, 28)
-    score += min(request.verification_gap_count * 10, 20)
-    score += min(request.ownership_change_count * 6, 18)
-    if request.transaction_value >= 100000000:
-        score += 6
-    elif request.transaction_value >= 25000000:
-        score += 3
-
-    score = max(0, min(100, score))
-    band = "low"
-    if score >= 75:
-        band = "critical"
-    elif score >= 55:
-        band = "high"
-    elif score >= 35:
-        band = "medium"
-
-    drivers: List[str] = []
-    if request.dispute_count:
-        drivers.append("dispute_history")
-    if request.encumbrance_count:
-        drivers.append("encumbrances")
-    if request.document_mismatch_count:
-        drivers.append("document_mismatch")
-    if request.verification_gap_count:
-        drivers.append("verification_gaps")
-    if request.ownership_change_count >= 3:
-        drivers.append("frequent_ownership_changes")
-    if request.transaction_value >= 25000000:
-        drivers.append("high_value_transaction")
-
-    return {
-        "score": score,
-        "band": band,
-        "drivers": drivers,
-        "explanation": f"Risk band is {band} with a score of {score} based on dispute, encumbrance, verification, and document-signal intensity.",
-        "generated_at": datetime.utcnow().isoformat(),
-    }
+    try:
+        result = predict_title_risk(title_risk_features(request))
+    except ModelUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=f"Title-risk inference is unavailable until a verified CPU model is trained: {exc}")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {**result, "generated_at": datetime.utcnow().isoformat()}
 
 
 @app.get("/analytics/title-risk/portfolio-summary")
@@ -790,3 +883,11 @@ async def geospatial_spatial_workbench(request: SedonaSpatialWorkbenchRequest):
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.getenv("LAKEHOUSE_API_PORT", "8000"))
+    host = os.getenv("LAKEHOUSE_API_HOST", "0.0.0.0")
+    uvicorn.run(app, host=host, port=port, log_level="info", access_log=True)

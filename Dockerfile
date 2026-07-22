@@ -7,7 +7,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 
@@ -25,9 +25,12 @@ RUN corepack enable
 
 COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/pnpm-lock.yaml* ./
+COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/server/data ./server/data
+COPY --from=build /app/server ./server
+COPY --from=build /app/temporal ./temporal
+COPY --from=build /app/permify ./permify
 COPY --from=build /app/nginx ./nginx
 COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/drizzle ./drizzle

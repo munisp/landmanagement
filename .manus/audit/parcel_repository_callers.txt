@@ -1,0 +1,127 @@
+server/analyticsService.ts:1:import { searchParcels } from './parcelRepository';
+server/analyticsService.ts:42:  const result = await searchParcels({ page: 1, limit: 1000 });
+server/api/routers/cached-parcel.ts:202:  geospatialSearch: publicProcedure
+server/api/routers/disputes.ts:14:import { getParcelByNumber } from '../../parcelRepository';
+server/api/routers/disputes.ts:80:      const parcel = await getParcelByNumber(input.parcelNumber);
+server/api/routers/geo-analytics.ts:3:import { searchParcels } from '../../parcelRepository';
+server/api/routers/geo-analytics.ts:20:      const parcels = (await searchParcels({ page: 1, limit: 1000 })).parcels;
+server/api/routers/search.ts:85:          const parcels = await es.searchParcels(query, {}, 0, 5);
+server/api/routers/search.ts:127:  searchParcels: publicProcedure
+server/api/routers/search.ts:157:        const result = await es.searchParcels(query, filters, from, pageSize);
+server/api/routers/valuations.ts:9:import { getParcelByNumber } from '../../parcelRepository';
+server/api/routers/valuations.ts:61:      const parcel = await getParcelByNumber(input.parcelNumber);
+server/buildingVisualizationRepository.ts:1:import { searchParcels } from './parcelRepository';
+server/buildingVisualizationRepository.ts:52:  const searchResult = await searchParcels({ limit: 1 });
+server/bulkImport.ts:9:import { createParcel, getParcelByNumber, searchParcels, verifyParcel } from './parcelRepository';
+server/bulkImport.ts:315:    return (await searchParcels({ page: 1, limit: 5000 })).parcels.map((parcel) => ({
+server/elasticsearch.ts:163:export async function searchParcels(query: string, options: {
+server/elasticsearchService.ts:233:  async searchParcels(
+server/elasticsearchService.ts:403:      this.searchParcels(query, {}, from, size),
+server/externalApi.ts:16:import { getParcelByNumber, searchParcels } from './parcelRepository';
+server/externalApi.ts:34:    const result = await searchParcels({
+server/externalApi.ts:55:    const parcel = await getParcelByNumber(req.params.parcelNumber);
+server/geolibreIntegrationRepository.ts:1:import { getParcelById, searchParcels, type ParcelRecord } from './parcelRepository';
+server/geolibreIntegrationRepository.ts:93:  const parcel = await getParcelById(parcelId);
+server/geolibreIntegrationRepository.ts:98:  const allParcels = searchParcels({ page: 1, limit: 1000 }).parcels;
+server/geospatialIntelligenceService.ts:2:import { getParcelById, searchParcels, type ParcelRecord } from './parcelRepository';
+server/geospatialIntelligenceService.ts:50:  const parcel = await getParcelById(parcelId);
+server/geospatialIntelligenceService.ts:55:    Promise.resolve(searchParcels({ page: 1, limit: 1000 })),
+server/geospatialIntelligenceService.ts:252:  const parcels = searchParcels({ page: 1, limit: 1000 }).parcels;
+server/marketplaceRepository.ts:1:import { getParcelById } from './parcelRepository';
+server/marketplaceRepository.ts:230:  const parcel = await getParcelById(input.parcelId);
+server/mortgageExplainabilityService.ts:79:  const parcel = application.parcelId ? await parcelRepository.getParcelById(application.parcelId) : undefined;
+server/parcelDigitalTwinService.ts:104:  const parcel = await parcelRepository.getParcelById(parcelId);
+server/postgresPersistence.test.ts:10:  createParcel,
+server/postgresPersistence.test.ts:11:  getParcelById,
+server/postgresPersistence.test.ts:12:  getParcelByNumber,
+server/postgresPersistence.test.ts:13:  searchParcels,
+server/postgresPersistence.test.ts:14:  updateParcel,
+server/postgresPersistence.test.ts:15:  verifyParcel,
+server/postgresPersistence.test.ts:16:  geospatialSearch,
+server/postgresPersistence.test.ts:42:    const created = await createParcel({
+server/postgresPersistence.test.ts:59:    const byId = await getParcelById(created.id);
+server/postgresPersistence.test.ts:63:    const byNumber = await getParcelByNumber(created.parcelNumber);
+server/postgresPersistence.test.ts:68:    const created = await createParcel({
+server/postgresPersistence.test.ts:78:    const verified = await verifyParcel(created.id, 'registrar-42');
+server/postgresPersistence.test.ts:84:    const again = await verifyParcel(created.id, 'registrar-42');
+server/postgresPersistence.test.ts:92:    expect(() => updateParcel(2, { notes: 'illegal edit' })).toThrow(/amendment/i);
+server/postgresPersistence.test.ts:96:    const lagos = await searchParcels({ state: 'Lagos', limit: 50 });
+server/postgresPersistence.test.ts:100:    const expensive = await searchParcels({ priceMin: 200000000, limit: 50 });
+server/postgresPersistence.test.ts:103:    const paged = await searchParcels({ page: 2, limit: 2 });
+server/postgresPersistence.test.ts:109:    const result = await geospatialSearch({ centerLat: 6.4281, centerLng: 3.4219, radiusKm: 2 });
+server/productionQueryCache.ts:3:import { searchParcels as searchParcelRepository, getParcelById as getParcelFromRepository, getParcelByNumber as getParcelByNumberFromRepository } from './parcelRepository';
+server/registryIntegrityService.ts:154:  const parcels = (await parcelRepository.searchParcels({ limit: 10000 } as any)).parcels as parcelRepository.ParcelRecord[];
+server/reportGeneration.ts:4:import { searchParcels } from './parcelRepository';
+server/reportGeneration.ts:66:    const offline = await searchParcels({
+server/routers.ts:90:  batchAssignParcels,
+server/routers.ts:91:  batchVerifyParcels,
+server/routers.ts:92:  createParcel,
+server/routers.ts:93:  geospatialSearch as geospatialParcelSearch,
+server/routers.ts:94:  getParcelById as getParcelFromRepository,
+server/routers.ts:95:  getParcelByNumber as getParcelByNumberFromRepository,
+server/routers.ts:96:  searchParcels as searchParcelRepository,
+server/routers.ts:97:  updateParcel as updateParcelInRepository,
+server/routers.ts:98:  verifyParcel as verifyParcelInRepository,
+server/routers.ts:812:    createParcel: protectedProcedure
+server/routers.ts:994:          const created = await createParcel({
+server/routers.ts:1048:          const updated = batchAssignParcels(input.parcelIds, input.surveyorId);
+server/routers.ts:1068:          const updated = batchVerifyParcels(input.parcelIds, String(ctx.user.id));
+server/routers.ts:1077:    geospatialSearch: publicProcedure
+server/stakeholderWorkflows.test.ts:24:  searchParcels,
+server/stakeholderWorkflows.test.ts:25:  getParcelById,
+server/stakeholderWorkflows.test.ts:26:  getParcelByNumber,
+server/stakeholderWorkflows.test.ts:27:  createParcel,
+server/stakeholderWorkflows.test.ts:28:  updateParcel,
+server/stakeholderWorkflows.test.ts:29:  verifyParcel,
+server/stakeholderWorkflows.test.ts:30:  geospatialSearch,
+server/stakeholderWorkflows.test.ts:31:  batchAssignParcels,
+server/stakeholderWorkflows.test.ts:32:  batchVerifyParcels,
+server/stakeholderWorkflows.test.ts:97:    const parcel = await createParcel({
+server/stakeholderWorkflows.test.ts:116:    const parcel = await getParcelById(newParcelId);
+server/stakeholderWorkflows.test.ts:123:    const results = await searchParcels({ state: 'Lagos', limit: 20 });
+server/stakeholderWorkflows.test.ts:129:    const results = await searchParcels({ landUseType: 'residential', limit: 20 });
+server/stakeholderWorkflows.test.ts:135:    const results = await searchParcels({ status: 'verified', limit: 20 });
+server/stakeholderWorkflows.test.ts:141:    const results = geospatialSearch({ centerLat: 6.5244, centerLng: 3.3792, radiusKm: 50, limit: 10 });
+server/stakeholderWorkflows.test.ts:149:    const created1 = await createParcel({
+server/stakeholderWorkflows.test.ts:154:    const created2 = await createParcel({
+server/stakeholderWorkflows.test.ts:159:    const result = batchAssignParcels([created1.id, created2.id], 'surveyor-batch-01');
+server/stakeholderWorkflows.test.ts:166:    const created = await createParcel({
+server/stakeholderWorkflows.test.ts:171:    const updated = updateParcel(created.id, { notes: 'Updated notes', streetAddress: '5 Refinery Road' });
+server/stakeholderWorkflows.test.ts:178:    expect(() => updateParcel(2, { notes: 'illegal edit' })).toThrow(/amendment/i);
+server/stakeholderWorkflows.test.ts:187:    const created = await createParcel({
+server/stakeholderWorkflows.test.ts:192:    const verified = verifyParcel(created.id, 'registrar-smoke-01');
+server/stakeholderWorkflows.test.ts:199:    const created = await createParcel({
+server/stakeholderWorkflows.test.ts:204:    verifyParcel(created.id, 'registrar-01');
+server/stakeholderWorkflows.test.ts:205:    const again = verifyParcel(created.id, 'registrar-01');
+server/stakeholderWorkflows.test.ts:210:    const p1 = await createParcel({
+server/stakeholderWorkflows.test.ts:215:    const p2 = await createParcel({
+server/stakeholderWorkflows.test.ts:220:    const result = batchVerifyParcels([p1.id, p2.id], 'registrar-batch-01');
+server/stakeholderWorkflows.test.ts:269:    const results = await searchParcels({ limit: 10 });
+server/stakeholderWorkflows.test.ts:275:    const results = await searchParcels({ priceMin: 100000000, priceMax: 500000000, limit: 20 });
+server/stakeholderWorkflows.test.ts:563:    const parcel = await createParcel({
+server/stakeholderWorkflows.test.ts:577:    const verified = verifyParcel(parcel.id, 'registrar-e2e-01');
+server/stakeholderWorkflows.test.ts:664:    const results = await searchParcels({ limit: 100 });
+server/stakeholderWorkflows.test.ts:671:    const results = await searchParcels({ limit: 50 });
+server/stakeholderWorkflows.test.ts:698:    const results = await searchParcels({ limit: 50 });
+server/stakeholderWorkflows.test.ts:710:    const page1 = await searchParcels({ limit: 3, page: 1 });
+server/stakeholderWorkflows.test.ts:711:    const page2 = await searchParcels({ limit: 3, page: 2 });
+server/taxRepository.ts:1:import { getParcelByNumber } from './parcelRepository';
+server/taxRepository.ts:311:  const parcel = getParcelByNumber(parcelId);
+server/titleIntelligenceRepository.ts:3:import { getParcelById } from './parcelRepository';
+server/titleIntelligenceRepository.ts:19:  parcel: Awaited<ReturnType<typeof getParcelById>>;
+server/titleIntelligenceRepository.ts:59:  const parcel = await getParcelById(title.parcelId);
+server/titleRiskService.ts:83:  const parcel = await parcelRepository.getParcelById(parcelId);
+server/valuationService.ts:1:import { getParcelByNumber, searchParcels } from './parcelRepository';
+server/valuationService.ts:116:  const subject = await getParcelByNumber(parcelNumber);
+server/valuationService.ts:121:  const parcels = (await searchParcels({ page: 1, limit: 1000 })).parcels.filter((parcel) => parcel.parcelNumber !== subject!.parcelNumber);
+server/valuationService.ts:155:  const subject = await getParcelByNumber(input.parcelNumber);
+server/valuationService.ts:231:  const parcels = (await searchParcels({ page: 1, limit: 1000 })).parcels;
+server/valuationService.ts:233:  const subject = parcelNumber ? await getParcelByNumber(parcelNumber) : null;
+server/workflows.test.ts:2:import { getParcelById, getParcelByNumber, searchParcels } from './parcelRepository';
+server/workflows.test.ts:9:      const results = await searchParcels({ query: 'LG-VI-2024', page: 1, limit: 10 });
+server/workflows.test.ts:16:      const results = await searchParcels({ query: 'Victoria Island', page: 1, limit: 10 });
+server/workflows.test.ts:23:      const parcel = await getParcelByNumber('LG-VI-2024-001');
+server/workflows.test.ts:53:      const parcel = await getParcelById(tx.parcelId);
+server/workflows.test.ts:101:      const parcel = await getParcelByNumber('LG-VI-2024-001');
+server/workflows.test.ts:118:      const parcelResults = (await searchParcels({ limit: 5 })).parcels;
+server/workflows.test.ts:127:      const parcel = await getParcelByNumber('LG-VI-2024-001');

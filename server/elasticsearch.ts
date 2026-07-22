@@ -1,11 +1,17 @@
 import { Client } from '@elastic/elasticsearch';
 
-// Initialize Elasticsearch client
+function requiredElasticsearchConfig(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} must be configured for Elasticsearch`);
+  return value;
+}
+
+// Initialize Elasticsearch client from explicitly supplied cluster credentials.
 const esClient = new Client({
-  node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
+  node: requiredElasticsearchConfig('ELASTICSEARCH_URL'),
   auth: {
-    username: process.env.ELASTICSEARCH_USERNAME || 'elastic',
-    password: process.env.ELASTICSEARCH_PASSWORD || 'changeme',
+    username: requiredElasticsearchConfig('ELASTICSEARCH_USERNAME'),
+    password: requiredElasticsearchConfig('ELASTICSEARCH_PASSWORD'),
   },
 });
 
@@ -122,6 +128,7 @@ export async function initializeIndices() {
     console.log('[Elasticsearch] All indices initialized');
   } catch (error) {
     console.error('[Elasticsearch] Failed to initialize indices:', error);
+    throw error;
   }
 }
 
@@ -154,6 +161,7 @@ export async function indexParcel(parcel: any) {
     console.log(`[Elasticsearch] Indexed parcel ${parcel.parcel_id}`);
   } catch (error) {
     console.error('[Elasticsearch] Failed to index parcel:', error);
+    throw error;
   }
 }
 
@@ -253,7 +261,7 @@ export async function searchParcels(query: string, options: {
     };
   } catch (error) {
     console.error('[Elasticsearch] Search failed:', error);
-    return { total: 0, results: [] };
+    throw error;
   }
 }
 
@@ -296,7 +304,7 @@ export async function getAutocompleteSuggestions(query: string, field: string = 
     return response.hits.hits.map((hit: any) => hit._source[field]).filter(Boolean);
   } catch (error) {
     console.error('[Elasticsearch] Autocomplete failed:', error);
-    return [];
+    throw error;
   }
 }
 
@@ -316,6 +324,7 @@ export async function trackSearchQuery(query: string, userId: string, results: n
     });
   } catch (error) {
     console.error('[Elasticsearch] Failed to track search:', error);
+    throw error;
   }
 }
 
@@ -347,7 +356,7 @@ export async function getPopularSearches(limit: number = 10) {
     })) || [];
   } catch (error) {
     console.error('[Elasticsearch] Failed to get popular searches:', error);
-    return [];
+    throw error;
   }
 }
 

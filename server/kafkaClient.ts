@@ -7,14 +7,33 @@
 
 import { Kafka, Producer, Consumer, Admin, logLevel } from 'kafkajs';
 
-// Environment variables
-const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
-const KAFKA_CLIENT_ID = process.env.KAFKA_CLIENT_ID || 'idlr-pts-platform';
-const KAFKA_SSL_ENABLED = process.env.KAFKA_SSL_ENABLED === 'true';
-const KAFKA_SASL_ENABLED = process.env.KAFKA_SASL_ENABLED === 'true';
-const KAFKA_SASL_MECHANISM = process.env.KAFKA_SASL_MECHANISM || 'plain';
-const KAFKA_SASL_USERNAME = process.env.KAFKA_SASL_USERNAME || '';
-const KAFKA_SASL_PASSWORD = process.env.KAFKA_SASL_PASSWORD || '';
+// Messaging configuration is validated only when the Kafka compatibility
+// client is constructed, avoiding an undeclared localhost broker at import time.
+function requiredKafkaConfig(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} must be configured for Kafka messaging`);
+  return value;
+}
+
+function kafkaRuntimeConfig() {
+  const brokers = requiredKafkaConfig('KAFKA_BROKERS').split(',').map((broker) => broker.trim()).filter(Boolean);
+  if (!brokers.length) throw new Error('KAFKA_BROKERS must contain at least one broker');
+  const sslEnabled = process.env.KAFKA_SSL_ENABLED === 'true';
+  const saslEnabled = process.env.KAFKA_SASL_ENABLED === 'true';
+  const configuration = {
+    clientId: requiredKafkaConfig('KAFKA_CLIENT_ID'),
+    brokers,
+    sslEnabled,
+    saslEnabled,
+    saslMechanism: process.env.KAFKA_SASL_MECHANISM?.trim(),
+    saslUsername: process.env.KAFKA_SASL_USERNAME?.trim(),
+    saslPassword: process.env.KAFKA_SASL_PASSWORD,
+  };
+  if (saslEnabled && (!configuration.saslMechanism || !configuration.saslUsername || !configuration.saslPassword)) {
+    throw new Error('KAFKA_SASL_MECHANISM, KAFKA_SASL_USERNAME, and KAFKA_SASL_PASSWORD are required when KAFKA_SASL_ENABLED=true');
+  }
+  return configuration;
+}
 
 // Topic names
 export const KAFKA_TOPICS = {
@@ -116,10 +135,11 @@ class KafkaClientManager {
   private connected: boolean = false;
 
   constructor() {
+    const runtime = kafkaRuntimeConfig();
     // Configure Kafka client
     const kafkaConfig: any = {
-      clientId: KAFKA_CLIENT_ID,
-      brokers: KAFKA_BROKERS,
+      clientId: runtime.clientId,
+      brokers: runtime.brokers,
       logLevel: logLevel.INFO,
       retry: {
         initialRetryTime: 100,
@@ -128,16 +148,16 @@ class KafkaClientManager {
     };
 
     // Add SSL configuration if enabled
-    if (KAFKA_SSL_ENABLED) {
+    if (runtime.sslEnabled) {
       kafkaConfig.ssl = true;
     }
 
     // Add SASL authentication if enabled
-    if (KAFKA_SASL_ENABLED) {
+    if (runtime.saslEnabled) {
       kafkaConfig.sasl = {
-        mechanism: KAFKA_SASL_MECHANISM,
-        username: KAFKA_SASL_USERNAME,
-        password: KAFKA_SASL_PASSWORD,
+        mechanism: runtime.saslMechanism,
+        username: runtime.saslUsername,
+        password: runtime.saslPassword,
       };
     }
 

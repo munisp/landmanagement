@@ -5,7 +5,11 @@
 
 import axios from 'axios';
 
-const OCR_SERVICE_URL = process.env.OCR_SERVICE_URL || 'http://localhost:8003';
+function ocrServiceUrl(): string {
+  const value = process.env.OCR_SERVICE_URL?.trim();
+  if (!value) throw new Error('OCR_SERVICE_URL must be configured for OCR integration');
+  return value.replace(/\/$/, '');
+}
 
 export interface OCRResult {
   text: string;
@@ -50,7 +54,7 @@ export async function extractTextFromDocument(
   language: string = 'en'
 ): Promise<OCRResult> {
   try {
-    const response = await axios.post(`${OCR_SERVICE_URL}/ocr/extract`, {
+    const response = await axios.post(`${ocrServiceUrl()}/ocr/extract`, {
       file_url: fileUrl,
       language,
     }, {
@@ -69,7 +73,7 @@ export async function extractTextFromDocument(
  */
 export async function classifyDocument(fileUrl: string): Promise<DocumentClassification> {
   try {
-    const response = await axios.post(`${OCR_SERVICE_URL}/ocr/classify`, {
+    const response = await axios.post(`${ocrServiceUrl()}/ocr/classify`, {
       file_url: fileUrl,
     }, {
       timeout: 30000,
@@ -90,7 +94,7 @@ export async function extractEntities(
   documentType: string
 ): Promise<ExtractedEntities> {
   try {
-    const response = await axios.post(`${OCR_SERVICE_URL}/ocr/extract-entities`, {
+    const response = await axios.post(`${ocrServiceUrl()}/ocr/extract-entities`, {
       file_url: fileUrl,
       document_type: documentType,
     }, {
@@ -109,7 +113,7 @@ export async function extractEntities(
  */
 export async function assessDocumentQuality(fileUrl: string): Promise<DocumentQualityScore> {
   try {
-    const response = await axios.post(`${OCR_SERVICE_URL}/ocr/quality-check`, {
+    const response = await axios.post(`${ocrServiceUrl()}/ocr/quality-check`, {
       file_url: fileUrl,
     }, {
       timeout: 30000,
@@ -130,7 +134,7 @@ export async function checkDuplicateDocument(
   threshold: number = 0.85
 ): Promise<{ isDuplicate: boolean; similarDocuments: Array<{ id: string; similarity: number }> }> {
   try {
-    const response = await axios.post(`${OCR_SERVICE_URL}/ocr/check-duplicate`, {
+    const response = await axios.post(`${ocrServiceUrl()}/ocr/check-duplicate`, {
       file_url: fileUrl,
       threshold,
     }, {

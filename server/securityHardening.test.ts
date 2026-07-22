@@ -404,7 +404,7 @@ describe('fraud block threshold governance', () => {
     // Tripwire: the threshold and the platform-side blocked decision must not
     // be silently removed in favor of trusting the model's own flag.
     expect(source).toContain('FRAUD_SCORE_BLOCK_THRESHOLD');
-    expect(source).toContain('fraudScore >= FRAUD_SCORE_BLOCK_THRESHOLD');
+    expect(source).toContain('fraudScore >= fraudScoreBlockThreshold()');
     expect(source).toContain('blocked,');
   });
 });

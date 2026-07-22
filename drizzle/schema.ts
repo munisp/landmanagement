@@ -1,5 +1,5 @@
 import { numeric } from "drizzle-orm/pg-core";
-import { bigint, boolean, decimal, doublePrecision, integer, json, jsonb, index, uniqueIndex, pgEnum, pgTable, real, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { bigint, boolean, date, decimal, doublePrecision, integer, json, jsonb, index, uniqueIndex, pgEnum, pgTable, real, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
@@ -24,6 +24,8 @@ export const users: any = pgTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 32 }),
+  walletAddress: varchar("wallet_address", { length: 42 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: roleEnum("role").default("user").notNull(),
   suspended: boolean("suspended").default(false).notNull(),
@@ -733,6 +735,7 @@ export const mojaloopTransactions = pgTable("mojaloop_transactions", {
   
   // Transaction identifiers
   transactionId: varchar("transaction_id", { length: 128 }).notNull().unique(),
+  reversalOfTransactionId: varchar("reversal_of_transaction_id", { length: 128 }),
   transferId: varchar("transfer_id", { length: 128 }).unique(),
   quoteId: varchar("quote_id", { length: 128 }).unique(),
   
@@ -2843,6 +2846,8 @@ export const lakehouseSyncJobs = pgTable("lakehouse_sync_jobs", {
   jobType: lakehouseJobTypeEnum("job_type").notNull(),
   tableName: varchar("table_name", { length: 255 }).notNull(),
   sourceEntity: varchar("source_entity", { length: 120 }),
+  sourceEventId: integer("source_event_id").references(() => eventOutbox.id, { onDelete: "set null" }),
+  contractVersion: varchar("contract_version", { length: 64 }),
   status: integrationSyncStatusEnum("status").default("pending").notNull(),
   cursorValue: varchar("cursor_value", { length: 255 }),
   payload: jsonb("payload"),
@@ -4046,3 +4051,154 @@ export const cofOStageLog = pgTable("cof_o_stage_log", {
 }, (t) => ({
   applicationIdx: index("cofo_stage_log_app_idx").on(t.applicationId),
 }));
+
+
+// ============================================
+// PLATFORM INTEGRITY MODELS
+// ============================================
+
+/**
+ * Durable account-security state. Identity credentials and OTP enrollment remain
+ * in Keycloak; this table records the platform's verified enrollment state.
+ */
+export const userSecuritySettings = pgTable("user_security_settings", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  twoFactorState: varchar("two_factor_state", { length: 32 }).notNull().default("disabled"),
+  passwordUpdatedAt: timestamp("password_updated_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const documentSignatures = pgTable("document_signatures", {
+  id: serial("id").primaryKey(),
+  documentId: varchar("document_id", { length: 255 }).notNull().unique(),
+  documentType: varchar("document_type", { length: 100 }).notNull(),
+  parcelId: varchar("parcel_id", { length: 255 }).references(() => parcels.parcelId, { onDelete: "set null" }),
+  documentHash: varchar("document_hash", { length: 64 }).notNull(),
+  signature: text("signature").notNull(),
+  chainEntryHash: varchar("chain_entry_hash", { length: 64 }).notNull(),
+  chainSequence: integer("chain_sequence").notNull().default(1),
+  signedBy: integer("signed_by").references(() => users.id, { onDelete: "set null" }),
+  signedAt: timestamp("signed_at", { withTimezone: true }).defaultNow().notNull(),
+  legallyBinding: boolean("legally_binding").notNull().default(true),
+  legalBasis: text("legal_basis"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  parcelIdx: index("idx_doc_sigs_parcel").on(table.parcelId),
+  signedAtIdx: index("document_signatures_signed_at_idx").on(table.signedAt),
+}));
+
+export const gazetteNotices = pgTable("gazette_notices", {
+  id: serial("id").primaryKey(),
+  gnn: varchar("gnn", { length: 50 }).notNull().unique(),
+  noticeType: varchar("notice_type", { length: 100 }).notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("PENDING"),
+  stateCode: varchar("state_code", { length: 3 }).notNull(),
+  lgaCode: varchar("lga_code", { length: 10 }),
+  title: text("title").notNull(),
+  description: text("description"),
+  authorizedBy: varchar("authorized_by", { length: 255 }).notNull(),
+  authorizerTitle: varchar("authorizer_title", { length: 255 }),
+  legalBasis: text("legal_basis"),
+  documentHash: varchar("document_hash", { length: 64 }),
+  effectiveDate: date("effective_date"),
+  submittedBy: integer("submitted_by").references(() => users.id, { onDelete: "set null" }),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  gazetteVolume: varchar("gazette_volume", { length: 50 }),
+  gazettePage: integer("gazette_page"),
+  legallyBinding: boolean("legally_binding").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  stateStatusIdx: index("idx_gazette_state").on(table.stateCode, table.status),
+}));
+
+export const gazetteParcelLinks = pgTable("gazette_parcel_links", {
+  id: serial("id").primaryKey(),
+  gazetteId: integer("gazette_id").notNull().references(() => gazetteNotices.id, { onDelete: "cascade" }),
+  parcelId: varchar("parcel_id", { length: 255 }).notNull().references(() => parcels.parcelId, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  gazetteParcelUnique: uniqueIndex("gazette_parcel_links_unique_idx").on(table.gazetteId, table.parcelId),
+}));
+
+export const identityVerifications = pgTable("identity_verifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  nin: varchar("nin", { length: 11 }),
+  bvn: varchar("bvn", { length: 11 }),
+  verificationStatus: varchar("verification_status", { length: 50 }).notNull().default("PENDING"),
+  verificationMethod: varchar("verification_method", { length: 50 }).notNull().default("NIN"),
+  verifiedName: varchar("verified_name", { length: 255 }),
+  verifiedDob: date("verified_dob"),
+  verifiedPhone: varchar("verified_phone", { length: 20 }),
+  biometricScore: decimal("biometric_score", { precision: 5, scale: 4 }),
+  nimcReference: varchar("nimc_reference", { length: 100 }),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("idx_identity_user").on(table.userId),
+  ninUniqueIdx: uniqueIndex("identity_verifications_nin_unique_idx").on(table.nin),
+  statusExpiryIdx: index("identity_verifications_status_expiry_idx").on(table.verificationStatus, table.expiresAt),
+}));
+
+/**
+ * The last published Permify schema version for each tenant. Relationship writes
+ * use this ledger to avoid silently targeting a stale authorization model.
+ */
+export const authorizationSchemaVersions = pgTable("authorization_schema_versions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  tenantId: varchar("tenant_id", { length: 64 }).notNull(),
+  schemaVersion: varchar("schema_version", { length: 128 }).notNull(),
+  schemaHash: varchar("schema_hash", { length: 128 }).notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }).defaultNow().notNull(),
+  publishedBy: integer("published_by").references(() => users.id, { onDelete: "set null" }),
+}, (table) => ({
+  tenantVersionUnique: uniqueIndex("authorization_schema_versions_tenant_version_unique").on(table.tenantId, table.schemaVersion),
+  tenantPublishedIdx: index("authorization_schema_versions_tenant_published_idx").on(table.tenantId, table.publishedAt),
+}));
+
+export type UserSecuritySettings = typeof userSecuritySettings.$inferSelect;
+export type DocumentSignature = typeof documentSignatures.$inferSelect;
+export type GazetteNotice = typeof gazetteNotices.$inferSelect;
+export type GazetteParcelLink = typeof gazetteParcelLinks.$inferSelect;
+export type IdentityVerification = typeof identityVerifications.$inferSelect;
+export type AuthorizationSchemaVersion = typeof authorizationSchemaVersions.$inferSelect;
+
+
+/** Verified examples and model-run metadata for CPU-trained lakehouse models. */
+export const mlTrainingExamples = pgTable("ml_training_examples", {
+  id: bigint("id", { mode: "number" }).primaryKey(),
+  modelName: varchar("model_name", { length: 128 }).notNull(),
+  featureVector: jsonb("feature_vector").notNull(),
+  label: boolean("label").notNull(),
+  sourceReference: varchar("source_reference", { length: 255 }).notNull(),
+  sourceEventId: integer("source_event_id").references(() => eventOutbox.id, { onDelete: "set null" }),
+  verifiedBy: integer("verified_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  modelCreatedIdx: index("ml_training_examples_model_created_idx").on(table.modelName, table.createdAt),
+  sourceUnique: uniqueIndex("ml_training_examples_source_unique").on(table.modelName, table.sourceReference),
+}));
+
+export const mlModelRuns = pgTable("ml_model_runs", {
+  id: bigint("id", { mode: "number" }).primaryKey(),
+  modelName: varchar("model_name", { length: 128 }).notNull(),
+  modelVersion: varchar("model_version", { length: 128 }).notNull(),
+  artifactUri: text("artifact_uri").notNull(),
+  featureSchema: jsonb("feature_schema").notNull(),
+  metrics: jsonb("metrics").notNull(),
+  trainingRows: integer("training_rows").notNull(),
+  positiveRows: integer("positive_rows").notNull(),
+  trainedBy: integer("trained_by").references(() => users.id, { onDelete: "set null" }),
+  trainedAt: timestamp("trained_at", { withTimezone: true }).defaultNow().notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+}, (table) => ({
+  nameVersionUnique: uniqueIndex("ml_model_runs_name_version_unique").on(table.modelName, table.modelVersion),
+  activeModelIdx: uniqueIndex("ml_model_runs_active_model_unique_idx").on(table.modelName),
+}));
+
+export type MlTrainingExample = typeof mlTrainingExamples.$inferSelect;
+export type MlModelRun = typeof mlModelRuns.$inferSelect;

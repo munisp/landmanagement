@@ -1,22 +1,60 @@
-/**
- * Temporal Activities
- * 
- * Activities are the building blocks of workflows. Each activity performs
- * a specific task and can be retried independently if it fails.
- */
+import { Context } from "@temporalio/activity";
+import { and, eq, inArray } from "drizzle-orm";
+import {
+  blockchainTransactions,
+  notificationInbox,
+  parcels,
+  registryTransactions,
+  users,
+} from "../../drizzle/schema";
+import {
+  cancelPayment,
+  executePayment,
+  getPaymentStatus,
+  initiatePropertyPayment,
+  refundCompletedPayment,
+} from "../../server/mojaloopPaymentService";
+import {
+  createEscrowForPayment,
+  getDefaultContractConfig,
+  refundEscrowOnPaymentFailure,
+  SmartContractIntegration,
+} from "../../server/smartContractIntegration";
+import { requireDb } from "../../server/db";
+import {
+  createLedgerTransfer as createTigerBeetleTransfer,
+  ensureLedgerAccounts,
+  reverseLedgerTransfer,
+  verifyLedgerTransfer,
+} from "../../server/tigerbeetleLedgerService";
+import { queueEvent } from "../../server/eventBus";
+import { sendNotification as deliverNotification } from "../../server/notificationDelivery";
 
-import { Context } from '@temporalio/activity';
-import { getPaymentStatus, cancelPayment } from '../../server/mojaloopPaymentService';
-// import { createEscrow } from '../../server/smartContractIntegration';
-// TigerBeetle client - using gRPC client
-// import { getClient } from '../../server/tigerBeetleClient';
-import { getDb } from '../../server/db';
-import { parcels, registryTransactions, users } from '../../drizzle/schema';
-import { eq } from 'drizzle-orm';
+function toUserId(value: string, label: string): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new Error(`${label} must be a positive application user ID`);
+  return parsed;
+}
 
-// ============================================================================
-// Payment Activities
-// ============================================================================
+function amountToMinorUnits(value: string): string {
+  const decimals = Number(process.env.LEDGER_CURRENCY_DECIMALS || 2);
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 9) {
+    throw new Error("LEDGER_CURRENCY_DECIMALS must be an integer between 0 and 9");
+  }
+  if (!/^\d+(?:\.\d+)?$/.test(value)) throw new Error("Transaction amount must be a positive decimal string");
+  const [whole, fraction = ""] = value.split(".");
+  if (fraction.length > decimals) throw new Error(`Transaction amount cannot contain more than ${decimals} decimal places`);
+  const result = `${whole}${fraction.padEnd(decimals, "0")}`.replace(/^0+(?=\d)/, "");
+  if (BigInt(result) <= 0n) throw new Error("Transaction amount must be positive");
+  return result;
+}
+
+async function requiredUser(id: number) {
+  const db = await requireDb();
+  const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  if (!rows[0]) throw new Error(`User ${id} was not found`);
+  return rows[0];
+}
 
 export interface InitiatePaymentParams {
   amount: string;
@@ -34,29 +72,27 @@ export interface InitiatePaymentResult {
 }
 
 export async function initiatePayment(params: InitiatePaymentParams): Promise<InitiatePaymentResult> {
-  Context.current().log.info('Initiating payment', { params });
-  
-  // TODO: Implement Mojaloop payment initiation
-  const result = {
-    paymentId: `pay-${Date.now()}`,
-    transactionId: `txn-${Date.now()}`,
-    status: 'initiated',
-  };
-  /*
-  const result = await initiateMojaloopPayment({
+  Context.current().log.info("Initiating Mojaloop payment", { propertyId: params.propertyId, payerId: params.payerId, payeeId: params.payeeId });
+  if (params.paymentMethod !== "mojaloop") {
+    throw new Error(`Unsupported payment method ${params.paymentMethod}; only the configured Mojaloop rail is accepted by this workflow`);
+  }
+  const payer = await requiredUser(toUserId(params.payerId, "payerId"));
+  const payee = await requiredUser(toUserId(params.payeeId, "payeeId"));
+  if (!payer.phone || !payee.phone) {
+    throw new Error("Both buyer and seller require verified MSISDN numbers before a Mojaloop payment can be initiated");
+  }
+
+  const result = await initiatePropertyPayment({
+    userId: payer.id,
     amount: params.amount,
     currency: params.currency,
-    payerId: params.payerId,
-    payeeId: params.payeeId,
-    metadata: { propertyId: params.propertyId },
+    payerMsisdn: payer.phone,
+    payeeMsisdn: payee.phone,
+    propertyId: params.propertyId,
+    purpose: "property_purchase",
+    note: `Property purchase for ${params.propertyId}`,
   });
-  */
-
-  return {
-    paymentId: result.paymentId,
-    transactionId: result.transactionId,
-    status: result.status,
-  };
+  return { paymentId: result.transactionId, transactionId: result.transactionId, status: "quote_received" };
 }
 
 export interface VerifyPaymentStatusParams {
@@ -70,15 +106,14 @@ export interface VerifyPaymentStatusResult {
 }
 
 export async function verifyPaymentStatus(params: VerifyPaymentStatusParams): Promise<VerifyPaymentStatusResult> {
-  Context.current().log.info('Verifying payment status', { paymentId: params.paymentId });
-  
-  const status = await getPaymentStatus(params.paymentId);
-  if (!status) throw new Error('Payment status not found');
-
-  return {
-    status: status.status,
-    errorMessage: status.errorDescription,
-  };
+  Context.current().log.info("Executing and verifying Mojaloop payment", { paymentId: params.paymentId });
+  if (!params.approvalCode?.trim()) throw new Error("A payment approval code is required");
+  const current = await getPaymentStatus(params.paymentId);
+  if (!current) throw new Error("Payment status was not found");
+  if (current.status === "quote_received") await executePayment(params.paymentId);
+  const result = await getPaymentStatus(params.paymentId);
+  if (!result) throw new Error("Payment status was not found after execution");
+  return { status: result.status, errorMessage: result.errorDescription };
 }
 
 export interface RefundPaymentParams {
@@ -94,19 +129,16 @@ export interface RefundPaymentResult {
 }
 
 export async function refundPayment(params: RefundPaymentParams): Promise<RefundPaymentResult> {
-  Context.current().log.info('Refunding payment', { paymentId: params.paymentId });
-  
-  await cancelPayment(params.paymentId, params.reason);
-
-  return {
-    refundId: params.paymentId,
-    status: 'refunded',
-  };
+  Context.current().log.info("Executing Mojaloop compensation refund", { paymentId: params.paymentId });
+  const original = await getPaymentStatus(params.paymentId);
+  if (!original) throw new Error("Original payment was not found for refund");
+  if (original.status === "quote_received" || original.status === "pending") {
+    await cancelPayment(params.paymentId, params.reason);
+    return { refundId: params.paymentId, status: "cancelled" };
+  }
+  const refund = await refundCompletedPayment({ transactionId: params.paymentId, reason: params.reason });
+  return { refundId: refund.refundTransactionId, status: refund.status };
 }
-
-// ============================================================================
-// Blockchain Activities
-// ============================================================================
 
 export interface CreateBlockchainEscrowParams {
   propertyId: string;
@@ -118,89 +150,56 @@ export interface CreateBlockchainEscrowParams {
 
 export interface CreateBlockchainEscrowResult {
   transactionHash: string;
-  escrowId: string;
+  escrowId: number;
   status: string;
 }
 
 export async function createBlockchainEscrow(params: CreateBlockchainEscrowParams): Promise<CreateBlockchainEscrowResult> {
-  Context.current().log.info('Creating blockchain escrow', { params });
-  
-  // TODO: Implement blockchain escrow creation
-  const result = {
-    transactionHash: `0x${Date.now().toString(16)}`,
-    escrowId: `escrow-${params.paymentId}`,
-  };
-  /*
-  const result = await createEscrow({
-    buyer: params.buyer,
-    seller: params.seller,
+  Context.current().log.info("Creating blockchain escrow", { propertyId: params.propertyId, paymentId: params.paymentId });
+  const buyer = await requiredUser(toUserId(params.buyer, "buyer"));
+  const seller = await requiredUser(toUserId(params.seller, "seller"));
+  if (!buyer.walletAddress || !seller.walletAddress) {
+    throw new Error("Both buyer and seller require verified wallet addresses before escrow can be created");
+  }
+  const result = await createEscrowForPayment({
+    mojaloopTransactionId: params.paymentId,
+    buyer: buyer.walletAddress,
+    seller: seller.walletAddress,
     amount: params.amount,
-    escrowId: `escrow-${params.paymentId}`,
-    metadata: { propertyId: params.propertyId, paymentId: params.paymentId },
+    propertyId: params.propertyId,
+    contractConfig: getDefaultContractConfig(),
   });
-  */
-
-  return {
-    transactionHash: result.transactionHash,
-    escrowId: result.escrowId,
-    status: 'pending',
-  };
+  return { transactionHash: result.transactionHash, escrowId: result.escrowId, status: "confirmed" };
 }
 
-export interface VerifyBlockchainTransactionParams {
-  transactionHash: string;
-}
-
-export interface VerifyBlockchainTransactionResult {
-  status: string;
-  blockNumber?: number;
-  errorMessage?: string;
-}
+export interface VerifyBlockchainTransactionParams { transactionHash: string; }
+export interface VerifyBlockchainTransactionResult { status: string; blockNumber?: number; errorMessage?: string; }
 
 export async function verifyBlockchainTransaction(params: VerifyBlockchainTransactionParams): Promise<VerifyBlockchainTransactionResult> {
-  Context.current().log.info('Verifying blockchain transaction', { transactionHash: params.transactionHash });
-  
-  // TODO: Implement blockchain transaction status check
-  const status = { confirmed: true, blockNumber: 12345, error: undefined };
-  /*
-  const status = await getTransactionStatus(params.transactionHash);
-  */
-
+  const verification = await new SmartContractIntegration(getDefaultContractConfig()).verifyTransaction(params.transactionHash);
   return {
-    status: status.confirmed ? 'confirmed' : 'pending',
-    blockNumber: status.blockNumber,
-    errorMessage: status.error,
+    status: verification.confirmed ? "confirmed" : "pending",
+    blockNumber: verification.blockNumber,
+    errorMessage: verification.confirmed ? undefined : "Blockchain transaction has not yet been confirmed",
   };
 }
 
 export interface RefundEscrowParams {
-  transactionHash: string;
-  recipient: string;
+  escrowId: number;
+  paymentId: string;
   reason: string;
 }
-
-export interface RefundEscrowResult {
-  refundTransactionHash: string;
-  status: string;
-}
+export interface RefundEscrowResult { refundTransactionHash: string; status: string; }
 
 export async function refundEscrow(params: RefundEscrowParams): Promise<RefundEscrowResult> {
-  Context.current().log.info('Refunding escrow', { transactionHash: params.transactionHash });
-  
-  // TODO: Implement escrow refund once smart contract integration is complete
-  const result = {
-    transactionHash: `refund-${params.transactionHash}`,
-  };
-
-  return {
-    refundTransactionHash: result.transactionHash,
-    status: 'refunded',
-  };
+  Context.current().log.info("Refunding blockchain escrow", { escrowId: params.escrowId, paymentId: params.paymentId });
+  const transactionHash = await refundEscrowOnPaymentFailure({
+    mojaloopTransactionId: params.paymentId,
+    escrowId: params.escrowId,
+    contractConfig: getDefaultContractConfig(),
+  });
+  return { refundTransactionHash: transactionHash, status: "confirmed" };
 }
-
-// ============================================================================
-// Ledger Activities
-// ============================================================================
 
 export interface CreateLedgerTransferParams {
   debitAccountId: string;
@@ -210,99 +209,43 @@ export interface CreateLedgerTransferParams {
   transactionHash: string;
   propertyId: string;
 }
-
-export interface CreateLedgerTransferResult {
-  transferId: string;
-  status: string;
-}
+export interface CreateLedgerTransferResult { transferId: string; status: string; }
 
 export async function createLedgerTransfer(params: CreateLedgerTransferParams): Promise<CreateLedgerTransferResult> {
-  Context.current().log.info('Creating ledger transfer', { params });
-  
-  // TODO: Implement TigerBeetle transfer once gRPC service is deployed
-  const result = {
-    transferId: `transfer-${Date.now()}`,
-  };
-  /*
-  const client = getClient();
-  const result = await client.createTransfer({
+  Context.current().log.info("Creating TigerBeetle ledger transfer", { paymentId: params.paymentId });
+  const minorAmount = amountToMinorUnits(params.amount);
+  await ensureLedgerAccounts([{ accountId: params.debitAccountId }, { accountId: params.creditAccountId }]);
+  const result = await createTigerBeetleTransfer({
+    transferReference: `property-payment:${params.paymentId}`,
     debitAccountId: params.debitAccountId,
     creditAccountId: params.creditAccountId,
-    amount: params.amount,
-    ledgerId: 1, // Property transactions ledger
-    code: 1001, // Property purchase code
-    userData128: JSON.stringify({
-      paymentId: params.paymentId,
-      transactionHash: params.transactionHash,
-      propertyId: params.propertyId,
-    }),
+    amount: minorAmount,
+    metadataHash: `${params.propertyId}:${params.transactionHash}`,
   });
-  */
-
-  return {
-    transferId: result.transferId,
-    status: 'posted',
-  };
+  return { transferId: result.transferId, status: "posted" };
 }
 
-export interface VerifyLedgerBalanceParams {
-  accountId: string;
-  expectedIncrease: string;
-  transferId: string;
-}
-
-export interface VerifyLedgerBalanceResult {
-  verified: boolean;
-  actualBalance: string;
-  errorMessage?: string;
-}
+export interface VerifyLedgerBalanceParams { accountId: string; expectedIncrease: string; transferId: string; }
+export interface VerifyLedgerBalanceResult { verified: boolean; actualBalance: string; errorMessage?: string; }
 
 export async function verifyLedgerBalance(params: VerifyLedgerBalanceParams): Promise<VerifyLedgerBalanceResult> {
-  Context.current().log.info('Verifying ledger balance', { accountId: params.accountId });
-  
-  // TODO: Implement balance check once TigerBeetle gRPC service is deployed
-  const balance = { balance: params.expectedIncrease };
-  /*
-  const client = getClient();
-  const balance = await client.getAccountBalance(params.accountId);
-  */
-
-  // Simple verification - in production, you'd check the actual balance change
-  const verified = parseFloat(balance.balance) >= parseFloat(params.expectedIncrease);
-
-  return {
-    verified,
-    actualBalance: balance.balance,
-    errorMessage: verified ? undefined : 'Balance verification failed',
-  };
+  return verifyLedgerTransfer({
+    transferId: params.transferId,
+    creditAccountId: params.accountId,
+    expectedAmount: amountToMinorUnits(params.expectedIncrease),
+  });
 }
 
-export interface VoidLedgerTransferParams {
-  transferId: string;
-  reason: string;
-}
-
-export interface VoidLedgerTransferResult {
-  status: string;
-}
+export interface VoidLedgerTransferParams { transferId: string; reason: string; }
+export interface VoidLedgerTransferResult { status: string; }
 
 export async function voidLedgerTransfer(params: VoidLedgerTransferParams): Promise<VoidLedgerTransferResult> {
-  Context.current().log.info('Voiding ledger transfer', { transferId: params.transferId });
-  
-  // TODO: Implement void transfer once TigerBeetle gRPC service is deployed
-  /*
-  const client = getClient();
-  await client.voidTransfer(params.transferId, params.reason);
-  */
-
-  return {
-    status: 'voided',
-  };
+  const result = await reverseLedgerTransfer({
+    transferId: params.transferId,
+    reversalReference: `workflow-compensation:${params.transferId}:${params.reason}`,
+  });
+  return { status: `reversed:${result.reversalTransferId}` };
 }
-
-// ============================================================================
-// Property Title Activities
-// ============================================================================
 
 export interface TransferPropertyTitleParams {
   propertyId: string;
@@ -311,94 +254,83 @@ export interface TransferPropertyTitleParams {
   paymentId: string;
   transactionHash: string;
   transferId: string;
+  amount?: string;
 }
-
-export interface TransferPropertyTitleResult {
-  titleTransferId: string;
-  status: string;
-}
+export interface TransferPropertyTitleResult { titleTransferId: string; status: string; }
 
 export async function transferPropertyTitle(params: TransferPropertyTitleParams): Promise<TransferPropertyTitleResult> {
-  Context.current().log.info('Transferring property title', { propertyId: params.propertyId });
-  
-  const db = await getDb();
-  if (!db) throw new Error('Database connection failed');
+  Context.current().log.info("Transferring property title", { propertyId: params.propertyId });
+  const db = await requireDb();
+  const fromOwnerId = toUserId(params.fromOwnerId, "fromOwnerId");
+  const toOwnerId = toUserId(params.toOwnerId, "toOwnerId");
+  const [fromOwner, toOwner] = await Promise.all([requiredUser(fromOwnerId), requiredUser(toOwnerId)]);
+  const result = await db.transaction(async (tx) => {
+    const parcelRows = await tx.select().from(parcels).where(eq(parcels.parcelId, params.propertyId)).limit(1);
+    const parcel = parcelRows[0];
+    if (!parcel) throw new Error("Property was not found");
+    if (parcel.ownerId !== fromOwnerId) throw new Error("Property ownership changed before title transfer could be finalized");
+    const updated = await tx
+      .update(parcels)
+      .set({ ownerId: toOwnerId, lastTransferDate: new Date(), updatedAt: new Date() })
+      .where(and(eq(parcels.parcelId, params.propertyId), eq(parcels.ownerId, fromOwnerId)))
+      .returning({ id: parcels.id });
+    if (!updated[0]) throw new Error("Property title transfer was not applied due to a concurrent ownership change");
 
-  // Update property ownership
-  await db
-    .update(parcels)
-    .set({
-      ownerId: parseInt(params.toOwnerId),
-      updatedAt: new Date(),
-    })
-    .where(eq(parcels.parcelId, params.propertyId));
-
-  // Get parcel ID
-  const parcelResults = await db
-    .select({ id: parcels.id })
-    .from(parcels)
-    .where(eq(parcels.parcelId, params.propertyId))
-    .limit(1);
-
-  if (parcelResults.length === 0) {
-    throw new Error('Property not found');
-  }
-
-  // Resolve party names for the registry record
-  const partyIds = [parseInt(params.fromOwnerId), parseInt(params.toOwnerId)];
-  const partyRows = await db.select({ id: users.id, name: users.name }).from(users);
-  const nameOf = (id: number) => partyRows.find((u) => u.id === id)?.name ?? `User ${id}`;
-
-  // Create registry transaction record
-  const [transaction] = await db
-    .insert(registryTransactions)
-    .values({
-      type: 'transfer',
-      parcelId: parcelResults[0].id,
-      initiatorId: parseInt(params.fromOwnerId),
-      initiatorName: nameOf(parseInt(params.fromOwnerId)),
-      counterpartyName: nameOf(parseInt(params.toOwnerId)),
-      status: 'completed',
-      workflowStage: 'closed',
-      paymentStatus: 'paid',
-      documentStatus: 'verified',
-      considerationAmount: 0, // Amount already recorded in payment
-      externalReference: `txn-${params.paymentId}`,
-      notes: `Blockchain anchor: ${params.transactionHash}`,
-    })
-    .returning();
-
-  return {
-    titleTransferId: transaction.id.toString(),
-    status: 'completed',
-  };
+    const consideration = params.amount ? Number(amountToMinorUnits(params.amount)) : 0;
+    if (!Number.isSafeInteger(consideration)) throw new Error("Transaction consideration exceeds the supported safe integer range");
+    const [transaction] = await tx.insert(registryTransactions).values({
+      type: "transfer",
+      parcelId: parcel.id,
+      initiatorId: fromOwner.id,
+      initiatorName: fromOwner.name || `user:${fromOwner.id}`,
+      counterpartyName: toOwner.name || `user:${toOwner.id}`,
+      status: "completed",
+      workflowStage: "closed",
+      paymentStatus: "paid",
+      documentStatus: "verified",
+      considerationAmount: consideration,
+      externalReference: `title:${params.paymentId}:${fromOwner.id}:${toOwner.id}`,
+      notes: `Mojaloop payment=${params.paymentId}; blockchain transaction=${params.transactionHash}; TigerBeetle transfer=${params.transferId}`,
+    }).returning();
+    return transaction;
+  });
+  return { titleTransferId: result.id.toString(), status: "completed" };
 }
 
-// ============================================================================
-// Notification Activities
-// ============================================================================
-
-export interface SendNotificationParams {
-  userId: string;
-  type: string;
-  message: string;
-  metadata?: Record<string, any>;
-}
-
-export interface SendNotificationResult {
-  notificationId: string;
-  status: string;
-}
+export interface SendNotificationParams { userId: string; type: string; message: string; metadata?: Record<string, unknown>; }
+export interface SendNotificationResult { notificationId: string; status: string; }
 
 export async function sendNotification(params: SendNotificationParams): Promise<SendNotificationResult> {
-  Context.current().log.info('Sending notification', { userId: params.userId, type: params.type });
-  
-  // In production, integrate with notification service
-  // For now, just log the notification
-  console.log(`[NOTIFICATION] ${params.userId}: ${params.message}`);
+  const db = await requireDb();
+  const recipients = params.userId === "admin"
+    ? await db.select().from(users).where(inArray(users.role, ["admin"] as any))
+    : [await requiredUser(toUserId(params.userId, "userId"))];
+  if (!recipients.length) throw new Error("No notification recipient was found");
 
-  return {
-    notificationId: `notif-${Date.now()}`,
-    status: 'sent',
-  };
+  const records = await db.insert(notificationInbox).values(recipients.map((recipient) => ({
+    userId: recipient.id,
+    type: params.type,
+    title: params.type.replace(/_/g, " "),
+    message: params.message,
+    data: params.metadata ?? null,
+  }))).returning();
+
+  for (const recipient of recipients) {
+    await queueEvent({
+      backend: "dapr_pubsub",
+      topic: "notification-requested",
+      eventType: "notification.requested.v1",
+      aggregateType: "notification",
+      aggregateId: String(recipient.id),
+      partitionKey: String(recipient.id),
+      payload: { notificationId: records.find((record) => record.userId === recipient.id)?.id, userId: recipient.id, type: params.type, message: params.message, metadata: params.metadata ?? {} },
+      deliveryStatus: "pending",
+      availableAt: new Date(),
+    });
+    const delivery = await deliverNotification({ email: recipient.email || undefined, phone: recipient.phone || undefined, smsMessage: params.message });
+    if (delivery.email?.success === false || delivery.sms?.success === false) {
+      Context.current().log.warn("A notification delivery channel failed; durable inbox and outbox records remain available", { userId: recipient.id });
+    }
+  }
+  return { notificationId: records[0].id.toString(), status: "queued" };
 }

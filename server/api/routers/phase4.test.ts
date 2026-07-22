@@ -46,11 +46,17 @@ describe('Phase 4 Router', () => {
       .insert(parcels)
       .values({
         parcelId: `TEST-PHASE4-${Date.now()}`,
+        parcelNumber: `TEST-PHASE4-${Date.now()}`,
+        surveyPlanNumber: `SP-PHASE4-${Date.now()}`,
         ownerId: testUserId,
         address: '123 Phase4 Test Street',
         state: 'Lagos',
+        lga: 'Eti-Osa',
+        country: 'Nigeria',
+        latitude: '6.4281',
+        longitude: '3.4219',
         area: 1000,
-        landUse: 'Residential',
+        landUse: 'residential',
         status: 'registered',
       })
       .returning();

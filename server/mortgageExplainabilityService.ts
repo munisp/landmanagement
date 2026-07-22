@@ -6,7 +6,8 @@
  * repayment burden, documentation completeness, and collateral status.
  * Designed for regulator/auditor/lender adverse-action defensibility.
  *
- * Offline-capable: composes in-memory repositories when PostgreSQL is down.
+ * Uses configured PostgreSQL repositories and provider-backed bureau signals;
+ * infrastructure failures are surfaced for review rather than replaced with local state.
  */
 
 import { desc, eq } from 'drizzle-orm';

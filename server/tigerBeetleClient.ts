@@ -25,7 +25,11 @@ const protoDescriptor = grpc.loadPackageDefinition(packageDefinition) as any;
 const ledgerProto = protoDescriptor.ledger;
 
 // Environment variables
-const TIGERBEETLE_GRPC_URL = process.env.TIGERBEETLE_GRPC_URL || 'localhost:50051';
+function configuredTigerBeetleGrpcUrl(): string {
+  const url = process.env.TIGERBEETLE_GRPC_URL?.trim();
+  if (!url) throw new Error('TIGERBEETLE_GRPC_URL must be configured for the TigerBeetle gRPC bridge');
+  return url;
+}
 
 // Account types
 export enum AccountType {
@@ -84,10 +88,15 @@ export class TigerBeetleClient {
   private client: any;
   private connected: boolean = false;
 
-  constructor(serverUrl: string = TIGERBEETLE_GRPC_URL) {
+  constructor(serverUrl?: string) {
+    const endpoint = serverUrl?.trim() || configuredTigerBeetleGrpcUrl();
+    const useTls = process.env.TIGERBEETLE_GRPC_TLS === 'true';
+    if (process.env.NODE_ENV === 'production' && !useTls) {
+      throw new Error('TIGERBEETLE_GRPC_TLS=true is required for the TigerBeetle gRPC bridge in production');
+    }
     this.client = new ledgerProto.LedgerService(
-      serverUrl,
-      grpc.credentials.createInsecure()
+      endpoint,
+      useTls ? grpc.credentials.createSsl() : grpc.credentials.createInsecure(),
     );
   }
 

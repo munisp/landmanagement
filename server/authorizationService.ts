@@ -1,137 +1,45 @@
-import { TRPCError } from '@trpc/server';
-import type { User } from '../drizzle/schema';
-import { externalClients } from './_core/externalClients';
+import { TRPCError } from "@trpc/server";
+import type { User } from "../drizzle/schema";
+import {
+  checkPermifyPermission,
+  type PermifyAction,
+  type PermifyResourceType,
+} from "./permifyService";
 
-export type AuthorizationResourceType =
-  | 'parcel'
-  | 'transaction'
-  | 'title'
-  | 'document'
-  | 'workflow'
-  | 'report'
-  | 'marketplace_listing'
-  | 'admin_surface'
-  | 'system';
+export type AuthorizationResourceType = PermifyResourceType;
+export type AuthorizationAction = PermifyAction;
 
-export type AuthorizationAction = 'view' | 'create' | 'update' | 'delete' | 'approve' | 'manage';
-
-const roleMatrix: Record<string, Partial<Record<AuthorizationResourceType, AuthorizationAction[]>>> = {
-  admin: {
-    system: ['view', 'manage'],
-    admin_surface: ['view', 'manage'],
-    parcel: ['view', 'create', 'update', 'delete', 'approve'],
-    transaction: ['view', 'create', 'update', 'delete', 'approve'],
-    title: ['view', 'create', 'update', 'delete', 'approve'],
-    document: ['view', 'create', 'update', 'delete', 'approve'],
-    workflow: ['view', 'create', 'update', 'delete', 'approve', 'manage'],
-    report: ['view', 'create', 'update', 'delete', 'approve', 'manage'],
-    marketplace_listing: ['view', 'create', 'update', 'delete', 'approve'],
-  },
-  registrar: {
-    admin_surface: ['view'],
-    parcel: ['view', 'create', 'update', 'approve'],
-    transaction: ['view', 'create', 'update', 'approve'],
-    title: ['view', 'create', 'update', 'approve'],
-    document: ['view', 'create', 'update', 'approve'],
-    workflow: ['view', 'update', 'approve'],
-    report: ['view', 'create'],
-    marketplace_listing: ['view'],
-  },
-  surveyor: {
-    parcel: ['view', 'create', 'update'],
-    document: ['view', 'create', 'update'],
-    workflow: ['view', 'update'],
-    report: ['view'],
-  },
-  broker: {
-    parcel: ['view'],
-    marketplace_listing: ['view', 'create', 'update'],
-    report: ['view'],
-    transaction: ['view'],
-  },
-  investor: {
-    marketplace_listing: ['view'],
-    report: ['view'],
-    transaction: ['view'],
-    parcel: ['view'],
-  },
-  user: {
-    parcel: ['view'],
-    title: ['view'],
-    transaction: ['view', 'create'],
-    document: ['view', 'create'],
-    marketplace_listing: ['view'],
-  },
-};
-
-function fallbackAllows(user: User, resource: AuthorizationResourceType, action: AuthorizationAction): boolean {
-  const allowed = roleMatrix[user.role || 'user']?.[resource] || [];
-  return allowed.includes(action);
-}
-
-async function checkPermify(user: User, resource: AuthorizationResourceType, resourceId: string, action: AuthorizationAction) {
-  const baseUrl = process.env.PERMIFY_URL;
-  if (!baseUrl || !externalClients.permify) {
-    return null;
-  }
-
-  try {
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/v1/permissions/check`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        tenantId: process.env.PERMIFY_TENANT_ID || 'idlr',
-        metadata: { schemaVersion: '', snapToken: '', depth: 20 },
-        entity: {
-          type: resource,
-          id: resourceId,
-        },
-        permission: action,
-        subject: {
-          type: 'user',
-          id: String(user.id),
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const payload = await response.json() as { can?: string | boolean; allowed?: boolean };
-    if (typeof payload.allowed === 'boolean') {
-      return payload.allowed;
-    }
-    if (typeof payload.can === 'boolean') {
-      return payload.can;
-    }
-    if (typeof payload.can === 'string') {
-      return payload.can.toUpperCase() === 'RESULT_ALLOWED' || payload.can.toLowerCase() === 'allow';
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
+/**
+ * Enforce authorization through the versioned Permify policy model.
+ *
+ * This is deliberately fail-closed: an unavailable or misconfigured Permify
+ * service is an authorization-system outage, not a reason to use a local role
+ * matrix that can drift from the deployed policy.
+ */
 export async function ensureAuthorized(params: {
   user: User | null;
   resource: AuthorizationResourceType;
   action: AuthorizationAction;
   resourceId?: string;
 }) {
-  const { user, resource, action, resourceId = 'global' } = params;
+  const { user, resource, action, resourceId = "global" } = params;
   if (!user) {
-    throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Authentication required' });
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication required" });
   }
 
-  const permifyDecision = await checkPermify(user, resource, resourceId, action);
-  const allowed = permifyDecision ?? fallbackAllows(user, resource, action);
+  let allowed: boolean;
+  try {
+    allowed = await checkPermifyPermission({ user, resource, resourceId, action });
+  } catch (error) {
+    console.error("[Authorization] Permify enforcement failed", error);
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Authorization service is unavailable. Please retry after it has recovered.",
+    });
+  }
 
   if (!allowed) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: `Not authorized to ${action} ${resource}` });
+    throw new TRPCError({ code: "FORBIDDEN", message: `Not authorized to ${action} ${resource}` });
   }
 
   return true;

@@ -10,19 +10,31 @@ import { logger } from './logger';
 // OpenTelemetry Configuration
 // ============================================================================
 
-const jaegerExporter = new JaegerExporter({
-  endpoint: process.env.JAEGER_ENDPOINT || 'http://localhost:14268/api/traces',
-});
+const TRACING_ENABLED = process.env.TRACING_ENABLED === 'true';
+const METRICS_ENABLED = process.env.METRICS_ENABLED === 'true';
 
-const prometheusExporter = new PrometheusExporter({
-  port: 9464, // Separate port for OpenTelemetry metrics
-}, () => {
-  logger.info({ port: 9464 }, 'OpenTelemetry Prometheus exporter started');
-});
+function requiredObservabilityConfig(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} must be configured when its observability integration is enabled`);
+  return value;
+}
+
+const jaegerExporter = TRACING_ENABLED
+  ? new JaegerExporter({ endpoint: requiredObservabilityConfig('JAEGER_ENDPOINT') })
+  : undefined;
+const prometheusPort = METRICS_ENABLED ? Number(requiredObservabilityConfig('PROMETHEUS_PORT')) : undefined;
+if (prometheusPort !== undefined && (!Number.isInteger(prometheusPort) || prometheusPort < 1 || prometheusPort > 65535)) {
+  throw new Error('PROMETHEUS_PORT must be a valid TCP port');
+}
+const prometheusExporter = prometheusPort
+  ? new PrometheusExporter({ port: prometheusPort }, () => {
+      logger.info({ port: prometheusPort }, 'OpenTelemetry Prometheus exporter started');
+    })
+  : undefined;
 
 const sdk = new NodeSDK({
-  traceExporter: jaegerExporter,
-  metricReader: prometheusExporter,
+  ...(jaegerExporter ? { traceExporter: jaegerExporter } : {}),
+  ...(prometheusExporter ? { metricReader: prometheusExporter } : {}),
   instrumentations: [
     getNodeAutoInstrumentations({
       // Customize instrumentation
@@ -52,12 +64,17 @@ const sdk = new NodeSDK({
 
 // Start the SDK
 export function startTracing(): void {
+  if (!TRACING_ENABLED && !METRICS_ENABLED) {
+    logger.info('OpenTelemetry exporters are disabled by configuration');
+    return;
+  }
   sdk.start();
   logger.info('OpenTelemetry tracing initialized');
 }
 
 // Graceful shutdown
 export async function stopTracing(): Promise<void> {
+  if (!TRACING_ENABLED && !METRICS_ENABLED) return;
   await sdk.shutdown();
   logger.info('OpenTelemetry tracing shut down');
 }

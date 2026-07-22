@@ -7,11 +7,8 @@ apisix:
     port: 9180
   admin_key:
     - name: admin
-      key: edd1c9f034335f136f87ad84b625c8f1
+      key: ${{APISIX_ADMIN_KEY:=}}
       role: admin
-    - name: viewer
-      key: 4054f7cf07e344346cd3f287985e76a2
-      role: viewer
 
 etcd:
   host:
@@ -28,7 +25,6 @@ plugins:
   - zipkin
   - ext-plugin-pre-req
   - fault-injection
-  - mocking
   - serverless-pre-function
   - cors
   - ip-restriction

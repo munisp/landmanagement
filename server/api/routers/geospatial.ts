@@ -846,23 +846,30 @@ WHERE ST_Intersects(dem.rast, ST_Buffer(
       confidenceThreshold: z.number().min(0).max(1).default(0.75),
     }))
     .mutation(async ({ input }) => {
-      // In production: call the Python AI boundary detection service
-      // (lakehouse/ml/models/boundary_detection.py with SAM/SegFormer model)
-      return {
-        parcelId: input.parcelId,
-        status: 'queued',
-        jobId: `boundary_${input.parcelId}_${Date.now()}`,
-        imagerySource: input.imagerySource,
-        message: 'Boundary detection job queued. The AI model (SAM/SegFormer) will process the imagery and return detected polygon boundaries.',
-        estimatedDurationSeconds: 30,
-        modelEndpoint: `${process.env.LAKEHOUSE_API_URL ?? 'http://localhost:8000'}/api/v1/boundary-detection`,
-        payload: {
+      const baseUrl = process.env.LAKEHOUSE_API_URL?.trim();
+      const apiKey = process.env.LAKEHOUSE_API_KEY?.trim();
+      if (!baseUrl || !apiKey) {
+        throw new Error('LAKEHOUSE_API_URL and LAKEHOUSE_API_KEY must be configured for boundary detection');
+      }
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/v1/boundary-detection`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+        },
+        body: JSON.stringify({
           parcel_id: input.parcelId,
           imagery_source: input.imagerySource,
           image_url: input.imageUrl,
           confidence_threshold: input.confidenceThreshold,
-        },
-      };
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(`Lakehouse boundary-detection inference failed with HTTP ${response.status}: ${detail.slice(0, 500)}`);
+      }
+      return response.json();
     }),
 
   // ============================================================

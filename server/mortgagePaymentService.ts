@@ -9,10 +9,26 @@ import {
 } from '../drizzle/schema';
 import { eq, and, lte, gte, desc } from 'drizzle-orm';
 import axios from 'axios';
-import { assertMockFallbackAllowed } from './_core/mockGuard';
 
-const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || 'sk_test_xxx';
-const FLUTTERWAVE_SECRET_KEY = process.env.FLUTTERWAVE_SECRET_KEY || 'FLWSECK_TEST-xxx';
+function requiredProviderConfig(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} must be configured for mortgage payment processing`);
+  return value;
+}
+
+function paystackConfig() {
+  return {
+    secretKey: requiredProviderConfig('PAYSTACK_SECRET_KEY'),
+    baseUrl: requiredProviderConfig('PAYSTACK_API_BASE_URL').replace(/\/$/, ''),
+  };
+}
+
+function flutterwaveConfig() {
+  return {
+    secretKey: requiredProviderConfig('FLUTTERWAVE_SECRET_KEY'),
+    baseUrl: requiredProviderConfig('FLUTTERWAVE_API_BASE_URL').replace(/\/$/, ''),
+  };
+}
 
 /**
  * Generate payment schedule for approved mortgage
@@ -490,8 +506,9 @@ async function createPaystackMandate(params: {
   email: string;
 }): Promise<{ authorization_code: string; authorization_url: string }> {
   try {
+    const provider = paystackConfig();
     const response = await axios.post(
-      'https://api.paystack.co/transaction/charge_authorization',
+      `${provider.baseUrl}/transaction/charge_authorization`,
       {
         account_number: params.accountNumber,
         bank_code: params.bankCode,
@@ -500,7 +517,7 @@ async function createPaystackMandate(params: {
       },
       {
         headers: {
-          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          Authorization: `Bearer ${provider.secretKey}`,
         },
       }
     );
@@ -510,13 +527,7 @@ async function createPaystackMandate(params: {
       authorization_url: response.data.data.authorization_url,
     };
   } catch (error: any) {
-    console.error('[Paystack] Mandate creation failed:', error.message);
-    // Mock data is only ever returned outside production (see mockGuard).
-    assertMockFallbackAllowed('paystack-mandate-creation');
-    return {
-      authorization_code: `AUTH_${Date.now()}`,
-      authorization_url: 'https://checkout.paystack.com/mock',
-    };
+    throw new Error(`Paystack mandate creation failed: ${error.message}`);
   }
 }
 
@@ -526,8 +537,9 @@ async function chargePaystackMandate(params: {
   reference: string;
 }): Promise<{ success: boolean; reference: string; message?: string }> {
   try {
+    const provider = paystackConfig();
     const response = await axios.post(
-      'https://api.paystack.co/transaction/charge_authorization',
+      `${provider.baseUrl}/transaction/charge_authorization`,
       {
         authorization_code: params.authorizationCode,
         amount: params.amount,
@@ -535,24 +547,17 @@ async function chargePaystackMandate(params: {
       },
       {
         headers: {
-          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          Authorization: `Bearer ${provider.secretKey}`,
         },
       }
     );
 
     return {
-      success: response.data.status === 'success',
+      success: response.data.status === true || response.data.data?.status === 'success',
       reference: response.data.data.reference,
     };
   } catch (error: any) {
-    console.error('[Paystack] Charge failed:', error.message);
-    // Simulate success for development only — throws in production, so a
-    // provider outage records the debit as FAILED, never as paid.
-    assertMockFallbackAllowed('chargePaystackMandate');
-    return {
-      success: true,
-      reference: params.reference,
-    };
+    throw new Error(`Paystack mandate charge failed: ${error.message}`);
   }
 }
 
@@ -562,8 +567,9 @@ async function createFlutterwaveMandate(params: {
   amount: number;
 }): Promise<{ mandate_code: string }> {
   try {
+    const provider = flutterwaveConfig();
     const response = await axios.post(
-      'https://api.flutterwave.com/v3/charges?type=debit_ng_account',
+      `${provider.baseUrl}/v3/charges?type=debit_ng_account`,
       {
         account_number: params.accountNumber,
         account_bank: params.bankCode,
@@ -572,7 +578,7 @@ async function createFlutterwaveMandate(params: {
       },
       {
         headers: {
-          Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
+          Authorization: `Bearer ${provider.secretKey}`,
         },
       }
     );
@@ -581,12 +587,7 @@ async function createFlutterwaveMandate(params: {
       mandate_code: response.data.data.mandate_code,
     };
   } catch (error: any) {
-    console.error('[Flutterwave] Mandate creation failed:', error.message);
-    // Development-only fake mandate code — throws in production.
-    assertMockFallbackAllowed('createFlutterwaveMandate');
-    return {
-      mandate_code: `MND_${Date.now()}`,
-    };
+    throw new Error(`Flutterwave mandate creation failed: ${error.message}`);
   }
 }
 
@@ -596,8 +597,9 @@ async function chargeFlutterwaveMandate(params: {
   reference: string;
 }): Promise<{ success: boolean; reference: string; message?: string }> {
   try {
+    const provider = flutterwaveConfig();
     const response = await axios.post(
-      'https://api.flutterwave.com/v3/charges?type=debit_ng_account',
+      `${provider.baseUrl}/v3/charges?type=debit_ng_account`,
       {
         mandate_code: params.mandateCode,
         amount: params.amount,
@@ -605,24 +607,17 @@ async function chargeFlutterwaveMandate(params: {
       },
       {
         headers: {
-          Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
+          Authorization: `Bearer ${provider.secretKey}`,
         },
       }
     );
 
     return {
-      success: response.data.status === 'successful',
+      success: response.data.status === 'success' || response.data.status === 'successful',
       reference: response.data.data.tx_ref,
     };
   } catch (error: any) {
-    console.error('[Flutterwave] Charge failed:', error.message);
-    // Development-only simulated success — throws in production, so a
-    // provider outage records the debit as FAILED, never as paid.
-    assertMockFallbackAllowed('chargeFlutterwaveMandate');
-    return {
-      success: true,
-      reference: params.reference,
-    };
+    throw new Error(`Flutterwave mandate charge failed: ${error.message}`);
   }
 }
 

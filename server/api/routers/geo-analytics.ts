@@ -24,12 +24,15 @@ export const geoAnalyticsRouter = router({
       const filteredTransactions = transactions.filter((transaction) => parcelIds.has(transaction.parcelId));
 
       const propertyValueData = Object.values(
-        filteredParcels.reduce<Record<string, { state: string; totalValue: number; count: number; registeredCount: number }>>((acc, parcel) => {
+        filteredParcels.reduce<Record<string, { state: string; totalValue: number; count: number; valuedCount: number; registeredCount: number }>>((acc, parcel) => {
           const key = parcel.state;
           if (!acc[key]) {
-            acc[key] = { state: parcel.state, totalValue: 0, count: 0, registeredCount: 0 };
+            acc[key] = { state: parcel.state, totalValue: 0, count: 0, valuedCount: 0, registeredCount: 0 };
           }
-          acc[key].totalValue += parcel.estimatedValue;
+          if (parcel.estimatedValue !== null) {
+            acc[key].totalValue += parcel.estimatedValue;
+            acc[key].valuedCount += 1;
+          }
           acc[key].count += 1;
           if (parcel.status === 'registered') {
             acc[key].registeredCount += 1;
@@ -38,8 +41,10 @@ export const geoAnalyticsRouter = router({
         }, {}),
       ).map((item) => ({
         state: item.state,
-        avgValue: Math.round(item.totalValue / Math.max(item.count, 1)),
+        avgValue: item.valuedCount > 0 ? Math.round(item.totalValue / item.valuedCount) : null,
         count: item.count,
+        valuedCount: item.valuedCount,
+        unappraisedCount: item.count - item.valuedCount,
         growth: Math.round((item.registeredCount / Math.max(item.count, 1)) * 1000) / 10,
       }));
 
@@ -85,26 +90,31 @@ export const geoAnalyticsRouter = router({
       const transactionTrends = trendBuckets.map(({ key, ...bucket }) => bucket);
 
       const parcelDensity = Object.values(
-        filteredParcels.reduce<Record<string, { lga: string; state: string; parcelCount: number; totalArea: number; totalValue: number }>>((acc, parcel) => {
+        filteredParcels.reduce<Record<string, { lga: string; state: string; parcelCount: number; valuedCount: number; totalArea: number; totalValue: number }>>((acc, parcel) => {
           const key = `${parcel.state}::${parcel.lga}`;
           if (!acc[key]) {
             acc[key] = {
               lga: parcel.lga,
               state: parcel.state,
               parcelCount: 0,
+              valuedCount: 0,
               totalArea: 0,
               totalValue: 0,
             };
           }
           acc[key].parcelCount += 1;
           acc[key].totalArea += parcel.areaSquareMeters;
-          acc[key].totalValue += parcel.estimatedValue;
+          if (parcel.estimatedValue !== null) {
+            acc[key].totalValue += parcel.estimatedValue;
+            acc[key].valuedCount += 1;
+          }
           return acc;
         }, {}),
       )
         .map((item) => ({
           ...item,
-          averageValue: Math.round(item.totalValue / Math.max(item.parcelCount, 1)),
+          averageValue: item.valuedCount > 0 ? Math.round(item.totalValue / item.valuedCount) : null,
+          unappraisedCount: item.parcelCount - item.valuedCount,
           averageArea: Math.round(item.totalArea / Math.max(item.parcelCount, 1)),
         }))
         .sort((a, b) => b.parcelCount - a.parcelCount);

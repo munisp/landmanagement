@@ -5,8 +5,27 @@
 
 import axios from 'axios';
 
-// OpenDroneMap API endpoint (can be configured via environment variable)
-const ODM_API_URL = process.env.ODM_API_URL || 'http://localhost:3000/api/odm';
+function requiredServiceUrl(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} must be configured for drone processing`);
+  return value.replace(/\/$/, '');
+}
+
+function odmApiUrl(): string {
+  return requiredServiceUrl('ODM_API_URL');
+}
+
+function buildingDetectionServiceUrl(): string {
+  return requiredServiceUrl('BUILDING_DETECTION_SERVICE_URL');
+}
+
+function buildingDetectionConfidenceThreshold(): number {
+  const value = Number(process.env.BUILDING_DETECTION_CONFIDENCE_THRESHOLD);
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error('BUILDING_DETECTION_CONFIDENCE_THRESHOLD must be configured as a number from 0 to 1');
+  }
+  return value;
+}
 
 export interface DroneImageUpload {
   images: string[]; // Array of image URLs or file paths
@@ -45,7 +64,7 @@ export interface ProcessingTask {
  */
 export async function submitDroneImagery(data: DroneImageUpload): Promise<ProcessingTask> {
   try {
-    const response = await axios.post(`${ODM_API_URL}/tasks`, {
+    const response = await axios.post(`${odmApiUrl()}/tasks`, {
       name: data.name,
       images: data.images,
       options: {
@@ -77,7 +96,7 @@ export async function submitDroneImagery(data: DroneImageUpload): Promise<Proces
  */
 export async function getTaskStatus(taskId: string): Promise<ProcessingTask> {
   try {
-    const response = await axios.get(`${ODM_API_URL}/tasks/${taskId}/info`);
+    const response = await axios.get(`${odmApiUrl()}/tasks/${taskId}/info`);
     const task = response.data;
 
     return {
@@ -89,12 +108,12 @@ export async function getTaskStatus(taskId: string): Promise<ProcessingTask> {
       completedAt: task.dateCompleted ? new Date(task.dateCompleted) : undefined,
       error: task.status.errorMessage,
       outputs: task.status.code === 40 ? {
-        orthophoto: `${ODM_API_URL}/tasks/${task.uuid}/download/orthophoto.tif`,
-        dsm: `${ODM_API_URL}/tasks/${task.uuid}/download/dsm.tif`,
-        dtm: `${ODM_API_URL}/tasks/${task.uuid}/download/dtm.tif`,
-        pointCloud: `${ODM_API_URL}/tasks/${task.uuid}/download/georeferenced_model.laz`,
-        mesh: `${ODM_API_URL}/tasks/${task.uuid}/download/textured_model.obj`,
-        report: `${ODM_API_URL}/tasks/${task.uuid}/download/report.pdf`,
+        orthophoto: `${odmApiUrl()}/tasks/${task.uuid}/download/orthophoto.tif`,
+        dsm: `${odmApiUrl()}/tasks/${task.uuid}/download/dsm.tif`,
+        dtm: `${odmApiUrl()}/tasks/${task.uuid}/download/dtm.tif`,
+        pointCloud: `${odmApiUrl()}/tasks/${task.uuid}/download/georeferenced_model.laz`,
+        mesh: `${odmApiUrl()}/tasks/${task.uuid}/download/textured_model.obj`,
+        report: `${odmApiUrl()}/tasks/${task.uuid}/download/report.pdf`,
       } : undefined,
     };
   } catch (error) {
@@ -108,7 +127,7 @@ export async function getTaskStatus(taskId: string): Promise<ProcessingTask> {
  */
 export async function cancelTask(taskId: string): Promise<void> {
   try {
-    await axios.post(`${ODM_API_URL}/tasks/${taskId}/cancel`);
+    await axios.post(`${odmApiUrl()}/tasks/${taskId}/cancel`);
   } catch (error) {
     console.error('Error canceling task:', error);
     throw new Error('Failed to cancel task');
@@ -120,7 +139,7 @@ export async function cancelTask(taskId: string): Promise<void> {
  */
 export async function listTasks(): Promise<ProcessingTask[]> {
   try {
-    const response = await axios.get(`${ODM_API_URL}/tasks`);
+    const response = await axios.get(`${odmApiUrl()}/tasks`);
     return response.data.map((task: any) => ({
       id: task.uuid,
       name: task.name,
@@ -153,7 +172,7 @@ export async function downloadOutput(
     };
 
     const response = await axios.get(
-      `${ODM_API_URL}/tasks/${taskId}/download/${fileMap[outputType]}`,
+      `${odmApiUrl()}/tasks/${taskId}/download/${fileMap[outputType]}`,
       { responseType: 'arraybuffer' }
     );
 
@@ -169,10 +188,9 @@ export async function downloadOutput(
  */
 export async function extractBuildingFootprints(orthophotoUrl: string): Promise<any> {
   try {
-    // This would integrate with the YOLOv8 service for building detection
-    const response = await axios.post('http://localhost:8004/detect', {
+    const response = await axios.post(`${buildingDetectionServiceUrl()}/detect`, {
       image_url: orthophotoUrl,
-      confidence_threshold: 0.5,
+      confidence_threshold: buildingDetectionConfidenceThreshold(),
       classes: ['building'],
     });
 
@@ -199,44 +217,6 @@ function mapStatus(code: number): ProcessingTask['status'] {
     case 60: // Failed
       return 'failed';
     default:
-      return 'queued';
+      return 'failed';
   }
-}
-
-/**
- * Mock implementation for development/testing
- */
-export async function submitDroneImageryMock(data: DroneImageUpload): Promise<ProcessingTask> {
-  const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  return {
-    id: taskId,
-    name: data.name,
-    status: 'queued',
-    progress: 0,
-    createdAt: new Date(),
-  };
-}
-
-export async function getTaskStatusMock(taskId: string): Promise<ProcessingTask> {
-  // Simulate processing progress
-  const progress = Math.min(100, Math.floor(Math.random() * 100));
-  const status = progress === 100 ? 'completed' : 'processing';
-  
-  return {
-    id: taskId,
-    name: 'Drone Survey Project',
-    status,
-    progress,
-    createdAt: new Date(Date.now() - 3600000), // 1 hour ago
-    completedAt: status === 'completed' ? new Date() : undefined,
-    outputs: status === 'completed' ? {
-      orthophoto: `https://storage.example.com/odm/${taskId}/orthophoto.tif`,
-      dsm: `https://storage.example.com/odm/${taskId}/dsm.tif`,
-      dtm: `https://storage.example.com/odm/${taskId}/dtm.tif`,
-      pointCloud: `https://storage.example.com/odm/${taskId}/point_cloud.laz`,
-      mesh: `https://storage.example.com/odm/${taskId}/mesh.obj`,
-      report: `https://storage.example.com/odm/${taskId}/report.pdf`,
-    } : undefined,
-  };
 }

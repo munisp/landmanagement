@@ -1,6 +1,10 @@
 import { getParcelById, searchParcels, type ParcelRecord } from './parcelRepository';
 
-const GEOLIBRE_BASE_URL = process.env.GEOLIBRE_BASE_URL || 'http://localhost:8080';
+function geoLibreBaseUrl(): string {
+  const baseUrl = process.env.GEOLIBRE_BASE_URL?.trim();
+  if (!baseUrl) throw new Error('GEOLIBRE_BASE_URL must be configured for GeoLibre integration');
+  return baseUrl;
+}
 
 function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
@@ -47,16 +51,7 @@ function buildPolygonCoordinates(parcel: ParcelRecord): number[][][] {
     }
   }
 
-  const area = Math.max(parcel.areaSquareMeters || 400, 100);
-  const offset = Math.sqrt(area) / 111000 / 2;
-  const { lat, lng } = parcel.coordinates;
-  return [[
-    [lng - offset, lat - offset],
-    [lng + offset, lat - offset],
-    [lng + offset, lat + offset],
-    [lng - offset, lat + offset],
-    [lng - offset, lat - offset],
-  ]];
+  throw new Error(`Parcel ${parcel.id} lacks a valid persisted polygon or boundary coordinate set`);
 }
 
 function toFeature(parcel: ParcelRecord, role: 'anchor' | 'nearby'): GeoJSON.Feature<GeoJSON.Polygon> {
@@ -83,7 +78,7 @@ function toFeature(parcel: ParcelRecord, role: 'anchor' | 'nearby'): GeoJSON.Fea
 }
 
 function buildLaunchUrl() {
-  const url = new URL(GEOLIBRE_BASE_URL);
+  const url = new URL(geoLibreBaseUrl());
   url.searchParams.set('maponly', '1');
   url.searchParams.set('welcome', '0');
   return url.toString();
@@ -95,12 +90,16 @@ export async function getGeoLibreLaunchContext(parcelId: number) {
     throw new Error(`Parcel ${parcelId} not found`);
   }
 
-  const allParcels = searchParcels({ page: 1, limit: 1000 }).parcels;
+  const anchorCoordinates = parcel.coordinates;
+  if (!anchorCoordinates) {
+    throw new Error(`Parcel ${parcelId} lacks persisted centroid coordinates required for proximity analysis`);
+  }
+  const allParcels = (await searchParcels({ page: 1, limit: 1000 })).parcels;
   const nearbyParcels = allParcels
-    .filter((candidate) => candidate.id !== parcel.id)
+    .filter((candidate): candidate is ParcelRecord & { coordinates: { lat: number; lng: number } } => candidate.id !== parcel.id && candidate.coordinates !== null)
     .map((candidate) => ({
       parcel: candidate,
-      distanceKm: Number(distanceKm(parcel.coordinates, candidate.coordinates).toFixed(2)),
+      distanceKm: Number(distanceKm(anchorCoordinates, candidate.coordinates).toFixed(2)),
     }))
     .filter((candidate) => candidate.distanceKm <= 25)
     .sort((a, b) => a.distanceKm - b.distanceKm)
@@ -116,7 +115,7 @@ export async function getGeoLibreLaunchContext(parcelId: number) {
 
   return {
     provider: 'GeoLibre',
-    baseUrl: GEOLIBRE_BASE_URL,
+      baseUrl: geoLibreBaseUrl(),
     launchUrl: buildLaunchUrl(),
     embedMode: 'iframe-maponly',
     parcel: {

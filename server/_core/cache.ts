@@ -13,7 +13,8 @@ import { cacheHits, cacheMisses, cacheEvictions } from './metrics';
 let redis: Redis | null = null;
 
 // Cache configuration
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL?.trim();
+const CACHE_ENABLED = process.env.CACHE_ENABLED !== 'false';
 const REDIS_PASSWORD = process.env.REDIS_PASSWORD;
 const REDIS_DB = parseInt(process.env.REDIS_DB || '0', 10);
 const REDIS_MAX_RETRIES = parseInt(process.env.REDIS_MAX_RETRIES || '3', 10);
@@ -32,6 +33,17 @@ export const CacheTTL = {
  * Initialize Redis connection
  */
 export function initializeCache(): void {
+  if (!CACHE_ENABLED) {
+    logger.info('Redis cache explicitly disabled');
+    return;
+  }
+  if (!REDIS_URL) {
+    if (process.env.NODE_ENV === 'test') {
+      logger.info('Redis cache is not configured for this test process');
+      return;
+    }
+    throw new Error('REDIS_URL must be configured when CACHE_ENABLED is not false');
+  }
   if (redis) {
     logger.warn('Cache already initialized');
     return;

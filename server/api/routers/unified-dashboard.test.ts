@@ -32,11 +32,17 @@ describe('Unified Dashboard Router', () => {
       .insert(parcels)
       .values({
         parcelId: `TEST-UNIFIED-${Date.now()}`,
+        parcelNumber: `TEST-UNIFIED-${Date.now()}`,
+        surveyPlanNumber: `SP-UNIFIED-${Date.now()}`,
         ownerId: testUserId,
         address: '123 Test Street',
         state: 'Lagos',
+        lga: 'Eti-Osa',
+        country: 'Nigeria',
+        latitude: '6.4281',
+        longitude: '3.4219',
         area: 1000,
-        landUse: 'Residential',
+        landUse: 'residential',
         status: 'registered',
       })
       .returning();

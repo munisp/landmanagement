@@ -5,15 +5,27 @@
 
 import Redis from 'ioredis';
 
-// Redis client configuration
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  maxRetriesPerRequest: 3,
-  enableReadyCheck: true,
-  retryStrategy(times: number) {
-    const delay = Math.min(times * 50, 2000);
-    return delay;
-  },
-});
+// Redis client configuration. Rate limiting must never select an undeclared
+// local Redis instance or fail open when shared state is unavailable.
+const RATE_LIMIT_ENABLED = process.env.RATE_LIMIT_ENABLED !== 'false';
+const RATE_LIMIT_REDIS_URL = process.env.REDIS_URL?.trim();
+if (RATE_LIMIT_ENABLED && !RATE_LIMIT_REDIS_URL && process.env.NODE_ENV !== 'test') {
+  throw new Error('REDIS_URL must be configured when RATE_LIMIT_ENABLED is not false');
+}
+const redis: Redis | null = RATE_LIMIT_ENABLED && RATE_LIMIT_REDIS_URL
+  ? new Redis(RATE_LIMIT_REDIS_URL, {
+      maxRetriesPerRequest: 3,
+      enableReadyCheck: true,
+      retryStrategy(times: number) {
+        return Math.min(times * 50, 2000);
+      },
+    })
+  : null;
+
+function requireRateLimitRedis(): Redis {
+  if (!redis) throw new Error('Rate limiting is unavailable because Redis is not configured or RATE_LIMIT_ENABLED=false');
+  return redis;
+}
 
 export interface RateLimitConfig {
   points: number;        // Number of requests allowed
@@ -92,8 +104,9 @@ export async function checkRateLimit(
   const blockKey = `ratelimit:block:${key}`;
   
   try {
+    const client = requireRateLimitRedis();
     // Check if currently blocked
-    const blocked = await redis.get(blockKey);
+    const blocked = await client.get(blockKey);
     if (blocked) {
       const blockExpiry = parseInt(blocked);
       const retryAfter = Math.ceil((blockExpiry - now) / 1000);
@@ -132,7 +145,7 @@ export async function checkRateLimit(
       return {0, now + (ttl * 1000)}
     `;
     
-    const result = await redis.eval(
+    const result = await client.eval(
       script,
       1,
       bucketKey,
@@ -146,7 +159,7 @@ export async function checkRateLimit(
     // If limit exceeded, set block
     if (remaining <= 0 && config.blockDuration) {
       const blockExpiry = now + (config.blockDuration * 1000);
-      await redis.set(blockKey, blockExpiry.toString(), 'EX', config.blockDuration);
+      await client.set(blockKey, blockExpiry.toString(), 'EX', config.blockDuration);
       
       return {
         allowed: false,
@@ -163,12 +176,7 @@ export async function checkRateLimit(
     };
   } catch (error) {
     console.error('Rate limit check failed:', error);
-    // Fail open - allow request if Redis is down
-    return {
-      allowed: true,
-      remaining: config.points,
-      resetAt: new Date(now + config.duration * 1000),
-    };
+    throw error;
   }
 }
 
@@ -228,8 +236,9 @@ export async function getRateLimitStatus(
   const now = Date.now();
   
   try {
+    const client = requireRateLimitRedis();
     // Check if blocked
-    const blocked = await redis.get(blockKey);
+    const blocked = await client.get(blockKey);
     if (blocked) {
       const blockExpiry = parseInt(blocked);
       return {
@@ -241,8 +250,8 @@ export async function getRateLimitStatus(
     }
     
     // Get current bucket value
-    const current = await redis.get(bucketKey);
-    const ttl = await redis.ttl(bucketKey);
+    const current = await client.get(bucketKey);
+    const ttl = await client.ttl(bucketKey);
     
     if (!current) {
       return {
@@ -259,11 +268,7 @@ export async function getRateLimitStatus(
     };
   } catch (error) {
     console.error('Failed to get rate limit status:', error);
-    return {
-      allowed: true,
-      remaining: config.points,
-      resetAt: new Date(now + config.duration * 1000),
-    };
+    throw error;
   }
 }
 
@@ -274,9 +279,10 @@ export async function resetRateLimit(key: string): Promise<void> {
   const bucketKey = `ratelimit:${key}`;
   const blockKey = `ratelimit:block:${key}`;
   
+  const client = requireRateLimitRedis();
   await Promise.all([
-    redis.del(bucketKey),
-    redis.del(blockKey),
+    client.del(bucketKey),
+    client.del(blockKey),
   ]);
 }
 
@@ -289,7 +295,8 @@ export async function getRateLimitStats(): Promise<{
   topConsumers: Array<{ key: string; remaining: number }>;
 }> {
   try {
-    const keys = await redis.keys('ratelimit:*');
+    const client = requireRateLimitRedis();
+    const keys = await client.keys('ratelimit:*');
     const blockKeys = keys.filter((k: string) => k.includes(':block:'));
     
     // Get top consumers (lowest remaining counts)
@@ -297,7 +304,7 @@ export async function getRateLimitStats(): Promise<{
     const values = await Promise.all(
       bucketKeys.slice(0, 100).map(async (k: string) => ({
         key: k.replace('ratelimit:', ''),
-        remaining: parseInt(await redis.get(k) || '0'),
+        remaining: parseInt(await client.get(k) || '0'),
       }))
     );
     
@@ -348,6 +355,7 @@ export async function checkRateLimitSlidingWindow(
   const bucketKey = `ratelimit:sliding:${key}`;
   
   try {
+    const client = requireRateLimitRedis();
     // Use sorted set to track requests in sliding window
     const script = `
       local key = KEYS[1]
@@ -371,7 +379,7 @@ export async function checkRateLimitSlidingWindow(
       return {0, 0, now + (duration * 1000)}
     `;
     
-    const result = await redis.eval(
+    const result = await client.eval(
       script,
       1,
       bucketKey,
@@ -390,11 +398,7 @@ export async function checkRateLimitSlidingWindow(
     };
   } catch (error) {
     console.error('Sliding window rate limit check failed:', error);
-    return {
-      allowed: true,
-      remaining: config.points,
-      resetAt: new Date(now + config.duration * 1000),
-    };
+    throw error;
   }
 }
 

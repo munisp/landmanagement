@@ -59,6 +59,7 @@ export interface PropertyTransactionState {
   status: 'pending' | 'payment_processing' | 'escrow_created' | 'ledger_updated' | 'title_transferred' | 'completed' | 'failed' | 'compensating';
   paymentId?: string;
   transactionHash?: string;
+  escrowId?: number;
   transferId?: string;
   titleTransferId?: string;
   errorMessage?: string;
@@ -182,6 +183,7 @@ export async function propertyTransactionWorkflow(
     });
 
     state.transactionHash = escrowResult.transactionHash;
+    state.escrowId = escrowResult.escrowId;
     state.completedSteps.push('escrow_created');
 
     // Wait for blockchain confirmation
@@ -308,6 +310,7 @@ export async function propertyTransactionWorkflow(
           paymentId: state.paymentId!,
           transactionHash: state.transactionHash!,
           transferId: state.transferId!,
+          amount: input.amount,
         });
       }
 
@@ -321,9 +324,12 @@ export async function propertyTransactionWorkflow(
 
       // Refund escrow (if created)
       if (state.completedSteps.includes('escrow_created')) {
+        if (!state.escrowId || !state.paymentId) {
+          throw new Error("Cannot compensate escrow because the persisted escrow identifier or payment ID is missing");
+        }
         await refundEscrow({
-          transactionHash: state.transactionHash!,
-          recipient: input.buyerId,
+          escrowId: state.escrowId,
+          paymentId: state.paymentId,
           reason: state.errorMessage,
         });
       }

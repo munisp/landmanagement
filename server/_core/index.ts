@@ -21,6 +21,7 @@ import { realtimeWebSocketService } from "../realtimeWebSocketService";
 import { externalApiRouter } from "../externalApi";
 import { startEmailQueueProcessor } from "../emailQueueService";
 import { healthCheck, livenessProbe, readinessProbe, startupProbe } from "./healthCheck";
+import { advancedSecurityHeaders, idsMiddleware, wafMiddleware } from "./advancedSecurity";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -53,6 +54,11 @@ export function configureApp(app: express.Express): void {
   // real client IP from X-Forwarded-For instead of the gateway address.
   app.set("trust proxy", 1);
 
+  // Defense in depth: application-level headers and IDS complement OpenAppSec
+  // at the gateway. The IDS observes all request and response outcomes.
+  app.use(advancedSecurityHeaders);
+  app.use(idsMiddleware);
+
   // Security headers: CSP, HSTS, frameguard, nosniff, referrer policy.
   app.use(helmetMiddleware());
 
@@ -74,6 +80,12 @@ export function configureApp(app: express.Express): void {
   app.use(requestSizeLimiter(maxBodySize));
   app.use(express.json({ limit: maxBodySize }));
   app.use(express.urlencoded({ limit: maxBodySize, extended: true }));
+
+  // Inspect parsed request bodies as a last application-layer protection if the
+  // edge attachment is unavailable during a controlled maintenance window.
+  if (process.env.IN_PROCESS_WAF_ENABLED !== "false") {
+    app.use(wafMiddleware);
+  }
 
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);

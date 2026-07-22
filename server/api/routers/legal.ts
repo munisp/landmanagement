@@ -1,14 +1,11 @@
 /**
  * Legal Framework Recognition Router
- * Digital signatures, cryptographic audit chains, gazette publication.
- * Legal basis: Nigeria Evidence Act 2011 s.84; Land Use Act 1978 (as amended)
+ * Digital signatures, cryptographic audit chains, and gazette publication.
  */
 import { z } from "zod";
 import { protectedProcedure, router } from "../../_core/trpc";
 import { TRPCError } from "@trpc/server";
 
-const CRYPTO_SERVICE_URL = process.env.CRYPTO_AUDIT_SERVICE_URL ?? "http://localhost:8092";
-const GAZETTE_SERVICE_URL = process.env.GAZETTE_SERVICE_URL ?? "http://localhost:8093";
 const TIMEOUT_MS = 10_000;
 
 const documentTypeEnum = z.enum([
@@ -31,24 +28,34 @@ const gazetteNoticeTypeEnum = z.enum([
   "ENVIRONMENTAL_PROTECTION",
 ]);
 
+function serviceUrl(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `${name} is not configured` });
+  return value.replace(/\/$/, "");
+}
+
 async function callService(url: string, method: "GET" | "POST", body?: unknown) {
   try {
-    const res = await fetch(url, {
+    const response = await fetch(url, {
       method,
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error((err as any).error ?? `Service error ${res.status}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: response.statusText }));
+      throw new Error((error as any).error ?? `Service returned HTTP ${response.status}`);
     }
-    return res.json();
-  } catch (err: any) {
-    if (err.name === "TimeoutError") {
-      throw new TRPCError({ code: "TIMEOUT", message: "Service timed out" });
+    return response.json();
+  } catch (error) {
+    if (error instanceof TRPCError) throw error;
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new TRPCError({ code: "TIMEOUT", message: "Legal service timed out" });
     }
-    return { error: err.message, serviceUnavailable: true };
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Legal service is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+    });
   }
 }
 
@@ -62,25 +69,19 @@ export const legalRouter = router({
       documentContent: z.string(),
       metadata: z.record(z.string(), z.unknown()).optional(),
     }))
-    .mutation(async ({ input, ctx }) => {
-      return callService(`${CRYPTO_SERVICE_URL}/sign`, "POST", {
-        ...input,
-        signedBy: ctx.user.id,
-        signerRole: ctx.user.role,
-      });
-    }),
+    .mutation(async ({ input, ctx }) => callService(`${serviceUrl("CRYPTO_AUDIT_SERVICE_URL")}/sign`, "POST", {
+      ...input,
+      signedBy: ctx.user.id,
+      signerRole: ctx.user.role,
+    })),
 
   verifyDocument: protectedProcedure
     .input(z.object({ documentId: z.string(), documentContent: z.string() }))
-    .query(async ({ input }) => {
-      return callService(`${CRYPTO_SERVICE_URL}/verify`, "POST", input);
-    }),
+    .query(async ({ input }) => callService(`${serviceUrl("CRYPTO_AUDIT_SERVICE_URL")}/verify`, "POST", input)),
 
   getAuditChain: protectedProcedure
     .input(z.object({ documentId: z.string() }))
-    .query(async ({ input }) => {
-      return callService(`${CRYPTO_SERVICE_URL}/chain/${input.documentId}`, "GET");
-    }),
+    .query(async ({ input }) => callService(`${serviceUrl("CRYPTO_AUDIT_SERVICE_URL")}/chain/${encodeURIComponent(input.documentId)}`, "GET")),
 
   submitGazette: protectedProcedure
     .input(z.object({
@@ -99,23 +100,18 @@ export const legalRouter = router({
       if (!["admin", "registrar", "federal_registrar"].includes(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient role for gazette submission" });
       }
-      return callService(`${GAZETTE_SERVICE_URL}/gazette/submit`, "POST", {
-        ...input,
-        submittedBy: ctx.user.id,
-      });
+      return callService(`${serviceUrl("GAZETTE_SERVICE_URL")}/gazette/submit`, "POST", { ...input, submittedBy: ctx.user.id });
     }),
 
   getGazetteNotice: protectedProcedure
     .input(z.object({ gnn: z.string() }))
-    .query(async ({ input }) => {
-      return callService(`${GAZETTE_SERVICE_URL}/gazette/${input.gnn}`, "GET");
-    }),
+    .query(async ({ input }) => callService(`${serviceUrl("GAZETTE_SERVICE_URL")}/gazette/${encodeURIComponent(input.gnn)}`, "GET")),
 
   listPendingGazettes: protectedProcedure.query(async ({ ctx }) => {
     if (!["admin", "registrar", "federal_registrar"].includes(ctx.user.role)) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Insufficient role" });
     }
-    return callService(`${GAZETTE_SERVICE_URL}/gazette/pending`, "GET");
+    return callService(`${serviceUrl("GAZETTE_SERVICE_URL")}/gazette/pending`, "GET");
   }),
 
   confirmGazette: protectedProcedure
@@ -124,16 +120,13 @@ export const legalRouter = router({
       if (!["admin", "federal_registrar"].includes(ctx.user.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Federal Registrar role required" });
       }
-      return callService(`${GAZETTE_SERVICE_URL}/gazette/confirm`, "POST", {
-        ...input,
-        confirmedBy: ctx.user.id,
-      });
+      return callService(`${serviceUrl("GAZETTE_SERVICE_URL")}/gazette/confirm`, "POST", { ...input, confirmedBy: ctx.user.id });
     }),
 
   servicesHealth: protectedProcedure.query(async () => {
     const [crypto, gazette] = await Promise.allSettled([
-      callService(`${CRYPTO_SERVICE_URL}/health`, "GET"),
-      callService(`${GAZETTE_SERVICE_URL}/health`, "GET"),
+      callService(`${serviceUrl("CRYPTO_AUDIT_SERVICE_URL")}/health`, "GET"),
+      callService(`${serviceUrl("GAZETTE_SERVICE_URL")}/health`, "GET"),
     ]);
     return {
       cryptoAuditService: crypto.status === "fulfilled" ? crypto.value : { status: "unreachable" },

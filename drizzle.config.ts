@@ -1,8 +1,8 @@
 import { defineConfig } from "drizzle-kit";
 
-const connectionString = process.env.POSTGRES_URL || 'postgresql://idlr_user:idlr_password@localhost:5432/idlr_pts';
+const connectionString = (process.env.POSTGRES_URL || process.env.DATABASE_URL || "").trim();
 if (!connectionString) {
-  throw new Error("POSTGRES_URL is required to run drizzle commands");
+  throw new Error("POSTGRES_URL or DATABASE_URL is required to run Drizzle commands");
 }
 
 export default defineConfig({

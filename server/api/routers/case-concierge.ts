@@ -10,7 +10,7 @@ export const caseConciergeRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return caseConciergeService.startSession({ userId: ctx.user.id, caseType: input.caseType });
+      return await caseConciergeService.startSession({ userId: ctx.user.id, caseType: input.caseType });
     }),
 
   answer: protectedProcedure
@@ -22,13 +22,13 @@ export const caseConciergeRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return caseConciergeService.answerStep(input);
+      return await caseConciergeService.answerStep(input);
     }),
 
   get: protectedProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
     .query(async ({ input }) => {
-      return caseConciergeService.getSession(input.sessionId);
+      return await caseConciergeService.getSession(input.sessionId);
     }),
 
   list: protectedProcedure
@@ -39,7 +39,7 @@ export const caseConciergeRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const sessions = caseConciergeService.listSessions({ userId: ctx.user.id, status: input.status, limit: input.limit });
+      const sessions = await caseConciergeService.listSessions({ userId: ctx.user.id, status: input.status, limit: input.limit });
       return { total: sessions.length, sessions };
     }),
 });

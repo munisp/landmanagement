@@ -106,7 +106,7 @@ export default function ParcelDigitalTwin() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><p className="text-muted-foreground">Estimated value</p><p className="text-lg font-bold">₦{twin.estimatedValue.toLocaleString()}</p></div>
+            <div><p className="text-muted-foreground">Estimated value</p><p className="text-lg font-bold">{twin.estimatedValue === null ? 'Not yet appraised' : `₦${twin.estimatedValue.toLocaleString()}`}</p></div>
             <div><p className="text-muted-foreground">Open disputes</p><p className="text-lg font-bold">{twin.openDisputes}</p></div>
             <div><p className="text-muted-foreground">Transactions</p><p className="text-lg font-bold">{twin.transactionCount}</p></div>
             <div><p className="text-muted-foreground">Elevation / amenity signal</p><p className="text-lg font-bold">{twin.elevationSignal} / {twin.amenitySignal}</p></div>

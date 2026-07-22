@@ -15,24 +15,22 @@ export function setDbForTests(db: ReturnType<typeof drizzle> | null) {
   _db = db;
 }
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
+// Lazily create and verify the configured PostgreSQL connection before use.
 export async function getDb() {
   if (!_db) {
-    try {
-      const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL || 'postgresql://idlr_user:idlr_password@localhost:5432/idlr_pts';
-      const client = postgres(connectionString, {
-        connect_timeout: 3,
-        max: 1,
-        idle_timeout: 5,
-      });
-      const candidate = drizzle(client);
-      await candidate.execute(sql`select 1`);
-      _db = candidate;
-      console.log('[Database] Connected to PostgreSQL');
-    } catch (error) {
-      console.warn('[Database] PostgreSQL unavailable, using offline-capable fallbacks');
-      _db = null;
+    const connectionString = (process.env.POSTGRES_URL || process.env.DATABASE_URL || "").trim();
+    if (!connectionString) {
+      throw new Error("POSTGRES_URL or DATABASE_URL must be configured for PostgreSQL access");
     }
+    const client = postgres(connectionString, {
+      connect_timeout: 3,
+      max: 1,
+      idle_timeout: 5,
+    });
+    const candidate = drizzle(client);
+    await candidate.execute(sql`select 1`);
+    _db = candidate;
+    console.log('[Database] Connected to PostgreSQL');
   }
   return _db;
 }
@@ -43,10 +41,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
-    return;
-  }
 
   try {
     const values: InsertUser = {
@@ -100,26 +94,22 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
-
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
 
   return result.length > 0 ? result[0] : undefined;
 }
 
 export async function isDatabaseAvailable(): Promise<boolean> {
-  return (await getDb()) !== null;
+  try {
+    await getDb();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function requireDb() {
-  const db = await getDb();
-  if (!db) {
-    throw new Error('Database connection failed');
-  }
-  return db;
+  return getDb();
 }
 
 export async function getDatabaseFeatureStatus() {
@@ -127,12 +117,12 @@ export async function getDatabaseFeatureStatus() {
   return {
     databaseAvailable,
     services: {
-      parcel: process.env.PARCEL_SERVICE_URL || 'http://localhost:8081',
-      title: process.env.TITLE_SERVICE_URL || 'http://localhost:8082',
-      transaction: process.env.TRANSACTION_SERVICE_URL || 'http://localhost:8083',
-      payment: process.env.PAYMENT_SERVICE_URL || 'http://localhost:8084',
-      document: process.env.DOCUMENT_SERVICE_URL || 'http://localhost:8085',
-      blockchain: process.env.BLOCKCHAIN_SERVICE_URL || 'http://localhost:8086',
+      parcel: Boolean(process.env.PARCEL_SERVICE_URL?.trim()),
+      title: Boolean(process.env.TITLE_SERVICE_URL?.trim()),
+      transaction: Boolean(process.env.TRANSACTION_SERVICE_URL?.trim()),
+      payment: Boolean(process.env.PAYMENT_SERVICE_URL?.trim()),
+      document: Boolean(process.env.DOCUMENT_SERVICE_URL?.trim()),
+      blockchain: Boolean(process.env.BLOCKCHAIN_SERVICE_URL?.trim()),
     },
   };
 }
@@ -144,6 +134,14 @@ export async function getDatabaseFeatureStatus() {
 // for 30 seconds; MICROSERVICES_ENABLED=false disables calls outright.
 const MICROSERVICES_ENABLED = process.env.MICROSERVICES_ENABLED !== 'false';
 const MICROSERVICE_TIMEOUT_MS = parseInt(process.env.MICROSERVICE_TIMEOUT_MS || '3000', 10);
+const MICROSERVICE_ENV_KEYS: Record<string, string> = {
+  parcel: 'PARCEL_SERVICE_URL',
+  title: 'TITLE_SERVICE_URL',
+  transaction: 'TRANSACTION_SERVICE_URL',
+  payment: 'PAYMENT_SERVICE_URL',
+  document: 'DOCUMENT_SERVICE_URL',
+  blockchain: 'BLOCKCHAIN_SERVICE_URL',
+};
 
 class CircuitBreaker {
   private failures = 0;
@@ -175,16 +173,12 @@ export class MicroserviceClient {
   private breaker = new CircuitBreaker();
 
   constructor(serviceName: string) {
-    // In production, use service discovery or API gateway
-    const serviceURLs: Record<string, string> = {
-      'parcel': process.env.PARCEL_SERVICE_URL || 'http://localhost:8081',
-      'title': process.env.TITLE_SERVICE_URL || 'http://localhost:8082',
-      'transaction': process.env.TRANSACTION_SERVICE_URL || 'http://localhost:8083',
-      'payment': process.env.PAYMENT_SERVICE_URL || 'http://localhost:8084',
-      'document': process.env.DOCUMENT_SERVICE_URL || 'http://localhost:8085',
-      'blockchain': process.env.BLOCKCHAIN_SERVICE_URL || 'http://localhost:8086',
-    };
-    this.baseURL = serviceURLs[serviceName] || 'http://localhost:8080';
+    const envKey = MICROSERVICE_ENV_KEYS[serviceName];
+    if (!envKey) throw new Error(`Unsupported microservice name: ${serviceName}`);
+    this.baseURL = process.env[envKey]?.trim() ?? '';
+    if (MICROSERVICES_ENABLED && !this.baseURL) {
+      throw new Error(`${envKey} must be configured when MICROSERVICES_ENABLED is not false`);
+    }
   }
 
   private assertAvailable() {

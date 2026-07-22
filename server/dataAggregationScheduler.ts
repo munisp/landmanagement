@@ -5,7 +5,8 @@ import postgres from 'postgres';
  * Runs daily to aggregate analytics metrics from various sources
  */
 
-const connectionString = process.env.POSTGRES_URL || 'postgresql://idlr_user:idlr_password@localhost:5432/idlr_pts';
+const connectionString = process.env.POSTGRES_URL?.trim();
+if (!connectionString) throw new Error('POSTGRES_URL must be configured for data aggregation');
 const sql = postgres(connectionString);
 
 export interface DailyMetrics {
@@ -41,7 +42,7 @@ async function aggregateTransactionData(date: string): Promise<{ count: number; 
     };
   } catch (error) {
     console.error('[DataAggregation] Error aggregating transaction data:', error);
-    return { count: 0, revenue: 0 };
+    throw error;
   }
 }
 
@@ -68,7 +69,7 @@ async function aggregateParcelData(date: string): Promise<{ total: number; new: 
     };
   } catch (error) {
     console.error('[DataAggregation] Error aggregating parcel data:', error);
-    return { total: 0, new: 0 };
+    throw error;
   }
 }
 
@@ -107,7 +108,7 @@ async function aggregateVerificationData(date: string): Promise<{
     };
   } catch (error) {
     console.error('[DataAggregation] Error aggregating verification data:', error);
-    return { requests: 0, approved: 0, rejected: 0, avgProcessingHours: 0 };
+    throw error;
   }
 }
 
@@ -134,7 +135,7 @@ async function aggregateUserData(date: string): Promise<{ active: number; new: n
     };
   } catch (error) {
     console.error('[DataAggregation] Error aggregating user data:', error);
-    return { active: 0, new: 0 };
+    throw error;
   }
 }
 

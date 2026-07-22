@@ -8,11 +8,14 @@
  *   - surveyor   : parcel creation, geospatial operations, batch workflows
  *   - user       : property search, transaction initiation, document upload
  *
- * Every test is self-contained and uses the file-backed JSON stores so no
- * live database or external services are required.
+ * Every test is self-contained and runs against the isolated PostgreSQL fixture,
+ * exercising durable persistence without file-backed state.
  */
 
 import { describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { users } from '../drizzle/schema';
+import { requireDb } from './db';
 import { appRouter } from './routers';
 import type { TrpcContext } from './_core/context';
 
@@ -63,6 +66,25 @@ function createAuthContext(role: string = 'user', userId: number = 1): TrpcConte
     req: { protocol: 'https', headers: {} } as TrpcContext['req'],
     res: {} as TrpcContext['res'],
   };
+}
+
+type WorkflowActor = { id: number; openId: string; name: string };
+let workflowActor: WorkflowActor | null = null;
+
+async function getWorkflowActor(): Promise<WorkflowActor> {
+  if (workflowActor) return workflowActor;
+  const db = await requireDb();
+  const openId = 'test:stakeholder-workflow-actor';
+  const [created] = await db.insert(users).values({
+    openId,
+    name: 'Stakeholder Workflow Actor',
+    email: 'stakeholder-workflow-actor@example.test',
+    role: 'user',
+  }).onConflictDoNothing({ target: users.openId }).returning();
+  const actor = created ?? (await db.select().from(users).where(eq(users.openId, openId)).limit(1))[0];
+  if (!actor) throw new Error('Unable to initialize stakeholder workflow actor');
+  workflowActor = { id: actor.id, openId, name: actor.name ?? 'Stakeholder Workflow Actor' };
+  return workflowActor;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,7 +138,7 @@ describe('Surveyor Workflows', () => {
   });
 
   it('performs geospatial search within radius', async () => {
-    const results = geospatialSearch({ centerLat: 6.5244, centerLng: 3.3792, radiusKm: 50, limit: 10 });
+    const results = await geospatialSearch({ centerLat: 6.5244, centerLng: 3.3792, radiusKm: 50, limit: 10 });
     expect(results).toBeDefined();
     expect(Array.isArray(results.parcels)).toBe(true);
     expect(typeof results.total).toBe('number');
@@ -127,14 +149,14 @@ describe('Surveyor Workflows', () => {
     const created1 = await createParcel({
       surveyPlanNumber: `SP/BATCH/${Date.now()}-1`,
       state: 'Kano', lga: 'Kano Municipal', areaSquareMeters: 500,
-      geometryGeoJSON: '{}', landUseType: 'residential',
+      geometryGeoJSON: '{}', landUseType: 'residential', surveyorId: 'surveyor-workflow-test',
     });
     const created2 = await createParcel({
       surveyPlanNumber: `SP/BATCH/${Date.now()}-2`,
       state: 'Kano', lga: 'Kano Municipal', areaSquareMeters: 600,
-      geometryGeoJSON: '{}', landUseType: 'residential',
+      geometryGeoJSON: '{}', landUseType: 'residential', surveyorId: 'surveyor-workflow-test',
     });
-    const result = batchAssignParcels([created1.id, created2.id], 'surveyor-batch-01');
+    const result = await batchAssignParcels([created1.id, created2.id], 'surveyor-batch-01');
     expect(Array.isArray(result)).toBe(true);
     expect(result.length).toBe(2);
     expect(result.every((p) => p.surveyorId === 'surveyor-batch-01')).toBe(true);
@@ -144,16 +166,16 @@ describe('Surveyor Workflows', () => {
     const created = await createParcel({
       surveyPlanNumber: `SP/UPDATE/${Date.now()}`,
       state: 'Delta', lga: 'Warri', areaSquareMeters: 400,
-      geometryGeoJSON: '{}', landUseType: 'industrial',
+      geometryGeoJSON: '{}', landUseType: 'industrial', surveyorId: 'surveyor-workflow-test',
     });
-    const updated = updateParcel(created.id, { notes: 'Updated notes', streetAddress: '5 Refinery Road' });
+    const updated = await updateParcel(created.id, { notes: 'Updated notes', streetAddress: '5 Refinery Road' });
     expect(updated.notes).toBe('Updated notes');
     expect(updated.streetAddress).toBe('5 Refinery Road');
   });
 
-  it('enforces amendment workflow for registered parcels', () => {
-    // Parcel 2 is seeded as 'registered'
-    expect(() => updateParcel(2, { notes: 'illegal edit' })).toThrow(/amendment/i);
+  it('enforces amendment workflow for registered parcels', async () => {
+    // Parcel 2 is seeded as 'registered'.
+    await expect(updateParcel(2, { notes: 'illegal edit' })).rejects.toThrow(/amendment/i);
   });
 });
 
@@ -165,9 +187,9 @@ describe('Registrar Workflows', () => {
     const created = await createParcel({
       surveyPlanNumber: `SP/VERIFY/${Date.now()}`,
       state: 'Ogun', lga: 'Abeokuta', areaSquareMeters: 800,
-      geometryGeoJSON: '{}', landUseType: 'residential',
+      geometryGeoJSON: '{}', landUseType: 'residential', surveyorId: 'surveyor-workflow-test',
     });
-    const verified = verifyParcel(created.id, 'registrar-smoke-01');
+    const verified = await verifyParcel(created.id, 'registrar-smoke-01');
     expect(verified.status).toBe('verified');
     expect(verified.verifierId).toBe('registrar-smoke-01');
     expect(verified.verifiedAt).toBeDefined();
@@ -177,10 +199,10 @@ describe('Registrar Workflows', () => {
     const created = await createParcel({
       surveyPlanNumber: `SP/IDEM/${Date.now()}`,
       state: 'Ogun', lga: 'Sagamu', areaSquareMeters: 300,
-      geometryGeoJSON: '{}', landUseType: 'agricultural',
+      geometryGeoJSON: '{}', landUseType: 'agricultural', surveyorId: 'surveyor-workflow-test',
     });
-    verifyParcel(created.id, 'registrar-01');
-    const again = verifyParcel(created.id, 'registrar-01');
+    await verifyParcel(created.id, 'registrar-01');
+    const again = await verifyParcel(created.id, 'registrar-01');
     expect(again.status).toBe('verified');
   });
 
@@ -188,14 +210,14 @@ describe('Registrar Workflows', () => {
     const p1 = await createParcel({
       surveyPlanNumber: `SP/BV/${Date.now()}-1`,
       state: 'Anambra', lga: 'Onitsha', areaSquareMeters: 450,
-      geometryGeoJSON: '{}', landUseType: 'commercial',
+      geometryGeoJSON: '{}', landUseType: 'commercial', surveyorId: 'surveyor-workflow-test',
     });
     const p2 = await createParcel({
       surveyPlanNumber: `SP/BV/${Date.now()}-2`,
       state: 'Anambra', lga: 'Onitsha', areaSquareMeters: 550,
-      geometryGeoJSON: '{}', landUseType: 'commercial',
+      geometryGeoJSON: '{}', landUseType: 'commercial', surveyorId: 'surveyor-workflow-test',
     });
-    const result = batchVerifyParcels([p1.id, p2.id], 'registrar-batch-01');
+    const result = await batchVerifyParcels([p1.id, p2.id], 'registrar-batch-01');
     expect(Array.isArray(result)).toBe(true);
     expect(result.length).toBe(2);
     expect(result.every((p) => p.status === 'verified')).toBe(true);
@@ -255,11 +277,12 @@ describe('User / Citizen Workflows', () => {
   });
 
   it('initiates a transfer transaction', async () => {
+    const actor = await getWorkflowActor();
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: 1,
-      initiatorId: 10,
-      initiatorName: 'John Doe',
+      initiatorId: actor.id,
+      initiatorName: actor.name,
       counterpartyName: 'Jane Smith',
       considerationAmount: 50000000,
     });
@@ -270,11 +293,12 @@ describe('User / Citizen Workflows', () => {
   });
 
   it('initiates a mortgage transaction', async () => {
+    const actor = await getWorkflowActor();
     const tx = await createTransaction({
       type: 'mortgage',
       parcelId: 1,
-      initiatorId: 11,
-      initiatorName: 'Alice Okafor',
+      initiatorId: actor.id,
+      initiatorName: actor.name,
       considerationAmount: 25000000,
     });
     expect(tx).toBeDefined();
@@ -283,22 +307,24 @@ describe('User / Citizen Workflows', () => {
   });
 
   it('initiates a subdivision transaction', async () => {
+    const actor = await getWorkflowActor();
     const tx = await createTransaction({
       type: 'subdivision',
       parcelId: 3,
-      initiatorId: 12,
-      initiatorName: 'Bob Adeyemi',
+      initiatorId: actor.id,
+      initiatorName: actor.name,
     });
     expect(tx).toBeDefined();
     expect(tx.type).toBe('subdivision');
   });
 
   it('retrieves transaction by id', async () => {
+    const actor = await getWorkflowActor();
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: 1,
-      initiatorId: 10,
-      initiatorName: 'Test User',
+      initiatorId: actor.id,
+      initiatorName: actor.name,
       considerationAmount: 10000000,
     });
     const retrieved = await getTransactionById(tx.id);
@@ -329,14 +355,15 @@ describe('User / Citizen Workflows', () => {
   });
 
   it('uploads a document to a transaction via tRPC', async () => {
+    const actor = await getWorkflowActor();
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: 1,
-      initiatorId: 10,
-      initiatorName: 'Doc Uploader',
+      initiatorId: actor.id,
+      initiatorName: actor.name,
       considerationAmount: 5000000,
     });
-    const caller = appRouter.createCaller(createAuthContext('user', 10));
+    const caller = appRouter.createCaller(createAuthContext('user', actor.id));
     const doc = await caller.documents.upload({
       type: 'document',
       title: 'Deed of Assignment',
@@ -410,11 +437,12 @@ describe('Admin Workflows', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('Transaction Lifecycle Workflows', () => {
   it('advances a transaction through the full approval workflow', async () => {
+    const actor = await getWorkflowActor();
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: 1,
-      initiatorId: 10,
-      initiatorName: 'Lifecycle Test User',
+      initiatorId: actor.id,
+      initiatorName: actor.name,
       counterpartyName: 'Lifecycle Recipient',
       considerationAmount: 75000000,
     });
@@ -430,11 +458,12 @@ describe('Transaction Lifecycle Workflows', () => {
   });
 
   it('rejects a transaction', async () => {
+    const actor = await getWorkflowActor();
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: 1,
-      initiatorId: 10,
-      initiatorName: 'Rejection Test User',
+      initiatorId: actor.id,
+      initiatorName: actor.name,
       considerationAmount: 5000000,
     });
     const rejected = await advanceTransaction(tx.id, 'reject');
@@ -545,22 +574,23 @@ describe('End-to-End Property Transaction Workflow', () => {
     expect(parcel.status).toBe('pending_verification');
 
     // Step 2: Registrar verifies
-    const verified = verifyParcel(parcel.id, 'registrar-e2e-01');
+    const verified = await verifyParcel(parcel.id, 'registrar-e2e-01');
     expect(verified.status).toBe('verified');
 
     // Step 3: User initiates transfer
+    const actor = await getWorkflowActor();
     const tx = await createTransaction({
       type: 'transfer',
       parcelId: parcel.id,
-      initiatorId: 20,
-      initiatorName: 'E2E Buyer',
+      initiatorId: actor.id,
+      initiatorName: actor.name,
       counterpartyName: 'E2E Seller',
       considerationAmount: 120000000,
     });
     expect(tx.status).toBe('pending_approval');
 
     // Step 4: User uploads deed via tRPC
-    const userCaller = appRouter.createCaller(createAuthContext('user', 20));
+    const userCaller = appRouter.createCaller(createAuthContext('user', actor.id));
     const doc = await userCaller.documents.upload({
       type: 'document',
       title: 'Deed of Assignment E2E',
@@ -630,7 +660,7 @@ describe('End-to-End Property Transaction Workflow', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('Data Integrity Checks', () => {
   it('all parcels have valid status values', async () => {
-    const validStatuses = new Set(['pending_verification', 'verified', 'registered', 'disputed']);
+    const validStatuses = new Set(['draft', 'pending_verification', 'verified', 'registered', 'transferred', 'disputed', 'archived']);
     const results = await searchParcels({ limit: 100 });
     for (const p of results.parcels) {
       expect(validStatuses.has(p.status)).toBe(true);
@@ -655,8 +685,8 @@ describe('Data Integrity Checks', () => {
 
   it('all transactions have valid status values', async () => {
     const validStatuses = new Set([
-      'pending_approval', 'approved', 'in_review', 'rejected',
-      'completed', 'registered', 'cancelled',
+      'draft', 'initiated', 'submitted', 'pending_approval', 'pending_payment',
+      'approved', 'in_review', 'rejected', 'completed', 'registered', 'cancelled',
     ]);
     const txResults = await listTransactions({ limit: 50 });
     for (const tx of txResults.transactions) {

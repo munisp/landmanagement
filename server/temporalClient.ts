@@ -17,33 +17,36 @@ import {
 
 let client: Client | null = null;
 
-/**
- * Initialize Temporal client connection
- */
-export async function initializeTemporalClient(): Promise<boolean> {
-  try {
-    const connection = await Connection.connect({
-      address: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
-      // TLS configuration for production
-      tls: process.env.TEMPORAL_TLS_ENABLED === 'true' ? {
-        clientCertPair: {
-          crt: Buffer.from(process.env.TEMPORAL_TLS_CERT || '', 'utf-8'),
-          key: Buffer.from(process.env.TEMPORAL_TLS_KEY || '', 'utf-8'),
-        },
-      } : undefined,
-    });
+function requiredTemporalConfig(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} must be configured for Temporal orchestration`);
+  return value;
+}
 
-    client = new Client({
-      connection,
-      namespace: process.env.TEMPORAL_NAMESPACE || 'default',
-    });
+function temporalTaskQueue(): string {
+  return requiredTemporalConfig('TEMPORAL_PROPERTY_TRANSACTION_TASK_QUEUE');
+}
 
-    console.log('✅ Temporal client initialized');
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to initialize Temporal client:', error);
-    return false;
+/** Initialize Temporal client connection. */
+export async function initializeTemporalClient(): Promise<true> {
+  const address = requiredTemporalConfig('TEMPORAL_ADDRESS');
+  const namespace = requiredTemporalConfig('TEMPORAL_NAMESPACE');
+  const tlsEnabled = process.env.TEMPORAL_TLS_ENABLED === 'true';
+  if (process.env.NODE_ENV === 'production' && !tlsEnabled) {
+    throw new Error('TEMPORAL_TLS_ENABLED=true is required for Temporal orchestration in production');
   }
+  const tls = tlsEnabled
+    ? {
+        clientCertPair: {
+          crt: Buffer.from(requiredTemporalConfig('TEMPORAL_TLS_CERT'), 'utf-8'),
+          key: Buffer.from(requiredTemporalConfig('TEMPORAL_TLS_KEY'), 'utf-8'),
+        },
+      }
+    : undefined;
+  const connection = await Connection.connect({ address, tls });
+  client = new Client({ connection, namespace });
+  console.info('Temporal client initialized');
+  return true;
 }
 
 /**
@@ -67,7 +70,7 @@ export async function startPropertyTransactionWorkflow(
   const workflowId = `property-transaction-${input.propertyId}-${Date.now()}`;
 
   const handle = await temporalClient.workflow.start(propertyTransactionWorkflow, {
-    taskQueue: 'property-transactions',
+    taskQueue: temporalTaskQueue(),
     workflowId,
     args: [input],
     // Workflow timeout (max 7 days for long-running transactions)
@@ -182,6 +185,6 @@ export async function shutdownTemporalClient(): Promise<void> {
   if (client) {
     client.connection.close();
     client = null;
-    console.log('✅ Temporal client shut down');
+    console.info('Temporal client shut down');
   }
 }

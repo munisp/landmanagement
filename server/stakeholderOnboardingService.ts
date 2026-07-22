@@ -1,16 +1,9 @@
-/**
- * Stakeholder Onboarding Service
- *
- * Handles multi-sector stakeholder onboarding including:
- * - Keycloak user provisioning and role assignment
- * - Permify policy application
- * - Dapr pub/sub event emission
- * - NIN/BVN verification integration
- */
-
-import { requireDb } from "./db";
-import { stakeholderOnboarding, users } from "../drizzle/schema";
+import { randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
+import { eventOutbox, stakeholderOnboarding, users } from "../drizzle/schema";
+import { provisionKeycloakUser as provisionKeycloakSubject } from "./keycloakAdminService";
+import { requireDb } from "./db";
+import { synchronizePlatformRole } from "./permifyService";
 
 export interface OnboardingRequest {
   userId: number;
@@ -26,8 +19,7 @@ export interface OnboardingResult {
   status: string;
 }
 
-// Sector-to-role mapping for Keycloak
-const SECTOR_ROLES: Record<string, string[]> = {
+const SECTOR_ROLES: Record<OnboardingRequest["sector"], readonly string[]> = {
   land: ["land_citizen", "land_surveyor", "land_registrar", "land_admin"],
   mining: ["mining_operator", "mining_inspector", "mining_registrar", "mining_admin"],
   oil_gas: ["petroleum_operator", "petroleum_inspector", "petroleum_registrar", "petroleum_admin"],
@@ -38,122 +30,100 @@ const SECTOR_ROLES: Record<string, string[]> = {
   renewable_energy: ["energy_operator", "energy_inspector", "energy_admin"],
 };
 
-// Permify policy templates per sector
-const PERMIFY_POLICIES: Record<string, string[]> = {
-  mining: [
-    "mining:operator:read:mining_licenses",
-    "mining:operator:write:mineral_production",
-    "mining:inspector:read:all",
-    "mining:inspector:write:environmental_compliance",
-  ],
-  oil_gas: [
-    "oil_gas:operator:read:petroleum_licenses",
-    "oil_gas:operator:write:oil_production_metering",
-    "oil_gas:inspector:read:all",
-    "oil_gas:inspector:write:environmental_compliance",
-  ],
-  water: [
-    "water:holder:read:water_rights",
-    "water:inspector:read:all",
-    "water:inspector:write:environmental_compliance",
-  ],
-  forestry: [
-    "forestry:operator:read:forestry_concessions",
-    "forestry:operator:write:production_reports",
-    "forestry:inspector:read:all",
-  ],
-  agriculture: [
-    "agriculture:operator:read:agricultural_concessions",
-    "agriculture:operator:write:production_reports",
-    "agriculture:inspector:read:all",
-  ],
-};
+function resolveSectorRole(sector: OnboardingRequest["sector"], inputRole: string): string {
+  const requested = inputRole.trim().toLowerCase();
+  const roles = SECTOR_ROLES[sector];
+  const matched = roles.find((role) => role === requested || role.endsWith(`_${requested}`));
+  if (!matched) {
+    throw new Error(`Role ${inputRole} is not permitted for the ${sector} sector`);
+  }
+  return matched;
+}
 
-/**
- * Initiate stakeholder onboarding for a given sector and role.
- */
+function appRoleForSectorRole(role: string): "user" | "surveyor" | "registrar" | "admin" {
+  if (role.endsWith("_admin")) return "admin";
+  if (role.includes("registrar")) return "registrar";
+  if (role.includes("surveyor") || role.includes("inspector")) return "surveyor";
+  return "user";
+}
+
+async function getOnboardingWithUser(onboardingId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ onboarding: stakeholderOnboarding, user: users })
+    .from(stakeholderOnboarding)
+    .innerJoin(users, eq(stakeholderOnboarding.userId, users.id))
+    .where(eq(stakeholderOnboarding.id, onboardingId))
+    .limit(1);
+  const row = rows[0];
+  if (!row) throw new Error(`Onboarding record ${onboardingId} was not found`);
+  return { db, ...row };
+}
+
+/** Create a pending, cryptographically random stakeholder invitation. */
 export async function initiateOnboarding(request: OnboardingRequest): Promise<OnboardingResult> {
   const db = await requireDb();
+  const role = resolveSectorRole(request.sector, request.role);
+  const user = await db.select().from(users).where(eq(users.id, request.userId)).limit(1);
+  if (!user[0]) throw new Error(`User ${request.userId} was not found`);
 
-  // Generate invite token
-  const inviteToken = generateInviteToken();
-  const inviteExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
+  const inviteToken = randomBytes(32).toString("base64url");
+  const inviteExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const [record] = await db
     .insert(stakeholderOnboarding)
     .values({
       userId: request.userId,
       sector: request.sector,
-      role: request.role,
+      role,
       onboardingStatus: "pending",
-      invitedBy: request.invitedBy,
+      invitedBy: request.invitedBy ?? null,
       inviteToken,
       inviteExpiresAt,
     })
     .returning();
 
-  return {
-    onboardingId: record.id,
-    inviteToken,
-    status: "pending",
-  };
+  return { onboardingId: record.id, inviteToken, status: record.onboardingStatus };
 }
 
-/**
- * Complete Keycloak provisioning for a stakeholder.
- * In production, this calls the Keycloak Admin REST API.
- */
-export async function provisionKeycloakUser(
-  onboardingId: number,
-  keycloakAdminToken: string
-): Promise<string> {
-  const db = await requireDb();
-
-  const [record] = await db
-    .select()
-    .from(stakeholderOnboarding)
-    .where(eq(stakeholderOnboarding.id, onboardingId))
-    .limit(1);
-
-  if (!record) throw new Error(`Onboarding record ${onboardingId} not found`);
-
-  const sectorRoles = SECTOR_ROLES[record.sector] || [];
-  const roleForUser = sectorRoles.find((r) => r.includes(record.role.toLowerCase())) || sectorRoles[0];
-
-  // Simulate Keycloak user creation (in production, call Keycloak Admin API)
-  const keycloakUserId = `kc-${record.userId}-${record.sector}`;
+/** Provision a real Keycloak subject and assign the validated sector role. */
+export async function provisionKeycloakUser(onboardingId: number): Promise<string> {
+  const { db, onboarding, user } = await getOnboardingWithUser(onboardingId);
+  const sectorRole = resolveSectorRole(onboarding.sector, onboarding.role);
+  const result = await provisionKeycloakSubject({
+    user,
+    realmRoles: [sectorRole],
+    requirePasswordSetup: true,
+  });
 
   await db
     .update(stakeholderOnboarding)
     .set({
-      keycloakUserId,
-      keycloakRolesAssigned: [roleForUser],
+      keycloakUserId: result.keycloakUserId,
+      keycloakRolesAssigned: result.assignedRoles,
       onboardingStatus: "keycloak_provisioned",
       updatedAt: new Date(),
     })
     .where(eq(stakeholderOnboarding.id, onboardingId));
 
-  return keycloakUserId;
+  return result.keycloakUserId;
 }
 
-/**
- * Apply Permify policies for a stakeholder.
- * In production, this calls the Permify gRPC API.
- */
+/** Synchronize the effective application role into the versioned Permify model. */
 export async function applyPermifyPolicies(onboardingId: number): Promise<void> {
-  const db = await requireDb();
+  const { db, onboarding, user } = await getOnboardingWithUser(onboardingId);
+  if (!onboarding.keycloakUserId) {
+    throw new Error("Keycloak provisioning must complete before Permify policy synchronization");
+  }
 
-  const [record] = await db
-    .select()
-    .from(stakeholderOnboarding)
-    .where(eq(stakeholderOnboarding.id, onboardingId))
-    .limit(1);
+  const role = appRoleForSectorRole(resolveSectorRole(onboarding.sector, onboarding.role));
+  const [updatedUser] = await db
+    .update(users)
+    .set({ role, updatedAt: new Date() })
+    .where(eq(users.id, user.id))
+    .returning();
+  if (!updatedUser) throw new Error(`User ${user.id} could not be updated for authorization synchronization`);
 
-  if (!record) throw new Error(`Onboarding record ${onboardingId} not found`);
-
-  // In production, call Permify API to write relationship tuples
-  const policies = PERMIFY_POLICIES[record.sector] || [];
-
+  await synchronizePlatformRole(updatedUser);
   await db
     .update(stakeholderOnboarding)
     .set({
@@ -165,30 +135,45 @@ export async function applyPermifyPolicies(onboardingId: number): Promise<void> 
 }
 
 /**
- * Activate a stakeholder after all verifications are complete.
- * Emits a Dapr pub/sub event for downstream services.
+ * Activate a stakeholder only after verified prerequisites, then atomically
+ * enqueue the downstream event for the Dapr pub/sub worker.
  */
 export async function activateStakeholder(onboardingId: number): Promise<void> {
-  const db = await requireDb();
-
-  await db
-    .update(stakeholderOnboarding)
-    .set({
-      onboardingStatus: "active",
-      activatedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(stakeholderOnboarding.id, onboardingId));
-
-  // In production, emit Dapr pub/sub event
-  // await daprClient.pubsub.publish("landmanagement-pubsub", "stakeholder-activated", { onboardingId });
-}
-
-function generateInviteToken(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let token = "";
-  for (let i = 0; i < 64; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  const { db, onboarding } = await getOnboardingWithUser(onboardingId);
+  if (!onboarding.keycloakUserId || !onboarding.permifyPoliciesApplied) {
+    throw new Error("Keycloak provisioning and Permify policy synchronization are required before activation");
   }
-  return token;
+  if (!onboarding.ninVerified || !onboarding.documentsVerified) {
+    throw new Error("Identity and document verification must complete before stakeholder activation");
+  }
+  if (onboarding.inviteExpiresAt && onboarding.inviteExpiresAt < new Date()) {
+    throw new Error("The stakeholder invitation has expired and must be reissued");
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(stakeholderOnboarding)
+      .set({ onboardingStatus: "active", activatedAt: new Date(), updatedAt: new Date() })
+      .where(eq(stakeholderOnboarding.id, onboardingId));
+
+    await tx.insert(eventOutbox).values({
+      backend: "dapr_pubsub",
+      topic: "stakeholder-activated",
+      eventType: "stakeholder.activated.v1",
+      aggregateType: "stakeholder_onboarding",
+      aggregateId: String(onboardingId),
+      partitionKey: String(onboarding.userId),
+      payload: {
+        onboardingId,
+        userId: onboarding.userId,
+        sector: onboarding.sector,
+        role: onboarding.role,
+        keycloakUserId: onboarding.keycloakUserId,
+        activatedAt: new Date().toISOString(),
+      },
+      headers: { "ce-type": "stakeholder.activated.v1", "content-type": "application/json" },
+      deliveryStatus: "pending",
+      availableAt: new Date(),
+    });
+  });
 }

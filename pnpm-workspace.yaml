@@ -1,0 +1,6 @@
+packages:
+  - .
+
+onlyBuiltDependencies:
+  - '@fluvio/client'
+  - puppeteer

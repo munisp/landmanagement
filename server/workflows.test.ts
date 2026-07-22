@@ -54,7 +54,8 @@ describe('End-to-End Workflow Tests', () => {
 
       expect(tx).toBeDefined();
       expect(parcel).toBeDefined();
-      expect(parcel?.parcelNumber).toBe('LG-VI-2024-001');
+      expect(parcel?.id).toBe(tx.parcelId);
+      expect(parcel?.parcelNumber).toMatch(/\S+/);
     });
 
     it('should track transaction amounts correctly', async () => {

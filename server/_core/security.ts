@@ -18,8 +18,20 @@ import type { Request, Response, NextFunction } from 'express';
 import { validateApiKey as validateStoredApiKey } from '../apiKeyService';
 import { recordAuthEvent } from '../authAudit.js';
 
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const NODE_ENV = process.env.NODE_ENV ?? 'development';
+
+function configuredAllowedOrigins(): string[] {
+  const origins = [
+    process.env.FRONTEND_URL,
+    ...(process.env.ALLOWED_ORIGINS?.split(',') ?? []),
+  ]
+    .map((origin) => origin?.trim())
+    .filter((origin): origin is string => Boolean(origin));
+  if (origins.length === 0) {
+    throw new Error('FRONTEND_URL or ALLOWED_ORIGINS must be configured for CORS');
+  }
+  return [...new Set(origins)];
+}
 
 /**
  * Rate limiting configuration
@@ -72,12 +84,7 @@ export const rateLimiters = {
  * CORS configuration
  */
 export function corsMiddleware() {
-  const allowedOrigins = [
-    FRONTEND_URL,
-    'http://localhost:3000',
-    'http://localhost:5173',
-    ...(process.env.ALLOWED_ORIGINS?.split(',') || []),
-  ].filter(Boolean);
+  const allowedOrigins = configuredAllowedOrigins();
   
   return cors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
@@ -89,7 +96,7 @@ export function corsMiddleware() {
       // Check if origin is allowed. Disallowed origins proceed WITHOUT CORS
       // headers (browser blocks the response client-side) instead of raising
       // a server error, so misbehaving clients cannot trigger 500s.
-      if (allowedOrigins.includes(origin) || NODE_ENV === 'development') {
+      if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(null, false);

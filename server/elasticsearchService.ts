@@ -526,18 +526,17 @@ let elasticsearchService: ElasticsearchService | null = null;
 
 export function getElasticsearchService(): ElasticsearchService {
   if (!elasticsearchService) {
+    const node = process.env.ELASTICSEARCH_URL?.trim();
+    const username = process.env.ELASTICSEARCH_USERNAME?.trim();
+    const password = process.env.ELASTICSEARCH_PASSWORD;
+    if (!node || !username || !password) {
+      throw new Error('ELASTICSEARCH_URL, ELASTICSEARCH_USERNAME, and ELASTICSEARCH_PASSWORD must be configured');
+    }
     const config: SearchConfig = {
-      node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
-      auth: process.env.ELASTICSEARCH_USERNAME && process.env.ELASTICSEARCH_PASSWORD
-        ? {
-            username: process.env.ELASTICSEARCH_USERNAME,
-            password: process.env.ELASTICSEARCH_PASSWORD,
-          }
-        : undefined,
+      node,
+      auth: { username, password },
     };
-    
     elasticsearchService = new ElasticsearchService(config);
   }
-  
   return elasticsearchService;
 }

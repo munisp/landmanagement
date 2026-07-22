@@ -14,7 +14,10 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from '../../drizzle/schema';
 
 // Database configuration
-const connectionString = process.env.POSTGRES_URL || 'postgresql://idlr_user:idlr_password@localhost:5432/idlr_pts';
+const connectionString = (process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.TEST_DATABASE_URL || '').trim();
+if (!connectionString) {
+  throw new Error('POSTGRES_URL, DATABASE_URL, or TEST_DATABASE_URL must be configured for the database pool');
+}
 
 // Production-grade pool configuration
 const poolConfig: PoolConfig = {
@@ -35,8 +38,8 @@ const poolConfig: PoolConfig = {
   application_name: process.env.APP_NAME || 'idlr-pts-platform',
   
   // SSL configuration for production
-  ssl: process.env.NODE_ENV === 'production' && process.env.DB_SSL !== 'false' 
-    ? { rejectUnauthorized: false } 
+  ssl: process.env.NODE_ENV === 'production' && process.env.DB_SSL !== 'false'
+    ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' }
     : false,
 };
 

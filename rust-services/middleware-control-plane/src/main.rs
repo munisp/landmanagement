@@ -4,7 +4,7 @@ use std::net::{TcpListener, TcpStream};
 use std::time::Duration;
 
 fn main() {
-    let port = env::var("PORT").unwrap_or_else(|_| "7010".to_string());
+    let port = env::var("PORT").expect("PORT must be configured for the middleware control plane");
     let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).expect("bind listener");
 
     for stream in listener.incoming() {
@@ -222,11 +222,18 @@ fn probe_http(
     };
 
     let host_port = normalize_host_port(&base_url);
-    let reachable = TcpStream::connect_timeout(
-        &host_port.parse().unwrap_or_else(|_| "127.0.0.1:9".parse().unwrap()),
-        Duration::from_secs(2),
-    )
-    .is_ok();
+    let socket_address = match host_port.parse() {
+        Ok(address) => address,
+        Err(_) => {
+            return (
+                name,
+                true,
+                false,
+                format!("{} has an invalid configured endpoint: {}", name, base_url),
+            )
+        }
+    };
+    let reachable = TcpStream::connect_timeout(&socket_address, Duration::from_secs(2)).is_ok();
 
     (
         name,

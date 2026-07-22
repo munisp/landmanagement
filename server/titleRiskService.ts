@@ -6,8 +6,8 @@
  * anomalies to produce a deterministic, explainable title risk score before
  * registration, transfer, mortgage perfection, or auction release.
  *
- * Offline-capable: composes the in-memory repositories when PostgreSQL is
- * unavailable so operators and tests keep working in degraded environments.
+ * All assessments and source data are loaded from configured PostgreSQL
+ * repositories; database failures are surfaced rather than replaced with local state.
  */
 
 import { and, desc, eq } from 'drizzle-orm';
@@ -136,11 +136,13 @@ export async function assessTitleRisk(params: {
   const valuedTx = parcelTransactions.filter((tx: any) => Number(tx.amount) > 0);
   let valuationScore = 0;
   let valuationExplanation = 'No transaction amounts available for valuation comparison';
-  if (valuedTx.length > 0 && parcel.estimatedValue > 0) {
+  if (valuedTx.length > 0 && parcel.estimatedValue !== null && parcel.estimatedValue > 0) {
     const maxAmount = Math.max(...valuedTx.map((tx: any) => Number(tx.amount)));
     const ratio = maxAmount / parcel.estimatedValue;
     valuationScore = ratio >= VALUATION_JUMP_RATIO ? 85 : ratio >= 2 ? 50 : ratio >= 1.25 ? 25 : 5;
     valuationExplanation = `Largest transaction amount is ${ratio.toFixed(2)}x the parcel estimated value`;
+  } else if (parcel.estimatedValue === null) {
+    valuationExplanation = 'No verified parcel appraisal is available for valuation anomaly analysis';
   }
 
   const factors: RiskFactor[] = [

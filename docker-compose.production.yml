@@ -50,21 +50,28 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
       REDIS_URL: redis://redis:6379
-      SESSION_SECRET: ${SESSION_SECRET}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be a 64-character hexadecimal key}
       # Keycloak
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-idlr-pts}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-idlr-pts-app}
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?KEYCLOAK_CLIENT_SECRET must be set}
+      KEYCLOAK_ADMIN_REALM: ${KEYCLOAK_ADMIN_REALM:-master}
+      KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:?KEYCLOAK_ADMIN_CLIENT_ID must be set}
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set}
       # Permify
       PERMIFY_URL: http://permify:3476
+      PERMIFY_TENANT_ID: ${PERMIFY_TENANT_ID:-idlr}
+      PERMIFY_TIMEOUT_MS: ${PERMIFY_TIMEOUT_MS:-5000}
       # APISIX
       APISIX_ADMIN_URL: http://apisix:9180
-      APISIX_API_KEY: ${APISIX_API_KEY:-edd1c9f034335f136f87ad84b625c8f1}
+      APISIX_API_KEY: ${APISIX_ADMIN_KEY:?APISIX_ADMIN_KEY must be set}
       # Kafka
       KAFKA_BROKERS: kafka:9092
       # Fluvio
-      FLUVIO_API_URL: http://fluvio:9003
+      FLUVIO_SC_ADDRESS: fluvio-sc:9003
+      FLUVIO_API_URL: http://fluvio-sc:9003
       # Temporal
       TEMPORAL_ADDRESS: temporal:7233
       # OpenSearch
@@ -73,16 +80,18 @@ services:
       # Dapr
       DAPR_HTTP_URL: http://localhost:3500
       DAPR_GRPC_PORT: 50001
+      DAPR_PUBSUB_NAME: idlr-pubsub
       # Lakehouse / ML
       LAKEHOUSE_API_URL: http://lakehouse-api:8000
+      LAKEHOUSE_API_KEY: ${LAKEHOUSE_API_KEY:?LAKEHOUSE_API_KEY must be set}
       # Mojaloop
       MOJALOOP_API_URL: http://mojaloop-simulator:3000
-      # OpenAppSec
-      OPENAPPSEC_URL: http://openappsec:8080
-      # TigerBeetle (via Rust bridge)
-      TIGERBEETLE_BRIDGE_URL: http://tigerbeetle-bridge:8090
+      # TigerBeetle
       TIGERBEETLE_CLUSTER_ID: ${TIGERBEETLE_CLUSTER_ID:-0}
-      TIGERBEETLE_REPLICAS: ${TIGERBEETLE_REPLICAS:-127.0.0.1:3000}
+      TIGERBEETLE_REPLICAS: ${TIGERBEETLE_REPLICAS:-tigerbeetle:3000}
+      TIGERBEETLE_LEDGER_ID: ${TIGERBEETLE_LEDGER_ID:-1}
+      TIGERBEETLE_ACCOUNT_CODE: ${TIGERBEETLE_ACCOUNT_CODE:-1}
+      TIGERBEETLE_TRANSFER_CODE: ${TIGERBEETLE_TRANSFER_CODE:-1}
       # Fabric
       FABRIC_GATEWAY_URL: ${FABRIC_GATEWAY_URL:-}
     depends_on:
@@ -92,6 +101,8 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+      keycloak-bootstrap:
+        condition: service_completed_successfully
     volumes:
       - ./server/data:/app/server/data
     networks:
@@ -137,8 +148,8 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_PROXY: edge
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_secret}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER:?KEYCLOAK_ADMIN_USER must be set}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD must be set}
       KC_FEATURES: token-exchange,admin-fine-grained-authz
     ports:
       - "8180:8080"
@@ -153,6 +164,29 @@ services:
       timeout: 10s
       retries: 10
       start_period: 90s
+
+  keycloak-bootstrap:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: idlr-keycloak-bootstrap
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    environment:
+      KEYCLOAK_BOOTSTRAP_URL: http://keycloak:8080
+      KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:?KEYCLOAK_ADMIN_USER must be set}
+      KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD must be set}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-idlr-pts}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-idlr-pts-app}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?KEYCLOAK_CLIENT_SECRET must be set}
+      KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:?KEYCLOAK_ADMIN_CLIENT_ID must be set}
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set}
+      KEYCLOAK_REDIRECT_URIS: ${KEYCLOAK_REDIRECT_URIS:?KEYCLOAK_REDIRECT_URIS must be set}
+    volumes:
+      - ./keycloak/bootstrap.sh:/bootstrap.sh:ro
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - idlr_net
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Permify — Fine-grained Authorization
@@ -344,13 +378,39 @@ services:
     networks:
       - idlr_net
 
+  openappsec-agent:
+    image: ghcr.io/openappsec/agent:${APPSEC_VERSION:-latest}
+    container_name: idlr-openappsec-agent
+    <<: *default-restart
+    logging: *default-logging
+    ipc: host
+    environment:
+      SHARED_STORAGE_HOST: ${APPSEC_SHARED_STORAGE_HOST:-}
+      LEARNING_HOST: ${APPSEC_LEARNING_HOST:-}
+      TUNING_HOST: ${APPSEC_TUNING_HOST:-}
+      AGENT_TOKEN: ${APPSEC_AGENT_TOKEN:?APPSEC_AGENT_TOKEN must be set for OpenAppSec policy management}
+      autoPolicyLoad: ${APPSEC_AUTO_POLICY_LOAD:-true}
+      registered_server: APISIX
+    command: /cp-nano-agent
+    volumes:
+      - openappsec_config:/etc/cp/conf
+      - openappsec_data:/etc/cp/data
+      - openappsec_logs:/var/log/nano_agent
+      - ./openappsec:/ext/appsec:ro
+    networks:
+      - idlr_net
+
   apisix:
-    image: apache/apisix:3.9.0-debian
+    image: ghcr.io/openappsec/apisix-attachment:${APPSEC_VERSION:-latest}
     container_name: idlr-apisix
     <<: *default-restart
     logging: *default-logging
+    ipc: host
+    environment:
+      APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY:?APISIX_ADMIN_KEY must be set}
     depends_on:
       - etcd
+      - openappsec-agent
     volumes:
       - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
     ports:
@@ -440,6 +500,8 @@ services:
     logging: *default-logging
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      LAKEHOUSE_API_KEY: ${LAKEHOUSE_API_KEY:?LAKEHOUSE_API_KEY must be set}
+      LAKEHOUSE_CORS_ORIGINS: ${LAKEHOUSE_CORS_ORIGINS:-}
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MODEL_WEIGHTS_DIR: /app/ml/weights
       RAY_ADDRESS: auto
@@ -569,6 +631,209 @@ services:
       - redis
 
   # ─────────────────────────────────────────────────────────────────────────────
+  # Durable workers and middleware runtime
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  temporal-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idlr-temporal-worker
+    <<: *default-restart
+    logging: *default-logging
+    command: ["pnpm", "worker:temporal"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      REDIS_URL: redis://redis:6379
+      TEMPORAL_ADDRESS: temporal:7233
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-idlr-pts}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-idlr-pts-app}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?KEYCLOAK_CLIENT_SECRET must be set}
+      PERMIFY_URL: http://permify:3476
+      PERMIFY_TENANT_ID: ${PERMIFY_TENANT_ID:-idlr}
+      MOJALOOP_API_URL: http://mojaloop-simulator:3000
+      TIGERBEETLE_CLUSTER_ID: ${TIGERBEETLE_CLUSTER_ID:-0}
+      TIGERBEETLE_REPLICAS: ${TIGERBEETLE_REPLICAS:-tigerbeetle:3000}
+      TIGERBEETLE_LEDGER_ID: ${TIGERBEETLE_LEDGER_ID:-1}
+      TIGERBEETLE_ACCOUNT_CODE: ${TIGERBEETLE_ACCOUNT_CODE:-1}
+      TIGERBEETLE_TRANSFER_CODE: ${TIGERBEETLE_TRANSFER_CODE:-1}
+      POLYGON_RPC_URL: ${POLYGON_RPC_URL:?POLYGON_RPC_URL must be set}
+      POLYGON_CHAIN_ID: ${POLYGON_CHAIN_ID:?POLYGON_CHAIN_ID must be set}
+      ESCROW_CONTRACT_ADDRESS: ${ESCROW_CONTRACT_ADDRESS:?ESCROW_CONTRACT_ADDRESS must be set}
+      DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:?DEPLOYER_PRIVATE_KEY must be set}
+      DAPR_PUBSUB_NAME: idlr-pubsub
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      tigerbeetle:
+        condition: service_started
+    networks:
+      - idlr_net
+
+  event-outbox-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idlr-event-outbox-worker
+    <<: *default-restart
+    logging: *default-logging
+    command: ["pnpm", "worker:outbox"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      KAFKA_BROKERS: kafka:9092
+      DAPR_HTTP_URL: http://localhost:3500
+      DAPR_PUBSUB_NAME: idlr-pubsub
+      FLUVIO_SC_ADDRESS: fluvio-sc:9003
+      EVENT_OUTBOX_POLL_INTERVAL_MS: ${EVENT_OUTBOX_POLL_INTERVAL_MS:-1000}
+      EVENT_OUTBOX_BATCH_SIZE: ${EVENT_OUTBOX_BATCH_SIZE:-100}
+      EVENT_OUTBOX_MAX_ATTEMPTS: ${EVENT_OUTBOX_MAX_ATTEMPTS:-8}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      fluvio-setup:
+        condition: service_completed_successfully
+    networks:
+      - idlr_net
+
+  dapr-placement:
+    image: daprio/dapr:1.14.4
+    container_name: idlr-dapr-placement
+    <<: *default-restart
+    command: ["./placement", "--port", "50006"]
+    networks:
+      - idlr_net
+
+  dapr-outbox-sidecar:
+    image: daprio/daprd:1.14.4
+    container_name: idlr-dapr-outbox-sidecar
+    <<: *default-restart
+    command:
+      - "./daprd"
+      - "--app-id"
+      - "idlr-pts-outbox-worker"
+      - "--placement-host-address"
+      - "dapr-placement:50006"
+      - "--dapr-http-port"
+      - "3500"
+      - "--dapr-grpc-port"
+      - "50001"
+      - "--resources-path"
+      - "/components"
+    volumes:
+      - ./dapr/components:/components:ro
+    network_mode: "service:event-outbox-worker"
+    depends_on:
+      - event-outbox-worker
+      - dapr-placement
+
+  tigerbeetle-format:
+    image: ghcr.io/tigerbeetle/tigerbeetle:0.16.74
+    container_name: idlr-tigerbeetle-format
+    command: ["format", "--cluster=${TIGERBEETLE_CLUSTER_ID:-0}", "--replica=0", "--replica-count=1", "--development", "/data/0_0.tigerbeetle"]
+    security_opt:
+      - seccomp=unconfined
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - tigerbeetle_data:/data
+    restart: "no"
+    networks:
+      - idlr_net
+
+  tigerbeetle:
+    image: ghcr.io/tigerbeetle/tigerbeetle:0.16.74
+    container_name: idlr-tigerbeetle
+    <<: *default-restart
+    command: ["start", "--addresses=0.0.0.0:3000", "--development", "/data/0_0.tigerbeetle"]
+    security_opt:
+      - seccomp=unconfined
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - tigerbeetle_data:/data
+    ports:
+      - "3000:3000"
+    depends_on:
+      tigerbeetle-format:
+        condition: service_completed_successfully
+    networks:
+      - idlr_net
+
+  fluvio-sc:
+    image: infinyon/fluvio:stable
+    container_name: idlr-fluvio-sc
+    <<: *default-restart
+    hostname: fluvio-sc
+    command: ["./fluvio-run", "sc", "--local", "/fluvio/metadata"]
+    volumes:
+      - fluvio_metadata:/fluvio/metadata
+    ports:
+      - "9103:9003"
+    networks:
+      - idlr_net
+
+  fluvio-spu:
+    image: infinyon/fluvio:stable
+    container_name: idlr-fluvio-spu
+    <<: *default-restart
+    hostname: fluvio-spu
+    command: ["./fluvio-run", "spu", "-i", "5001", "-p", "fluvio-spu:9010", "-v", "fluvio-spu:9011", "--sc-addr", "fluvio-sc:9004", "--log-base-dir", "/fluvio/data"]
+    volumes:
+      - fluvio_data:/fluvio/data
+    depends_on:
+      - fluvio-sc
+    networks:
+      - idlr_net
+
+  fluvio-setup:
+    build:
+      context: ./fluvio
+      dockerfile: Dockerfile
+    container_name: idlr-fluvio-setup
+    entrypoint: ["/bin/sh", "-ec"]
+    command: >
+      fluvio profile add idlr fluvio-sc:9003 docker || true;
+      until fluvio topic list --profile idlr >/dev/null 2>&1; do sleep 2; done;
+      fluvio cluster spu register --profile idlr --id 5001 -p fluvio-spu:9010 --private-server fluvio-spu:9011 || true;
+      fluvio topic create --profile idlr stakeholder-activated || true;
+      fluvio topic create --profile idlr notification-requested || true;
+      fluvio topic create --profile idlr landmanagement-events || true
+    depends_on:
+      - fluvio-sc
+      - fluvio-spu
+    restart: "no"
+    networks:
+      - idlr_net
+
+  apisix-bootstrap:
+    image: curlimages/curl:8.10.1
+    container_name: idlr-apisix-bootstrap
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    environment:
+      APISIX_ADMIN_URL: http://apisix:9180
+      APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY:?APISIX_ADMIN_KEY must be set}
+      APP_UPSTREAM_HOST: app
+      APP_UPSTREAM_PORT: 3000
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:?CORS_ALLOW_ORIGINS must be set}
+    volumes:
+      - ./apisix/bootstrap.sh:/bootstrap.sh:ro
+    depends_on:
+      apisix:
+        condition: service_healthy
+      app:
+        condition: service_started
+    restart: "no"
+    networks:
+      - idlr_net
+
+  # ─────────────────────────────────────────────────────────────────────────────
   # Observability Stack
   # ─────────────────────────────────────────────────────────────────────────────
 
@@ -634,6 +899,12 @@ volumes:
   mlflow_artifacts:
   prometheus_data:
   grafana_data:
+  tigerbeetle_data:
+  fluvio_metadata:
+  fluvio_data:
+  openappsec_config:
+  openappsec_data:
+  openappsec_logs:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Networks
