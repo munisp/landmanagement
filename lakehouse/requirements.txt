@@ -3,7 +3,7 @@ pyiceberg[pyarrow,sql-postgres]==0.6.1
 
 # Data processing
 pandas==2.2.0
-pyarrow==15.0.0
+pyarrow==25.0.0
 numpy==1.26.3
 
 # Database connectivity
