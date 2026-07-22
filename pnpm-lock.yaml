@@ -246,8 +246,8 @@ importers:
         specifier: ^3.4.12
         version: 3.4.12
       dotenv:
-        specifier: ^17.2.2
-        version: 17.2.3
+        specifier: ^17.4.2
+        version: 17.4.2
       drizzle-orm:
         specifier: 0.44.7
         version: 0.44.7(@electric-sql/pglite@0.5.4)(@opentelemetry/api@1.9.0)(@types/pg@8.16.0)(mysql2@3.15.1)(pg@8.18.0)(postgres@3.4.8)
@@ -6326,8 +6326,8 @@ packages:
   dompurify@3.4.12:
     resolution: {integrity: sha512-zQvGet8Z2sWbQhCmfFz/T5QWH2oBmjnqK3qvOjaqaNLrLEF912WamU+ohnTp0TCep/MFVHpdJuCZEdFOdTnEFg==}
 
-  dotenv@17.2.3:
-    resolution: {integrity: sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w==}
+  dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
 
   draco3d@1.5.7:
@@ -17868,7 +17868,7 @@ snapshots:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
-  dotenv@17.2.3: {}
+  dotenv@17.4.2: {}
 
   draco3d@1.5.7: {}
 
