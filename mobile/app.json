@@ -19,7 +19,8 @@
         "NSLocationWhenInUseUsageDescription": "IDLR-PTS needs your location to display nearby parcels and assist field surveyors.",
         "NSCameraUsageDescription": "IDLR-PTS needs camera access to capture parcel photos and scan documents.",
         "NSFaceIDUsageDescription": "IDLR-PTS uses Face ID for secure login.",
-        "NSPhotoLibraryUsageDescription": "IDLR-PTS needs photo library access to attach documents."
+        "NSPhotoLibraryUsageDescription": "IDLR-PTS needs photo library access to select immutable field evidence and attach documents.",
+        "NSPhotoLibraryAddUsageDescription": "IDLR-PTS needs photo library access when a user explicitly saves captured field evidence."
       }
     },
     "android": {
@@ -33,7 +34,9 @@
         "ACCESS_COARSE_LOCATION",
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
         "WRITE_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS",
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
         "RECEIVE_BOOT_COMPLETED",
@@ -72,13 +75,16 @@
         {
           "cameraPermission": "Allow IDLR-PTS to access your camera."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow IDLR-PTS to select field evidence from your photo library.",
+          "cameraPermission": "Allow IDLR-PTS to access your camera for field evidence."
+        }
       ]
     ],
     "scheme": "idlrpts",
-    "extra": {
-      "eas": {
-        "projectId": "idlr-pts-land-registry"
-      }
-    }
+    "extra": {}
   }
 }

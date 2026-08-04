@@ -1,0 +1,20 @@
+import React from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useMobileSession } from "../providers/MobileSessionProvider";
+
+export function MoreScreen() {
+  const router = useRouter();
+  const session = useMobileSession();
+  const confirmSignOut = () => Alert.alert("Sign out?", "This removes the securely stored mobile session from this device. Offline field drafts remain local until you synchronize or delete them.", [{ text: "Cancel", style: "cancel" }, { text: "Sign out", style: "destructive", onPress: () => void session.signOut() }]);
+  return <View style={styles.container}>
+    <View style={styles.profile}><Text style={styles.profileName}>{session.identity?.name ?? session.identity?.preferredUsername ?? "Authorized user"}</Text><Text style={styles.profileEmail}>{session.identity?.email ?? "Identity details are provided by Keycloak"}</Text><Text style={styles.profileRoles}>{session.identity?.roles.length ? session.identity.roles.join(" · ") : "Server authorization remains authoritative"}</Text></View>
+    <View style={styles.section}><Text style={styles.sectionTitle}>Field operations</Text><Pressable style={styles.item} onPress={() => router.push("/field/drafts" as any)}><Text style={styles.itemTitle}>Offline Field Drafts</Text><Text style={styles.itemDetail}>Review, synchronize, resolve conflicts, or delete device-local evidence.</Text></Pressable><Pressable style={styles.item} onPress={() => router.push("/arcgis" as any)}><Text style={styles.itemTitle}>ArcGIS Operations</Text><Text style={styles.itemDetail}>View server-persisted operation status; execution is controlled separately.</Text></Pressable></View>
+    <View style={styles.section}><Text style={styles.sectionTitle}>Security</Text><Text style={styles.securityText}>Screen-level role hints only improve navigation. Every GeoAI and ArcGIS action is authorized again by the server through Keycloak and Permify.</Text><Pressable style={styles.signOut} onPress={confirmSignOut}><Text style={styles.signOutText}>Sign out from this device</Text></Pressable></View>
+  </View>;
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#f8fafc", padding: 16, gap: 16 }, profile: { backgroundColor: "#ffffff", borderColor: "#e2e8f0", borderWidth: 1, borderRadius: 14, padding: 16, gap: 4 }, profileName: { color: "#0f172a", fontSize: 18, fontWeight: "800" }, profileEmail: { color: "#475569" }, profileRoles: { color: "#64748b", fontSize: 11, lineHeight: 17, marginTop: 4 },
+  section: { backgroundColor: "#ffffff", borderColor: "#e2e8f0", borderWidth: 1, borderRadius: 14, overflow: "hidden" }, sectionTitle: { color: "#334155", fontSize: 12, fontWeight: "800", textTransform: "uppercase", paddingHorizontal: 14, paddingTop: 14, paddingBottom: 7 }, item: { paddingHorizontal: 14, paddingVertical: 13, borderTopColor: "#f1f5f9", borderTopWidth: 1, gap: 3 }, itemTitle: { color: "#1e293b", fontWeight: "800" }, itemDetail: { color: "#64748b", fontSize: 12, lineHeight: 17 }, securityText: { color: "#475569", lineHeight: 19, fontSize: 13, paddingHorizontal: 14, paddingBottom: 14 }, signOut: { margin: 14, borderRadius: 10, padding: 12, alignItems: "center", borderColor: "#fecaca", borderWidth: 1, backgroundColor: "#fffafa" }, signOutText: { color: "#b91c1c", fontWeight: "800" },
+});

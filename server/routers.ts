@@ -1,4 +1,5 @@
 import { COOKIE_NAME } from "@shared/const";
+import { createHash } from "crypto";
 import { getSessionCookieOptions } from "./_core/cookies";
 import * as fabricClient from './fabricClient';
 import { systemRouter } from "./_core/systemRouter";
@@ -196,17 +197,27 @@ export const appRouter = router({
   notificationPreferences: notificationPreferencesRouter,
   notificationInbox: notificationInboxRouter,
 
-  // Storage upload endpoint
+  // Storage upload endpoint. The server derives integrity metadata from the
+  // received bytes so clients cannot self-attest a different file checksum.
   storage: router({
     upload: protectedProcedure
       .input(z.object({
-        key: z.string(),
-        data: z.string(), // base64 encoded
-        contentType: z.string(),
+        key: z.string().min(3).max(1024),
+        data: z.string().min(4).max(20 * 1024 * 1024), // base64 encoded, 15 MiB decoded maximum
+        contentType: z.string().min(3).max(255),
       }))
       .mutation(async ({ input }) => {
         const buffer = Buffer.from(input.data, 'base64');
-        return await storagePut(input.key, buffer, input.contentType);
+        if (!buffer.byteLength) throw new TRPCError({ code: "BAD_REQUEST", message: "Upload payload does not contain file bytes" });
+        if (buffer.byteLength > 15 * 1024 * 1024) {
+          throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Upload exceeds the 15 MiB mobile evidence limit" });
+        }
+        const stored = await storagePut(input.key, buffer, input.contentType);
+        return {
+          ...stored,
+          checksumSha256: createHash("sha256").update(buffer).digest("hex"),
+          byteLength: buffer.byteLength,
+        };
       }),
   }),
 

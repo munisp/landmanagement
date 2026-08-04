@@ -17,7 +17,6 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  RefreshControl,
   Animated,
   PanResponder,
   Vibration,
@@ -27,10 +26,13 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useMobileSession } from '../providers/MobileSessionProvider';
 import {
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  dismissNotification,
   type MobileNotification,
 } from '../services/api';
 
@@ -47,6 +49,9 @@ const NOTIFICATION_ICONS: Record<string, { name: string; color: string; bg: stri
   system_alert: { name: 'warning', color: '#d97706', bg: '#fffbeb' },
   dispute_filed: { name: 'alert-circle', color: '#dc2626', bg: '#fef2f2' },
   mortgage_update: { name: 'home', color: '#ea580c', bg: '#fff7ed' },
+  verification_request: { name: 'map', color: '#2563eb', bg: '#eff6ff' },
+  verification_approved: { name: 'shield-checkmark', color: '#16a34a', bg: '#f0fdf4' },
+  verification_rejected: { name: 'shield-outline', color: '#dc2626', bg: '#fef2f2' },
   default: { name: 'notifications', color: '#6b7280', bg: '#f9fafb' },
 };
 
@@ -62,9 +67,10 @@ interface SwipeableRowProps {
   notification: MobileNotification;
   onMarkRead: (id: number) => void;
   onDismiss: (id: number) => void;
+  onOpen: (notification: MobileNotification) => void;
 }
 
-function SwipeableRow({ notification, onMarkRead, onDismiss }: SwipeableRowProps) {
+function SwipeableRow({ notification, onMarkRead, onDismiss, onOpen }: SwipeableRowProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const DISMISS_THRESHOLD = -100;
   const icon = getIcon(notification.type);
@@ -134,6 +140,7 @@ function SwipeableRow({ notification, onMarkRead, onDismiss }: SwipeableRowProps
               Haptics.selectionAsync();
               onMarkRead(notification.id);
             }
+            onOpen(notification);
           }}
           activeOpacity={0.7}
         >
@@ -172,34 +179,33 @@ function SwipeableRow({ notification, onMarkRead, onDismiss }: SwipeableRowProps
 
 export default function NotificationInboxScreen() {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const session = useMobileSession();
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [page, setPage] = useState(0);
   const LIMIT = 20;
 
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const { data, isLoading, refetch, isRefetching } = useQuery<{ notifications: MobileNotification[]; total: number; unreadCount: number }, Error>({
     queryKey: ['notifications', unreadOnly, page],
-    queryFn: () => listNotifications({ limit: LIMIT, offset: page * LIMIT, unreadOnly }),
+    queryFn: () => listNotifications({ limit: LIMIT, offset: page * LIMIT, unreadOnly }, session.accessToken),
+    enabled: Boolean(session.accessToken),
   });
 
-  const markReadMutation = useMutation({
-    mutationFn: markNotificationRead,
+  const markReadMutation = useMutation<{ success: boolean }, Error, number>({
+    mutationFn: (notificationId) => markNotificationRead(notificationId, session.accessToken),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
-  const markAllMutation = useMutation({
-    mutationFn: markAllNotificationsRead,
+  const markAllMutation = useMutation<{ success: boolean; count: number }, Error, void>({
+    mutationFn: () => markAllNotificationsRead(session.accessToken),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       Alert.alert('Done', `Marked ${result.count} notifications as read`);
     },
   });
 
-  const dismissMutation = useMutation({
-    mutationFn: (notificationId: number) =>
-      fetch(`/api/trpc/notificationInbox.dismiss`, {
-        method: 'POST',
-        body: JSON.stringify({ json: { notificationId } }),
-      }),
+  const dismissMutation = useMutation<{ success: boolean }, Error, number>({
+    mutationFn: (notificationId) => dismissNotification(notificationId, session.accessToken),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
@@ -213,6 +219,10 @@ export default function NotificationInboxScreen() {
         notification={item}
         onMarkRead={(id) => markReadMutation.mutate(id)}
         onDismiss={(id) => dismissMutation.mutate(id)}
+        onOpen={(notification) => {
+          const route = notification.metadata?.route;
+          if (typeof route === 'string' && (route.startsWith('/geoai/') || route.startsWith('/arcgis'))) router.push(route as any);
+        }}
       />
     ),
     [markReadMutation, dismissMutation]
@@ -287,21 +297,14 @@ export default function NotificationInboxScreen() {
       <ListHeader />
       <FilterTabs />
       <Text style={styles.swipeHint}>← Swipe left to dismiss · Tap to mark as read</Text>
-      <FlatList
+      {notifications.length === 0 ? <EmptyState /> : <FlatList<MobileNotification>
         data={notifications}
         renderItem={renderItem}
         keyExtractor={(item) => String(item.id)}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
-            tintColor="#2563eb"
-          />
-        }
-        ListEmptyComponent={<EmptyState />}
-        contentContainerStyle={notifications.length === 0 ? styles.emptyContainer : undefined}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
+        refreshing={isRefetching}
+        onRefresh={() => void refetch()}
+      />}
+      {notifications.length > 1 ? <View style={styles.separator} /> : null}
     </View>
   );
 }

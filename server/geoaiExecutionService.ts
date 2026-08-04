@@ -54,6 +54,28 @@ export async function executeGeoAnalysisRun(runId: number) {
     let uncertaintySummary: Record<string, unknown>;
 
     switch (manifest.analysisType) {
+      case "field_evidence_review": {
+        const fieldObservations = manifest.sourceAssets.filter((asset) => asset.assetType === "field_observation");
+        if (!fieldObservations.length) throw new Error("Field evidence review requires at least one registered field observation");
+        resultSummary = {
+          status: "field_evidence_registered_for_review",
+          observationCount: fieldObservations.length,
+          observations: fieldObservations.map((asset) => ({
+            assetId: asset.assetId,
+            uri: asset.uri,
+            checksumSha256: asset.checksumSha256,
+            capturedAt: asset.provenance.capturedAt,
+            location: asset.provenance.location,
+            captureMethod: asset.provenance.captureMethod,
+            sourceCrs: asset.sourceCrs,
+          })),
+        };
+        uncertaintySummary = {
+          status: "requires_authorized_field_review",
+          statement: "The platform has registered immutable captured bytes and declared capture provenance. It has not inferred parcel validity, ownership, boundary accuracy, or legal sufficiency from a mobile observation.",
+        };
+        break;
+      }
       case "spatial_correctness": {
         const geometry = recordValue(parameters.geometry, "methodParameters.geometry");
         const referenceGeometries = Array.isArray(parameters.referenceGeometries) ? parameters.referenceGeometries : [];

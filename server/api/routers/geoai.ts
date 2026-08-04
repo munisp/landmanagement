@@ -10,6 +10,7 @@ import {
   failGeoAnalysisRun,
   getGeoAnalysisRun,
   listGeoAnalysisRuns,
+  listGeoAssets,
   markGeoAnalysisRunning,
   queueGeoAnalysisRun,
   recordGeoAnalysisCheckpoint,
@@ -80,6 +81,14 @@ export const geoaiRouter = router({
   listRuns: authorizedProcedure("geo_analysis", "view")
     .input(z.object({ parcelId: z.number().int().positive().optional(), limit: z.number().int().positive().max(200).optional() }))
     .query(async ({ input }) => listGeoAnalysisRuns(input)),
+
+  listAssets: authorizedProcedure("geo_analysis", "view")
+    .input(z.object({
+      parcelId: z.number().int().positive().optional(),
+      assetTypes: z.array(geoAssetReferenceSchema.shape.assetType).max(20).optional(),
+      limit: z.number().int().positive().max(200).optional(),
+    }))
+    .query(async ({ input }) => listGeoAssets(input)),
 
   getPresentation: authorizedProcedure("geo_analysis", "view")
     .input(z.object({ runId: z.number().int().positive() }))

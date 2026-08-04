@@ -1,18 +1,11 @@
-/**
- * Push Notifications Hook
- * ========================
- * Handles Expo push notification registration, token management,
- * and notification event listeners for the IDLR-PTS mobile app.
- */
+import { useEffect, useRef, useState } from "react";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
+import { useRouter } from "expo-router";
+import { registerPushToken } from "../services/api";
 
-import { useEffect, useRef, useState } from 'react';
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
-import { registerPushToken } from '../services/api';
-
-// Configure how notifications are displayed when the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -27,115 +20,100 @@ export interface PushNotificationState {
   error: string | null;
 }
 
-export function usePushNotifications() {
+export function usePushNotifications({ enabled, accessToken }: { enabled: boolean; accessToken: string | null }) {
   const [state, setState] = useState<PushNotificationState>({
     expoPushToken: null,
     notification: null,
     error: null,
   });
-
-  const notificationListener = useRef<Notifications.EventSubscription>();
-  const responseListener = useRef<Notifications.EventSubscription>();
+  const router = useRouter();
+  const notificationListener = useRef<Notifications.Subscription>();
+  const responseListener = useRef<Notifications.Subscription>();
 
   useEffect(() => {
-    registerForPushNotifications().then((token) => {
-      if (token) {
-        setState((s) => ({ ...s, expoPushToken: token }));
-        // Register token with the backend
-        const platform = Platform.OS as 'ios' | 'android';
-        registerPushToken(token, platform).catch(console.error);
+    if (!enabled || !accessToken || Platform.OS === "web") return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const token = await registerForPushNotifications();
+        if (!token || cancelled) return;
+        const platform = Platform.OS === "ios" ? "ios" : "android";
+        await registerPushToken(token, platform, accessToken);
+        if (!cancelled) setState((current) => ({ ...current, expoPushToken: token, error: null }));
+      } catch (error) {
+        if (!cancelled) {
+          setState((current) => ({
+            ...current,
+            error: error instanceof Error ? error.message : "Unable to register this device for protected notifications",
+          }));
+        }
       }
-    });
+    })();
 
-    // Listen for notifications received while app is in foreground
     notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      setState((s) => ({ ...s, notification }));
+      setState((current) => ({ ...current, notification }));
     });
 
-    // Listen for notification response (user tapped notification)
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data;
-      handleNotificationResponse(data);
+      routeNotificationPayload(response.notification.request.content.data, router);
     });
 
     return () => {
-      if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
-      }
-      if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
-      }
+      cancelled = true;
+      if (notificationListener.current) Notifications.removeNotificationSubscription(notificationListener.current);
+      if (responseListener.current) Notifications.removeNotificationSubscription(responseListener.current);
     };
-  }, []);
+  }, [accessToken, enabled, router]);
 
   return state;
 }
 
-async function registerForPushNotifications(): Promise<string | null> {
-  if (!Device.isDevice) {
-    console.warn('[Push] Must use physical device for push notifications');
-    return null;
-  }
+type ExpoPermissionCompatibility = { granted?: boolean };
 
-  // Request permission
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') {
-    console.warn('[Push] Push notification permission denied');
-    return null;
-  }
-
-  // Configure Android notification channel
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('idlr-default', {
-      name: 'IDLR-PTS Notifications',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#0ea5e9',
-      sound: 'notification.wav',
-    });
-
-    await Notifications.setNotificationChannelAsync('idlr-disputes', {
-      name: 'Dispute Alerts',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 500, 250, 500],
-      lightColor: '#ef4444',
-      sound: 'notification.wav',
-      bypassDnd: true,
-    });
-
-    await Notifications.setNotificationChannelAsync('idlr-transactions', {
-      name: 'Transaction Updates',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#22c55e',
-    });
-  }
-
-  try {
-    const projectId =
-      Constants.expoConfig?.extra?.eas?.projectId ??
-      Constants.easConfig?.projectId;
-
-    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-    return tokenData.data;
-  } catch (err) {
-    console.error('[Push] Failed to get push token:', err);
-    return null;
-  }
+function permissionsAreGranted(permissions: Notifications.NotificationPermissionsStatus): boolean {
+  // Expo SDK 51 exposes `granted` at runtime while its mobile declaration can omit it
+  // under pnpm's isolated transitive-module layout.
+  return (permissions as unknown as ExpoPermissionCompatibility).granted === true;
 }
 
-function handleNotificationResponse(data: Record<string, unknown>) {
-  // Navigation will be handled by the app's navigation service
-  console.log('[Push] Notification tapped, data:', data);
-  // In a real app, use a navigation ref to navigate:
-  // if (data.transactionId) navigationRef.navigate('Transaction', { id: data.transactionId });
-  // if (data.parcelId) navigationRef.navigate('Parcel', { id: data.parcelId });
-  // if (data.disputeId) navigationRef.navigate('Dispute', { id: data.disputeId });
+async function registerForPushNotifications(): Promise<string | null> {
+  if (!Device.isDevice) return null;
+
+  const currentPermissions = await Notifications.getPermissionsAsync();
+  const permissions = permissionsAreGranted(currentPermissions)
+    ? currentPermissions
+    : await Notifications.requestPermissionsAsync();
+  if (!permissionsAreGranted(permissions)) return null;
+
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("idlr-default", {
+      name: "IDLR platform updates",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#0ea5e9",
+    });
+    await Notifications.setNotificationChannelAsync("idlr-geoai", {
+      name: "GeoAI evidence and review alerts",
+      description: "Evidence workflow completion, failure, and review-required notifications",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 300, 150, 300],
+      lightColor: "#2563eb",
+    });
+  }
+
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+  if (!projectId) throw new Error("Expo EAS projectId is required to register push notifications");
+  const token = await Notifications.getExpoPushTokenAsync({ projectId });
+  return token.data;
+}
+
+function routeNotificationPayload(data: Record<string, unknown>, router: ReturnType<typeof useRouter>) {
+  const route = typeof data.route === "string" ? data.route : null;
+  if (route && (route.startsWith("/geoai/") || route.startsWith("/arcgis"))) {
+    router.push(route as any);
+    return;
+  }
+  const runId = Number(data.runId);
+  if (Number.isInteger(runId) && runId > 0) router.push(`/geoai/${runId}` as any);
 }

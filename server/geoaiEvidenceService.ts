@@ -11,6 +11,7 @@ import {
 import { requireDb } from "./db";
 import { queueEvent } from "./eventBus";
 import { grantPlatformResourceAccess } from "./permifyService";
+import { publishGeoAiMobileNotification } from "./geoaiMobileNotificationService";
 import {
   defaultGeoCheckpoints,
   deriveEvidenceStatus,
@@ -42,6 +43,25 @@ async function publishLifecycleEvent(eventType: string, runId: number, payload: 
     payload,
     deliveryStatus: "pending",
     availableAt: new Date(),
+  });
+}
+
+async function publishMobileRunLifecycle(
+  run: { id: number; runKey: string; title: string; status: string; evidenceStatus: string; requestedBy: number | null; failureReason?: string | null },
+  event: "created" | "queued" | "running" | "awaiting_review" | "failed" | "reviewed",
+) {
+  await publishGeoAiMobileNotification(run, event).catch(async (error) => {
+    await queueEvent({
+      backend: "dapr_pubsub",
+      topic: "geoai-mobile-notification-failed",
+      eventType: "geoai.mobile_notification.persistence_failed.v1",
+      aggregateType: "geo_analysis",
+      aggregateId: String(run.id),
+      partitionKey: String(run.requestedBy ?? "unattributed"),
+      payload: { runId: run.id, event, error: error instanceof Error ? error.message : String(error) },
+      deliveryStatus: "pending",
+      availableAt: new Date(),
+    }).catch(() => undefined);
   });
 }
 
@@ -203,6 +223,7 @@ export async function createGeoAnalysisRun(params: {
     parcelId: result.run.parcelId,
     policyVersion: result.run.policyVersion,
   });
+  await publishMobileRunLifecycle(result.run, "created");
   return result;
 }
 
@@ -221,6 +242,7 @@ export async function queueGeoAnalysisRun(runId: number, workflowId?: string) {
     analysisType: updated[0].analysisType,
     workflowId: updated[0].workflowId,
   });
+  await publishMobileRunLifecycle(updated[0], "queued");
   return updated[0];
 }
 
@@ -246,6 +268,7 @@ export async function markGeoAnalysisRunning(runId: number) {
     .returning();
   if (!updated[0]) throw new Error(`GeoAI run ${runId} was not found`);
   await publishLifecycleEvent("geoai.analysis.running.v1", runId, { runId, runKey: updated[0].runKey });
+  await publishMobileRunLifecycle(updated[0], "running");
   return updated[0];
 }
 
@@ -339,6 +362,7 @@ export async function completeGeoAnalysisRun(params: {
     runKey: updated[0].runKey,
     evidenceStatus: provisionalStatus,
   });
+  await publishMobileRunLifecycle(updated[0], "awaiting_review");
   return updated[0];
 }
 
@@ -351,6 +375,7 @@ export async function failGeoAnalysisRun(runId: number, failureReason: string) {
     .returning();
   if (!updated[0]) throw new Error(`GeoAI run ${runId} was not found`);
   await publishLifecycleEvent("geoai.analysis.failed.v1", runId, { runId, failureReason });
+  await publishMobileRunLifecycle(updated[0], "failed");
   return updated[0];
 }
 
@@ -390,6 +415,7 @@ export async function reviewGeoAnalysisRun(params: {
     decision: params.decision,
     reviewerId: params.reviewerId,
   });
+  await publishMobileRunLifecycle(updated[0], "reviewed");
   return updated[0];
 }
 
@@ -408,6 +434,20 @@ export async function listGeoAnalysisRuns(params: { parcelId?: number; limit?: n
   const db = await requireDb();
   const query = db.select().from(geoAnalysisRuns).orderBy(desc(geoAnalysisRuns.createdAt)).limit(Math.min(params.limit ?? 50, 200));
   return params.parcelId ? query.where(eq(geoAnalysisRuns.parcelId, params.parcelId)) : query;
+}
+
+export async function listGeoAssets(params: { parcelId?: number; assetTypes?: GeoAssetReference["assetType"][]; limit?: number }) {
+  const db = await requireDb();
+  const conditions = [
+    params.parcelId ? eq(geoAssetCatalog.parcelId, params.parcelId) : undefined,
+    params.assetTypes?.length ? inArray(geoAssetCatalog.assetType, params.assetTypes) : undefined,
+  ].filter((condition): condition is NonNullable<typeof condition> => Boolean(condition));
+  const query = db
+    .select()
+    .from(geoAssetCatalog)
+    .orderBy(desc(geoAssetCatalog.createdAt))
+    .limit(Math.min(params.limit ?? 100, 200));
+  return conditions.length ? query.where(and(...conditions)) : query;
 }
 
 export async function recordGeoModelEvidence(params: {

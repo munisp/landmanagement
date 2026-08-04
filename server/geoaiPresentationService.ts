@@ -53,6 +53,8 @@ export async function buildGeoAiPresentation(runId: number) {
         sourceCrs: asset.sourceCrs ?? null,
         verticalCrs: asset.verticalCrs ?? null,
         acquiredAt: asset.acquiredAt ?? null,
+        qualityMetadata: asset.qualityMetadata,
+        provenance: asset.provenance,
       })),
     },
     layers: stored.artifacts.map((artifact) => ({

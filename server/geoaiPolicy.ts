@@ -10,6 +10,7 @@ export const GEOAI_POLICY_VERSION = "1.0.0";
 
 export const geoAnalysisTypeSchema = z.enum([
   "spatial_correctness",
+  "field_evidence_review",
   "network_access",
   "imagery_analysis",
   "change_detection",
@@ -141,6 +142,13 @@ export function defaultGeoCheckpoints(manifest: GeoAnalysisManifest): GeoCheckpo
         { key: "row-accounting", name: "Spatial join or overlay row accounting reconciled", required: true },
         { key: "query-plan-reviewed", name: "Representative PostGIS query plan and index usage recorded", required: true },
       ];
+    case "field_evidence_review":
+      return [
+        { key: "provenance-recorded", name: "Capture device, acquisition time, location permission state, and immutable asset identifier recorded", required: true },
+        { key: "capture-integrity", name: "Server-computed file checksum and capture metadata match the registered source asset", required: true },
+        { key: "field-location-review", name: "Captured location, declared geographic CRS, and parcel relationship are reviewed", required: true },
+        { key: "field-observation-review", name: "Authorized reviewer has inspected the field observation and attached decision notes", required: true },
+      ];
     case "network_access":
       return [...common,
         { key: "network-mode", name: "Network mode and impedance match the access question", required: true },
@@ -215,6 +223,17 @@ export function validateGeoAnalysisManifest(rawManifest: unknown): GeoAnalysisMa
       requireAssetType(manifest, "parcel_geometry", errors);
       requireAssetCrs(manifest, ["parcel_geometry"], errors);
       break;
+    case "field_evidence_review": {
+      requireAssetType(manifest, "field_observation", errors);
+      for (const asset of manifest.sourceAssets.filter((candidate) => candidate.assetType === "field_observation")) {
+        if (!asset.sourceCrs) errors.push(`Field observation ${asset.assetId} is missing sourceCrs`);
+        const provenance = asset.provenance;
+        if (typeof provenance.capturedAt !== "string") errors.push(`Field observation ${asset.assetId} is missing provenance.capturedAt`);
+        if (!provenance.location || typeof provenance.location !== "object") errors.push(`Field observation ${asset.assetId} is missing provenance.location`);
+        if (typeof provenance.captureMethod !== "string") errors.push(`Field observation ${asset.assetId} is missing provenance.captureMethod`);
+      }
+      break;
+    }
     case "network_access":
       requireMetricCrs(manifest, errors);
       requireAssetType(manifest, "road_network", errors);
