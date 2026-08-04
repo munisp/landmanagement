@@ -4202,3 +4202,155 @@ export const mlModelRuns = pgTable("ml_model_runs", {
 
 export type MlTrainingExample = typeof mlTrainingExamples.$inferSelect;
 export type MlModelRun = typeof mlModelRuns.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// GeoAI policy, evidence, and guarded-operation domain
+// ---------------------------------------------------------------------------
+
+export const geoEvidenceStatusEnum = pgEnum("geo_evidence_status", [
+  "verified", "provisional", "insufficient_evidence", "rejected",
+]);
+export const geoAnalysisStatusEnum = pgEnum("geo_analysis_status", [
+  "draft", "queued", "running", "awaiting_review", "completed", "failed", "cancelled",
+]);
+export const geoAssetTypeEnum = pgEnum("geo_asset_type", [
+  "parcel_geometry", "survey_plan", "orthophoto", "satellite_scene", "raster",
+  "lidar_point_cloud", "dem", "dtm", "dsm", "road_network", "field_observation", "derived_product",
+]);
+export const geoCheckpointStatusEnum = pgEnum("geo_checkpoint_status", ["pending", "passed", "failed", "waived"]);
+export const geoArcgisOperationStatusEnum = pgEnum("geo_arcgis_operation_status", [
+  "requested", "approved", "rejected", "running", "completed", "failed", "cancelled",
+]);
+
+export const geoAssetCatalog = pgTable("geo_asset_catalog", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  assetId: varchar("asset_id", { length: 128 }).notNull().unique(),
+  parcelId: integer("parcel_id").references(() => parcels.id, { onDelete: "set null" }),
+  assetType: geoAssetTypeEnum("asset_type").notNull(),
+  uri: text("uri").notNull(),
+  checksumSha256: varchar("checksum_sha256", { length: 128 }),
+  mediaType: varchar("media_type", { length: 128 }),
+  dataSource: varchar("data_source", { length: 255 }).notNull(),
+  acquiredAt: timestamp("acquired_at", { withTimezone: true }),
+  sourceCrs: varchar("source_crs", { length: 64 }),
+  verticalCrs: varchar("vertical_crs", { length: 128 }),
+  coverageGeojson: jsonb("coverage_geojson"),
+  qualityMetadata: jsonb("quality_metadata").notNull().default({}),
+  provenance: jsonb("provenance").notNull().default({}),
+  evidenceStatus: geoEvidenceStatusEnum("evidence_status").notNull().default("insufficient_evidence"),
+  registeredBy: integer("registered_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  parcelTypeAcquiredIdx: index("geo_asset_catalog_parcel_type_idx").on(table.parcelId, table.assetType, table.acquiredAt),
+  statusCreatedIdx: index("geo_asset_catalog_status_idx").on(table.evidenceStatus, table.createdAt),
+}));
+
+export const geoAnalysisRuns = pgTable("geo_analysis_runs", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  runKey: varchar("run_key", { length: 128 }).notNull().unique(),
+  parcelId: integer("parcel_id").references(() => parcels.id, { onDelete: "set null" }),
+  analysisType: varchar("analysis_type", { length: 64 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  purpose: text("purpose").notNull(),
+  policyVersion: varchar("policy_version", { length: 64 }).notNull(),
+  status: geoAnalysisStatusEnum("status").notNull().default("draft"),
+  evidenceStatus: geoEvidenceStatusEnum("evidence_status").notNull().default("insufficient_evidence"),
+  requestedBy: integer("requested_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  workflowId: varchar("workflow_id", { length: 255 }),
+  inputManifest: jsonb("input_manifest").notNull(),
+  provenance: jsonb("provenance").notNull().default({}),
+  resultSummary: jsonb("result_summary"),
+  uncertaintySummary: jsonb("uncertainty_summary"),
+  failureReason: text("failure_reason"),
+  reviewNotes: text("review_notes"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  parcelCreatedIdx: index("geo_analysis_runs_parcel_created_idx").on(table.parcelId, table.createdAt),
+  statusCreatedIdx: index("geo_analysis_runs_status_created_idx").on(table.status, table.createdAt),
+  typeStatusCreatedIdx: index("geo_analysis_runs_type_status_idx").on(table.analysisType, table.evidenceStatus, table.createdAt),
+}));
+
+export const geoAnalysisArtifacts = pgTable("geo_analysis_artifacts", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  runId: bigint("run_id", { mode: "number" }).notNull().references(() => geoAnalysisRuns.id, { onDelete: "cascade" }),
+  assetId: varchar("asset_id", { length: 128 }).references(() => geoAssetCatalog.assetId, { onDelete: "set null" }),
+  artifactType: varchar("artifact_type", { length: 64 }).notNull(),
+  uri: text("uri").notNull(),
+  checksumSha256: varchar("checksum_sha256", { length: 128 }),
+  mediaType: varchar("media_type", { length: 128 }),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({ runCreatedIdx: index("geo_artifacts_run_idx").on(table.runId, table.createdAt) }));
+
+export const geoAnalysisCheckpoints = pgTable("geo_analysis_checkpoints", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  runId: bigint("run_id", { mode: "number" }).notNull().references(() => geoAnalysisRuns.id, { onDelete: "cascade" }),
+  checkpointKey: varchar("checkpoint_key", { length: 96 }).notNull(),
+  checkpointName: varchar("checkpoint_name", { length: 255 }).notNull(),
+  required: boolean("required").notNull().default(true),
+  status: geoCheckpointStatusEnum("status").notNull().default("pending"),
+  evidence: jsonb("evidence").notNull().default({}),
+  fulfilledBy: integer("fulfilled_by").references(() => users.id, { onDelete: "set null" }),
+  fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  runStatusIdx: index("geo_checkpoints_run_status_idx").on(table.runId, table.status),
+  runCheckpointUnique: uniqueIndex("geo_checkpoint_unique").on(table.runId, table.checkpointKey),
+}));
+
+export const geoModelEvidence = pgTable("geo_model_evidence", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  runId: bigint("run_id", { mode: "number" }).references(() => geoAnalysisRuns.id, { onDelete: "set null" }),
+  modelName: varchar("model_name", { length: 128 }).notNull(),
+  modelVersion: varchar("model_version", { length: 128 }).notNull(),
+  modelRunId: bigint("model_run_id", { mode: "number" }).references(() => mlModelRuns.id, { onDelete: "set null" }),
+  trainingManifest: jsonb("training_manifest").notNull(),
+  splitManifest: jsonb("split_manifest").notNull(),
+  baselineMetrics: jsonb("baseline_metrics").notNull(),
+  evaluationMetrics: jsonb("evaluation_metrics").notNull(),
+  uncertaintyMetrics: jsonb("uncertainty_metrics").notNull(),
+  errorArtifactUri: text("error_artifact_uri"),
+  geographicTransferArtifactUri: text("geographic_transfer_artifact_uri"),
+  evidenceStatus: geoEvidenceStatusEnum("evidence_status").notNull().default("insufficient_evidence"),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  runCreatedIdx: index("geo_model_evidence_run_idx").on(table.runId, table.createdAt),
+  modelVersionUnique: uniqueIndex("geo_model_version_unique").on(table.modelName, table.modelVersion),
+}));
+
+export const geoArcgisOperationRequests = pgTable("geo_arcgis_operation_requests", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  operationKey: varchar("operation_key", { length: 128 }).notNull().unique(),
+  runId: bigint("run_id", { mode: "number" }).references(() => geoAnalysisRuns.id, { onDelete: "set null" }),
+  requestedBy: integer("requested_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  approvedBy: integer("approved_by").references(() => users.id, { onDelete: "set null" }),
+  operationType: varchar("operation_type", { length: 96 }).notNull(),
+  operationPlan: jsonb("operation_plan").notNull(),
+  recoveryPlan: jsonb("recovery_plan").notNull(),
+  targetWorkspaceUri: text("target_workspace_uri").notNull(),
+  status: geoArcgisOperationStatusEnum("status").notNull().default("requested"),
+  externalJobId: varchar("external_job_id", { length: 255 }),
+  resultSummary: jsonb("result_summary"),
+  failureReason: text("failure_reason"),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).defaultNow().notNull(),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => ({ statusRequestedIdx: index("geo_arcgis_operations_status_idx").on(table.status, table.requestedAt) }));
+
+export type GeoAssetCatalog = typeof geoAssetCatalog.$inferSelect;
+export type GeoAnalysisRun = typeof geoAnalysisRuns.$inferSelect;
+export type GeoAnalysisArtifact = typeof geoAnalysisArtifacts.$inferSelect;
+export type GeoAnalysisCheckpoint = typeof geoAnalysisCheckpoints.$inferSelect;
+export type GeoModelEvidence = typeof geoModelEvidence.$inferSelect;
+export type GeoArcgisOperationRequest = typeof geoArcgisOperationRequests.$inferSelect;

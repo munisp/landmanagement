@@ -140,3 +140,32 @@ entity system {
     action approve = platform.admin
     action manage = platform.admin
 }
+
+
+entity geo_analysis {
+    relation platform @platform
+    relation requester @user
+    relation reviewer @user
+    relation operator @user
+
+    action view = requester or reviewer or operator or platform.view
+    action create = platform.create
+    action update = requester or reviewer or operator or platform.update
+    action delete = requester or platform.delete
+    action approve = reviewer or platform.approve
+    action manage = platform.manage
+}
+
+entity geo_arcgis_operation {
+    relation platform @platform
+    relation requester @user
+    relation approver @user
+    relation operator @user
+
+    action view = requester or approver or operator or platform.view
+    action create = platform.create
+    action update = requester or approver or operator or platform.update
+    action delete = requester or platform.delete
+    action approve = approver or platform.approve
+    action manage = platform.manage
+}

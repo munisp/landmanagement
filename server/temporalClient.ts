@@ -14,6 +14,7 @@ import {
   getStateQuery,
   getProgressQuery,
 } from '../temporal/workflows/propertyTransactionWorkflow';
+import { geoAiAnalysisWorkflow, type GeoAiAnalysisWorkflowInput } from '../temporal/workflows/geoaiAnalysisWorkflow';
 
 let client: Client | null = null;
 
@@ -25,6 +26,10 @@ function requiredTemporalConfig(name: string): string {
 
 function temporalTaskQueue(): string {
   return requiredTemporalConfig('TEMPORAL_PROPERTY_TRANSACTION_TASK_QUEUE');
+}
+
+function geoAiTemporalTaskQueue(): string {
+  return requiredTemporalConfig('TEMPORAL_GEOAI_TASK_QUEUE');
 }
 
 /** Initialize Temporal client connection. */
@@ -85,6 +90,22 @@ export async function startPropertyTransactionWorkflow(
     workflowId: handle.workflowId,
     runId: handle.firstExecutionRunId,
   };
+}
+
+/** Start a durable, evidence-gated GeoAI workflow. */
+export async function startGeoAiAnalysisWorkflow(input: GeoAiAnalysisWorkflowInput): Promise<{ workflowId: string; runId: string }> {
+  if (!client) await initializeTemporalClient();
+  const temporalClient = getTemporalClient();
+  const workflowId = `geoai-analysis-${input.runId}-${Date.now()}`;
+  const handle = await temporalClient.workflow.start(geoAiAnalysisWorkflow, {
+    taskQueue: geoAiTemporalTaskQueue(),
+    workflowId,
+    args: [input],
+    workflowExecutionTimeout: '24 hours',
+    workflowRunTimeout: '12 hours',
+    workflowTaskTimeout: '1 minute',
+  });
+  return { workflowId: handle.workflowId, runId: handle.firstExecutionRunId };
 }
 
 /**

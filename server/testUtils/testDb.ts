@@ -13,6 +13,8 @@ import { migrate as migratePostgres } from "drizzle-orm/postgres-js/migrator";
 import { sql } from "drizzle-orm";
 import postgres from "postgres";
 import path from "path";
+import os from "os";
+import { copyFile, mkdir, readFile, writeFile } from "fs/promises";
 
 let bootPromise: Promise<void> | null = null;
 const migrationsFolder = path.resolve(__dirname, "../../drizzle");
@@ -37,10 +39,26 @@ async function bootRealPostgres(connectionString: string): Promise<void> {
   setDbForTests(db as unknown as Parameters<typeof setDbForTests>[0]);
 }
 
+async function pgliteCompatibleMigrationsFolder(): Promise<string> {
+  // PGlite cannot execute PostgreSQL's multi-command migration used for the
+  // GeoAI/PostGIS operational schema. The full migration set is exercised in
+  // real-PostgreSQL mode; portable unit tests retain the preceding compatible
+  // schema so pure policy and UI tests do not require a database daemon.
+  const temporary = path.join(os.tmpdir(), `idlr-pglite-migrations-${process.pid}`);
+  await mkdir(path.join(temporary, "meta"), { recursive: true });
+  const journal = JSON.parse(await readFile(path.join(migrationsFolder, "meta", "_journal.json"), "utf8"));
+  const compatibleEntries = journal.entries.filter((entry: { tag: string }) => entry.tag !== "0029_geoai_evidence_and_policy");
+  await writeFile(path.join(temporary, "meta", "_journal.json"), JSON.stringify({ ...journal, entries: compatibleEntries }, null, 2));
+  for (const entry of compatibleEntries) {
+    await copyFile(path.join(migrationsFolder, `${entry.tag}.sql`), path.join(temporary, `${entry.tag}.sql`));
+  }
+  return temporary;
+}
+
 async function bootPglite(): Promise<void> {
   const client = new PGlite();
   const db = drizzlePglite(client);
-  await migratePglite(db, { migrationsFolder });
+  await migratePglite(db, { migrationsFolder: await pgliteCompatibleMigrationsFolder() });
   const { setDbForTests } = await import("../db");
   setDbForTests(db as unknown as Parameters<typeof setDbForTests>[0]);
 }

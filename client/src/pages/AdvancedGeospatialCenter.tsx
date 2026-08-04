@@ -67,6 +67,7 @@ export default function AdvancedGeospatialCenter() {
               <Button variant="outline" asChild><Link href="/drone-processing">Open Drone Processing</Link></Button>
               <Button variant="outline" asChild><Link href={`/parcels/${activeParcelId}/map`}>Open Parcel Map</Link></Button>
               <Button variant="outline" asChild><Link href="/geolibre-workspace">Open GeoLibre Workspace</Link></Button>
+              <Button variant="outline" asChild><Link href="/geoai-operations">Open GeoAI Operations Center</Link></Button>
             </div>
             <div className="rounded-lg border p-4 text-sm text-muted-foreground">
               This workbench now integrates a dedicated MapLibre surface, Sedona-aligned lakehouse analytics, AI/CV/NLP-ready photo-analysis hooks, and a direct launch path into the exact upstream GeoLibre companion workspace.

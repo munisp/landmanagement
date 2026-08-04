@@ -31,6 +31,7 @@ try:
 except ImportError:
     get_catalog = None
 
+from api.geoai_service import router as geoai_router
 from ml.title_risk_model import (
     FEATURE_NAMES,
     MODEL_NAME,
@@ -43,7 +44,7 @@ from ml.title_risk_model import (
 app = FastAPI(
     title="IDLR Lakehouse API",
     description="Data analytics and ingestion API for IDLR platform",
-    version="1.1.0",
+    version="1.2.0",
 )
 
 def configured_cors_origins() -> List[str]:
@@ -884,6 +885,11 @@ async def geospatial_spatial_workbench(request: SedonaSpatialWorkbenchRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
+
+# Attach the GeoAI routes only after the application module has completed all
+# existing endpoint declarations. This ensures a single final app instance owns
+# the entire authenticated route set in every import and worker mode.
+app.include_router(geoai_router)
 
 if __name__ == "__main__":
     import uvicorn

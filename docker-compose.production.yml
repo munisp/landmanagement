@@ -74,6 +74,9 @@ services:
       FLUVIO_API_URL: http://fluvio-sc:9003
       # Temporal
       TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_PROPERTY_TRANSACTION_TASK_QUEUE: ${TEMPORAL_PROPERTY_TRANSACTION_TASK_QUEUE:-property-transaction}
+      TEMPORAL_GEOAI_TASK_QUEUE: ${TEMPORAL_GEOAI_TASK_QUEUE:?TEMPORAL_GEOAI_TASK_QUEUE must be set}
       # OpenSearch
       OPENSEARCH_URL: http://opensearch:9200
       ELASTICSEARCH_URL: http://opensearch:9200
@@ -502,6 +505,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
       LAKEHOUSE_API_KEY: ${LAKEHOUSE_API_KEY:?LAKEHOUSE_API_KEY must be set}
       LAKEHOUSE_CORS_ORIGINS: ${LAKEHOUSE_CORS_ORIGINS:-}
+      GEOAI_ALLOWED_ASSET_URI_PREFIXES: ${GEOAI_ALLOWED_ASSET_URI_PREFIXES:?GEOAI_ALLOWED_ASSET_URI_PREFIXES must be set}
+      GEOAI_PDAL_BINARY: ${GEOAI_PDAL_BINARY:-}
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MODEL_WEIGHTS_DIR: /app/ml/weights
       RAY_ADDRESS: auto
@@ -671,6 +676,47 @@ services:
         condition: service_healthy
       tigerbeetle:
         condition: service_started
+    networks:
+      - idlr_net
+
+  geoai-temporal-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idlr-geoai-temporal-worker
+    <<: *default-restart
+    logging: *default-logging
+    command: ["pnpm", "worker:geoai"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_GEOAI_TASK_QUEUE: ${TEMPORAL_GEOAI_TASK_QUEUE:?TEMPORAL_GEOAI_TASK_QUEUE must be set}
+      TEMPORAL_TLS_ENABLED: ${TEMPORAL_TLS_ENABLED:-true}
+      TEMPORAL_TLS_CERT: ${TEMPORAL_TLS_CERT:-}
+      TEMPORAL_TLS_KEY: ${TEMPORAL_TLS_KEY:-}
+      LAKEHOUSE_API_URL: http://lakehouse-api:8000
+      LAKEHOUSE_API_KEY: ${LAKEHOUSE_API_KEY:?LAKEHOUSE_API_KEY must be set}
+      GEOAI_LAKEHOUSE_TIMEOUT_MS: ${GEOAI_LAKEHOUSE_TIMEOUT_MS:-120000}
+      DAPR_PUBSUB_NAME: idlr-pubsub
+      PERMIFY_URL: http://permify:3476
+      PERMIFY_TENANT_ID: ${PERMIFY_TENANT_ID:-idlr}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-idlr-pts}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-idlr-pts-app}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?KEYCLOAK_CLIENT_SECRET must be set}
+      ARCGIS_GEOAI_CONTROL_PLANE_URL: ${ARCGIS_GEOAI_CONTROL_PLANE_URL:-}
+      ARCGIS_GEOAI_CONTROL_PLANE_API_KEY: ${ARCGIS_GEOAI_CONTROL_PLANE_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      lakehouse-api:
+        condition: service_healthy
+      permify:
+        condition: service_healthy
     networks:
       - idlr_net
 

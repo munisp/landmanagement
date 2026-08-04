@@ -14,6 +14,8 @@ export type PermifyResourceType =
   | "workflow"
   | "report"
   | "marketplace_listing"
+  | "geo_analysis"
+  | "geo_arcgis_operation"
   | "admin_surface"
   | "system";
 
@@ -127,6 +129,18 @@ function platformTuple(userId: number, relation: string) {
   };
 }
 
+async function ensureGlobalGeoResourceRelations(schemaVersion: string): Promise<void> {
+  const { tenantId } = getConfig();
+  await permifyRequest(`/v1/tenants/${encodeURIComponent(tenantId)}/data/write`, {
+    metadata: { schema_version: schemaVersion },
+    tuples: ["geo_analysis", "geo_arcgis_operation"].map((type) => ({
+      entity: { type, id: "global" },
+      relation: "platform",
+      subject: { type: "platform", id: "global", relation: "" },
+    })),
+  });
+}
+
 async function deletePlatformRole(userId: number, relation: RoleRelation): Promise<void> {
   const { tenantId } = getConfig();
   await permifyRequest(`/v1/tenants/${encodeURIComponent(tenantId)}/data/delete`, {
@@ -159,6 +173,7 @@ export async function synchronizePlatformRole(user: User): Promise<string> {
     metadata: { schema_version: schemaVersion },
     tuples,
   });
+  await ensureGlobalGeoResourceRelations(schemaVersion);
   return schemaVersion;
 }
 
@@ -205,4 +220,37 @@ export async function checkPermifyPermission(params: {
     return payload.can === "RESULT_ALLOWED" || payload.can.toLowerCase() === "allow";
   }
   throw new Error("Permify permission check returned no authorization decision");
+}
+
+
+/**
+ * Attach a resource to the global platform relation and optionally grant a
+ * direct requester/reviewer/operator relation. This is required for resource
+ * policies that delegate their default permissions through platform:global.
+ */
+export async function grantPlatformResourceAccess(params: {
+  resourceType: Exclude<PermifyResourceType, "admin_surface" | "system">;
+  resourceId: string;
+  userId?: number;
+  userRelation?: string;
+}): Promise<string> {
+  const { tenantId } = getConfig();
+  const schemaVersion = await publishAuthorizationSchema(params.userId);
+  const tuples: Array<Record<string, unknown>> = [{
+    entity: { type: params.resourceType, id: params.resourceId },
+    relation: "platform",
+    subject: { type: "platform", id: "global", relation: "" },
+  }];
+  if (params.userId && params.userRelation) {
+    tuples.push({
+      entity: { type: params.resourceType, id: params.resourceId },
+      relation: params.userRelation,
+      subject: { type: "user", id: String(params.userId), relation: "" },
+    });
+  }
+  await permifyRequest(`/v1/tenants/${encodeURIComponent(tenantId)}/data/write`, {
+    metadata: { schema_version: schemaVersion },
+    tuples,
+  });
+  return schemaVersion;
 }
