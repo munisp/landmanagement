@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
+import { Link } from "wouter";
 import { FileText, CheckCircle2, XCircle, Clock, TrendingUp, DollarSign, User, Building, Calendar } from "lucide-react";
 import { toast } from "sonner";
 
@@ -127,9 +128,12 @@ export default function LoanOfficerDashboard() {
 
   return (
     <div className="container py-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Loan Officer Dashboard</h1>
-        <p className="text-muted-foreground">Review and manage mortgage applications</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Loan Officer Dashboard</h1>
+          <p className="text-muted-foreground">Review and manage mortgage applications</p>
+        </div>
+        <Button asChild variant="outline"><Link href="/lender-collateral-control">Open Lender Collateral Control</Link></Button>
       </div>
 
       {/* Statistics Cards */}

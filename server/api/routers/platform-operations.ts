@@ -6,13 +6,13 @@ export const platformOperationsRouter = router({
     return getPlatformOperationsOverview();
   }),
 
-  syntheticJourneys: protectedProcedure.query(async () => {
+  derivedOperationalChecks: protectedProcedure.query(async () => {
     const overview = await getPlatformOperationsOverview();
     return {
       generatedAt: overview.generatedAt,
       overallStatus: overview.overallStatus,
       readinessScore: overview.readinessScore,
-      journeys: overview.syntheticJourneys,
+      checks: overview.derivedOperationalChecks,
     };
   }),
 });

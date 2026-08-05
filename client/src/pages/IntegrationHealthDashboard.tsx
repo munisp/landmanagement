@@ -238,7 +238,7 @@ export default function IntegrationHealthDashboard() {
         <div>
           <h1 className="text-3xl font-bold">Trusted Middleware Readiness</h1>
           <p className="text-muted-foreground">
-            Monitor service health, synthetic journeys, cross-language control signals, and operational trust posture.
+            Monitor measured service health, derived operational checks, cross-language control signals, and operational trust posture.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -350,9 +350,10 @@ export default function IntegrationHealthDashboard() {
           <Separator />
 
           <div>
-            <h2 className="mb-4 text-2xl font-bold">Synthetic Journeys</h2>
+            <h2 className="mb-2 text-2xl font-bold">Derived Operational Checks</h2>
+            <p className="mb-4 text-sm text-muted-foreground">Each check is calculated from the displayed live dependency, configuration, and backup signals. It is not a simulated transaction or a substitute for an exercised end-to-end control.</p>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {operations.syntheticJourneys.map((journey) => {
+              {operations.derivedOperationalChecks.map((journey) => {
                 const badge = getReadinessBadge(journey.status);
                 return (
                   <Card key={journey.id}>
@@ -367,7 +368,7 @@ export default function IntegrationHealthDashboard() {
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Journey score</span>
+                        <span className="text-muted-foreground">Derived score</span>
                         <span className="font-semibold">{journey.score}/100</span>
                       </div>
                       <div>

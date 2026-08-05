@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, Camera, CheckCircle, ClipboardList, Loader2, MapPin, Save, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'wouter';
 
 type DraftFieldData = {
   parcelNumber: string;
@@ -393,6 +394,7 @@ export default function FieldSurveyor() {
           )}
           <Badge variant="outline">{stats?.totalRecords ?? 0} synced records</Badge>
           {queuedRecords.length > 0 && <Badge variant="secondary">{queuedRecords.length} pending sync</Badge>}
+          <Button asChild variant="outline" size="sm"><Link href="/field-survey-operations">Open Field Survey Operations</Link></Button>
         </div>
       </div>
 

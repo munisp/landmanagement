@@ -47,6 +47,7 @@ const PropertyDetails = lazy(() => import('./pages/PropertyDetails'));
 const MortgageApplicationPage = lazy(() => import('./pages/MortgageApplicationPage'));
 const MortgageDashboard = lazy(() => import('./pages/MortgageDashboard'));
 const LoanOfficerDashboard = lazy(() => import('./pages/LoanOfficerDashboard'));
+const LenderCollateralControl = lazy(() => import('./pages/LenderCollateralControl'));
 const BorrowerPaymentPortal = lazy(() => import('./pages/BorrowerPaymentPortal'));
 const BrokerDashboard = lazy(() => import('./pages/BrokerDashboard'));
 const InvestorDashboard = lazy(() => import('./pages/InvestorDashboard'));
@@ -63,6 +64,7 @@ const SupportCenter = lazy(() => import('./pages/SupportCenter'));
 const MarketingCenter = lazy(() => import('./pages/MarketingCenter'));
 const IoTOperations = lazy(() => import('./pages/IoTOperations'));
 const LegalDocumentCenter = lazy(() => import('./pages/LegalDocumentCenter'));
+const ConveyancingWorkspace = lazy(() => import('./pages/ConveyancingWorkspace'));
 const CivicComplianceCenter = lazy(() => import('./pages/CivicComplianceCenter'));
 const UtilityConnectionCenter = lazy(() => import('./pages/UtilityConnectionCenter'));
 const CommunityEngagementCenter = lazy(() => import('./pages/CommunityEngagementCenter'));
@@ -98,6 +100,7 @@ const VerificationAnalytics = lazy(() => import('./pages/VerificationAnalytics')
 const SecurityMonitoring = lazy(() => import('./pages/SecurityMonitoring'));
 const DocumentValidation = lazy(() => import('./pages/DocumentValidation'));
 const FieldSurveyor = lazy(() => import('./pages/FieldSurveyor'));
+const FieldSurveyOperations = lazy(() => import('./pages/FieldSurveyOperations'));
 const ExecutiveDashboard = lazy(() => import('./pages/ExecutiveDashboard'));
 const BlockchainTransactions = lazy(() => import('./pages/BlockchainTransactions'));
 const BlockchainVerify = lazy(() => import('./pages/BlockchainVerify'));
@@ -181,6 +184,7 @@ function Router() {
             <Route path="/document-validation" component={DocumentValidation} />
       <Route path="/document-verification" component={DocumentValidation} />
             <Route path="/field-surveyor" component={FieldSurveyor} />
+            <Route path="/field-survey-operations" component={FieldSurveyOperations} />
             <Route path="/executive-dashboard" component={ExecutiveDashboard} />
             <Route path="/blockchain-transactions" component={BlockchainTransactions} />
       <Route path="/reports" component={Reports} />      <Route path={"/bulk-import"} component={BulkImport} />
@@ -216,6 +220,7 @@ function Router() {
       <Route path="/mortgage-application" component={MortgageApplicationPage} />
       <Route path="/mortgage-dashboard" component={MortgageDashboard} />
       <Route path="/loan-officer-dashboard" component={LoanOfficerDashboard} />
+      <Route path="/lender-collateral-control" component={LenderCollateralControl} />
       <Route path="/borrower-payment-portal" component={BorrowerPaymentPortal} />
       <Route path="/broker-dashboard" component={BrokerDashboard} />
       <Route path="/investor-dashboard" component={InvestorDashboard} />
@@ -233,6 +238,7 @@ function Router() {
       <Route path="/marketing-center" component={MarketingCenter} />
       <Route path="/iot-operations" component={IoTOperations} />
       <Route path="/legal-document-center" component={LegalDocumentCenter} />
+      <Route path="/conveyancing-workspace" component={ConveyancingWorkspace} />
       <Route path="/civic-compliance-center" component={CivicComplianceCenter} />
       <Route path="/utility-connection-center" component={UtilityConnectionCenter} />
       <Route path="/community-engagement-center" component={CommunityEngagementCenter} />

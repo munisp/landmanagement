@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { FileSignature, PenSquare, ShieldCheck, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'wouter';
 
 const documentTypeOptions = [
   { value: 'deed_of_assignment', label: 'Deed of Assignment' },
@@ -116,9 +117,12 @@ export default function LegalDocumentCenter() {
 
   return (
     <div className="container py-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Legal Document Center</h1>
-        <p className="text-muted-foreground mt-2">Generate legal templates, apply automated document filling, verify signature cues, and submit legal workflows into the Phase 4 registry pipeline.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Legal Document Center</h1>
+          <p className="text-muted-foreground mt-2">Generate legal templates, apply automated document filling, verify signature cues, and submit legal workflows into the Phase 4 registry pipeline.</p>
+        </div>
+        <Button asChild variant="outline"><Link href="/conveyancing-workspace">Open Conveyancing Workspace</Link></Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

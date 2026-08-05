@@ -886,3 +886,90 @@ export async function getMobileContextGlobe(
   if (!summary || !features) throw new MobileApiError("The Context Globe response was incomplete", "INVALID_RESPONSE", 502);
   return { summary, features };
 }
+
+
+export type MobileCommercialAccount = {
+  accountKey: string;
+  legalName: string;
+  status: string;
+  billingEmail: string;
+  role: string;
+};
+
+export type MobileFieldAssignment = {
+  assignmentKey: string;
+  parcelId: number;
+  assignedTo: number;
+  assignedBy: number;
+  status: "assigned" | "in_progress" | "submitted" | "under_review" | "accepted" | "returned" | "cancelled";
+  instructions: string;
+  scheduledFor?: string | null;
+  dueAt?: string | null;
+  reviewNotes?: string | null;
+  updatedAt: string;
+};
+
+export type MobileFieldEvidence = {
+  evidenceKey: string;
+  evidenceType: string;
+  sourceReference: string;
+  sourceChecksumSha256?: string | null;
+  capturedAt: string;
+  latitude?: string | null;
+  longitude?: string | null;
+  qualityFlags: string[];
+  status: "pending" | "accepted" | "rejected";
+  reviewNotes?: string | null;
+  submittedAt: string;
+};
+
+export type MobileFieldEvent = {
+  id: number;
+  eventType: string;
+  previousStatus?: string | null;
+  nextStatus?: string | null;
+  description: string;
+  createdAt: string;
+};
+
+export type MobileFieldDashboard = {
+  account: { accountKey: string; legalName: string; accountStatus: string; billingEmail: string; role: string };
+  subscriptions: Array<{ subscription: { status: string; currentPeriodEnd: string }; product: { name: string } }>;
+  assignments: MobileFieldAssignment[];
+  usageByMetric: Record<string, number>;
+  selectedAssignment: { assignment: MobileFieldAssignment; evidence: MobileFieldEvidence[]; events: MobileFieldEvent[] } | null;
+};
+
+export async function listMobileFieldAccounts(accessToken?: string | null): Promise<MobileCommercialAccount[]> {
+  const accounts = await trpcQuery<MobileCommercialAccount[]>("commercialLender.listMyAccounts", undefined, accessToken);
+  return accounts.filter((account) => account.accountKey.startsWith("FIELD-"));
+}
+
+export const getMobileFieldDashboard = (input: { accountKey: string; assignmentKey?: string }, accessToken?: string | null) =>
+  trpcQuery<MobileFieldDashboard>("commercialLender.fieldSurveyDashboard", input, accessToken);
+
+export const submitMobileFieldEvidence = (input: {
+  accountKey: string;
+  assignmentKey: string;
+  evidenceType: string;
+  sourceReference: string;
+  sourceChecksumSha256?: string;
+  capturedAt: string;
+  latitude?: number;
+  longitude?: number;
+  qualityFlags?: string[];
+}, accessToken?: string | null) => trpcMutation<MobileFieldEvidence>("commercialLender.submitFieldEvidence", input, accessToken);
+
+export const reviewMobileFieldEvidence = (input: {
+  accountKey: string;
+  evidenceKey: string;
+  status: "accepted" | "rejected";
+  reviewNotes: string;
+}, accessToken?: string | null) => trpcMutation<MobileFieldEvidence>("commercialLender.reviewFieldEvidence", input, accessToken);
+
+export const transitionMobileFieldAssignment = (input: {
+  accountKey: string;
+  assignmentKey: string;
+  nextStatus: MobileFieldAssignment["status"];
+  reviewNotes?: string;
+}, accessToken?: string | null) => trpcMutation<MobileFieldAssignment>("commercialLender.transitionFieldAssignment", input, accessToken);

@@ -1107,6 +1107,58 @@ services:
     networks:
       - idlr_net
 
+  commercial-billing-temporal-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idlr-commercial-billing-temporal-worker
+    <<: *default-restart
+    logging: *default-logging
+    command: ["pnpm", "worker:commercial-billing"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_COMMERCIAL_BILLING_TASK_QUEUE: ${TEMPORAL_COMMERCIAL_BILLING_TASK_QUEUE:?TEMPORAL_COMMERCIAL_BILLING_TASK_QUEUE must be set}
+      TEMPORAL_TLS_ENABLED: ${TEMPORAL_TLS_ENABLED:-true}
+      TEMPORAL_TLS_CERT: ${TEMPORAL_TLS_CERT:-}
+      TEMPORAL_TLS_KEY: ${TEMPORAL_TLS_KEY:-}
+      COMMERCIAL_BILLING_GRACE_DAYS: ${COMMERCIAL_BILLING_GRACE_DAYS:-7}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    networks:
+      - idlr_net
+
+  commercial-billing-temporal-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idlr-commercial-billing-temporal-scheduler
+    <<: *default-restart
+    logging: *default-logging
+    command: ["pnpm", "worker:commercial-billing-scheduler"]
+    environment:
+      NODE_ENV: production
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_COMMERCIAL_BILLING_TASK_QUEUE: ${TEMPORAL_COMMERCIAL_BILLING_TASK_QUEUE:?TEMPORAL_COMMERCIAL_BILLING_TASK_QUEUE must be set}
+      TEMPORAL_TLS_ENABLED: ${TEMPORAL_TLS_ENABLED:-true}
+      TEMPORAL_TLS_CERT: ${TEMPORAL_TLS_CERT:-}
+      TEMPORAL_TLS_KEY: ${TEMPORAL_TLS_KEY:-}
+      COMMERCIAL_BILLING_INTERVAL_SECONDS: ${COMMERCIAL_BILLING_INTERVAL_SECONDS:-86400}
+      COMMERCIAL_BILLING_WORKFLOW_ID: ${COMMERCIAL_BILLING_WORKFLOW_ID:-commercial-billing-cycle-v1}
+    depends_on:
+      temporal:
+        condition: service_healthy
+      commercial-billing-temporal-worker:
+        condition: service_started
+    networks:
+      - idlr_net
+
   geo-innovation-temporal-scheduler:
     build:
       context: .

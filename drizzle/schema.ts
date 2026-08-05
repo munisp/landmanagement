@@ -4669,3 +4669,302 @@ export const contextDeliveryAudits = pgTable("context_delivery_audits", {
 export type ContextLayer = typeof contextLayers.$inferSelect;
 export type ContextEvent = typeof contextEvents.$inferSelect;
 export type ContextIngestionRun = typeof contextIngestionRuns.$inferSelect;
+
+/**
+ * Commercial accounts and Lender Collateral Control.
+ * These tables are deliberately separate from statutory registry data: they
+ * model paid workflow access, billable usage, and institutional review cases.
+ */
+export const commercialAccountStatusEnum = pgEnum("commercial_account_status", ["trial", "active", "past_due", "suspended", "cancelled"]);
+export const commercialMemberRoleEnum = pgEnum("commercial_member_role", ["owner", "billing_admin", "lender_admin", "lender_analyst", "reviewer", "matter_manager", "legal_reviewer", "field_manager", "field_inspector", "field_reviewer"]);
+export const commercialSubscriptionStatusEnum = pgEnum("commercial_subscription_status", ["trialing", "active", "past_due", "suspended", "cancelled"]);
+export const commercialInvoiceStatusEnum = pgEnum("commercial_invoice_status", ["draft", "issued", "paid", "void", "overdue"]);
+export const collateralCaseStatusEnum = pgEnum("collateral_case_status", ["opened", "evidence_requested", "ready_for_review", "under_review", "conditional_approval", "approved", "declined", "withdrawn"]);
+export const collateralEvidenceStatusEnum = pgEnum("collateral_evidence_status", ["pending", "accepted", "rejected"]);
+
+export const commercialProducts = pgTable("commercial_products", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  productKey: varchar("product_key", { length: 64 }).notNull().unique(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description").notNull(),
+  monthlyPriceMinor: integer("monthly_price_minor").notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  includedSeats: integer("included_seats").notNull(),
+  includedUnits: jsonb("included_units").notNull().default({}),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const commercialAccounts = pgTable("commercial_accounts", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  accountKey: varchar("account_key", { length: 96 }).notNull().unique(),
+  legalName: varchar("legal_name", { length: 255 }).notNull(),
+  billingEmail: varchar("billing_email", { length: 320 }).notNull(),
+  status: commercialAccountStatusEnum("status").notNull().default("trial"),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const commercialAccountMembers = pgTable("commercial_account_members", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  accountId: bigint("account_id", { mode: "number" }).notNull().references(() => commercialAccounts.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: commercialMemberRoleEnum("role").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  accountUserUnique: uniqueIndex("commercial_account_members_account_user_unique").on(table.accountId, table.userId),
+  userAccountIdx: index("commercial_account_members_user_idx").on(table.userId, table.accountId),
+}));
+
+export const commercialSubscriptions = pgTable("commercial_subscriptions", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  subscriptionKey: varchar("subscription_key", { length: 96 }).notNull().unique(),
+  accountId: bigint("account_id", { mode: "number" }).notNull().references(() => commercialAccounts.id, { onDelete: "cascade" }),
+  productId: bigint("product_id", { mode: "number" }).notNull().references(() => commercialProducts.id),
+  status: commercialSubscriptionStatusEnum("status").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  currentPeriodStart: timestamp("current_period_start", { withTimezone: true }).notNull(),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  accountStatusIdx: index("commercial_subscriptions_account_status_idx").on(table.accountId, table.status, table.currentPeriodEnd),
+}));
+
+export const commercialUsageEvents = pgTable("commercial_usage_events", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  accountId: bigint("account_id", { mode: "number" }).notNull().references(() => commercialAccounts.id, { onDelete: "cascade" }),
+  metricKey: varchar("metric_key", { length: 96 }).notNull(),
+  quantity: integer("quantity").notNull(),
+  idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull().unique(),
+  sourceType: varchar("source_type", { length: 64 }).notNull(),
+  sourceKey: varchar("source_key", { length: 160 }).notNull(),
+  metadata: jsonb("metadata").notNull().default({}),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  accountMetricTimeIdx: index("commercial_usage_events_account_metric_time_idx").on(table.accountId, table.metricKey, table.occurredAt),
+}));
+
+export const commercialInvoices = pgTable("commercial_invoices", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  invoiceKey: varchar("invoice_key", { length: 96 }).notNull().unique(),
+  accountId: bigint("account_id", { mode: "number" }).notNull().references(() => commercialAccounts.id),
+  subscriptionId: bigint("subscription_id", { mode: "number" }).references(() => commercialSubscriptions.id, { onDelete: "set null" }),
+  status: commercialInvoiceStatusEnum("status").notNull().default("draft"),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  subtotalMinor: integer("subtotal_minor").notNull(),
+  taxMinor: integer("tax_minor").notNull().default(0),
+  totalMinor: integer("total_minor").notNull(),
+  issuedAt: timestamp("issued_at", { withTimezone: true }),
+  dueAt: timestamp("due_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  collectionMethod: varchar("collection_method", { length: 64 }).notNull().default("manual_reconciliation"),
+  providerReference: varchar("provider_reference", { length: 160 }),
+  paymentEvidence: jsonb("payment_evidence").notNull().default({}),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  accountStatusDueIdx: index("commercial_invoices_account_status_due_idx").on(table.accountId, table.status, table.dueAt),
+}));
+
+export const lenderPortfolios = pgTable("lender_portfolios", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  portfolioKey: varchar("portfolio_key", { length: 96 }).notNull().unique(),
+  accountId: bigint("account_id", { mode: "number" }).notNull().unique().references(() => commercialAccounts.id, { onDelete: "cascade" }),
+  lenderName: varchar("lender_name", { length: 255 }).notNull(),
+  policyVersion: varchar("policy_version", { length: 64 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const lenderCollateralCases = pgTable("lender_collateral_cases", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  caseKey: varchar("case_key", { length: 96 }).notNull().unique(),
+  accountId: bigint("account_id", { mode: "number" }).notNull().references(() => commercialAccounts.id),
+  portfolioId: bigint("portfolio_id", { mode: "number" }).notNull().references(() => lenderPortfolios.id),
+  mortgageApplicationId: integer("mortgage_application_id").references(() => mortgageApplications.id, { onDelete: "set null" }),
+  parcelId: integer("parcel_id").notNull().references(() => parcels.id),
+  borrowerId: integer("borrower_id").references(() => users.id, { onDelete: "set null" }),
+  status: collateralCaseStatusEnum("status").notNull().default("opened"),
+  requestedAmountMinor: integer("requested_amount_minor").notNull(),
+  declaredCollateralValueMinor: integer("declared_collateral_value_minor"),
+  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  assignedReviewerId: integer("assigned_reviewer_id").references(() => users.id, { onDelete: "set null" }),
+  decisionNotes: text("decision_notes"),
+  openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  accountStatusUpdatedIdx: index("lender_collateral_cases_account_status_updated_idx").on(table.accountId, table.status, table.updatedAt),
+  portfolioStatusIdx: index("lender_collateral_cases_portfolio_idx").on(table.portfolioId, table.status),
+}));
+
+export const lenderCollateralEvidence = pgTable("lender_collateral_evidence", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  evidenceKey: varchar("evidence_key", { length: 96 }).notNull().unique(),
+  caseId: bigint("case_id", { mode: "number" }).notNull().references(() => lenderCollateralCases.id, { onDelete: "cascade" }),
+  evidenceType: varchar("evidence_type", { length: 64 }).notNull(),
+  sourceReference: varchar("source_reference", { length: 160 }).notNull(),
+  sourceChecksumSha256: varchar("source_checksum_sha256", { length: 64 }),
+  status: collateralEvidenceStatusEnum("status").notNull().default("pending"),
+  reviewNotes: text("review_notes"),
+  submittedBy: integer("submitted_by").notNull().references(() => users.id),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  metadata: jsonb("metadata").notNull().default({}),
+}, (table) => ({
+  caseStatusIdx: index("lender_collateral_evidence_case_status_idx").on(table.caseId, table.status),
+}));
+
+export const lenderCollateralEvents = pgTable("lender_collateral_events", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  caseId: bigint("case_id", { mode: "number" }).notNull().references(() => lenderCollateralCases.id, { onDelete: "cascade" }),
+  eventType: varchar("event_type", { length: 64 }).notNull(),
+  previousStatus: collateralCaseStatusEnum("previous_status"),
+  nextStatus: collateralCaseStatusEnum("next_status"),
+  actorId: integer("actor_id").notNull().references(() => users.id),
+  description: text("description").notNull(),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  caseCreatedIdx: index("lender_collateral_events_case_created_idx").on(table.caseId, table.createdAt),
+}));
+
+export type CommercialProduct = typeof commercialProducts.$inferSelect;
+export type CommercialAccount = typeof commercialAccounts.$inferSelect;
+export type CommercialSubscription = typeof commercialSubscriptions.$inferSelect;
+export type CommercialInvoice = typeof commercialInvoices.$inferSelect;
+export type LenderCollateralCase = typeof lenderCollateralCases.$inferSelect;
+
+/** Professional conveyancing and title-verification workspace. */
+export const conveyancingMatterStatusEnum = pgEnum("conveyancing_matter_status", ["opened", "evidence_requested", "title_review", "legal_drafting", "signatures_pending", "closing_ready", "completed", "withdrawn"]);
+export const conveyancingEvidenceStatusEnum = pgEnum("conveyancing_evidence_status", ["pending", "accepted", "rejected"]);
+
+export const conveyancingMatters = pgTable("conveyancing_matters", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  matterKey: varchar("matter_key", { length: 96 }).notNull().unique(),
+  accountId: bigint("account_id", { mode: "number" }).notNull().references(() => commercialAccounts.id),
+  transactionReference: varchar("transaction_reference", { length: 96 }),
+  parcelId: integer("parcel_id").notNull().references(() => parcels.id),
+  clientId: integer("client_id").references(() => users.id, { onDelete: "set null" }),
+  status: conveyancingMatterStatusEnum("status").notNull().default("opened"),
+  assignedReviewerId: integer("assigned_reviewer_id").references(() => users.id, { onDelete: "set null" }),
+  titleReviewNotes: text("title_review_notes"),
+  closingNotes: text("closing_notes"),
+  openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  accountStatusUpdatedIdx: index("conveyancing_matters_account_status_updated_idx").on(table.accountId, table.status, table.updatedAt),
+  parcelStatusIdx: index("conveyancing_matters_parcel_idx").on(table.parcelId, table.status),
+}));
+
+export const conveyancingMatterEvidence = pgTable("conveyancing_matter_evidence", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  evidenceKey: varchar("evidence_key", { length: 96 }).notNull().unique(),
+  matterId: bigint("matter_id", { mode: "number" }).notNull().references(() => conveyancingMatters.id, { onDelete: "cascade" }),
+  evidenceType: varchar("evidence_type", { length: 64 }).notNull(),
+  sourceReference: varchar("source_reference", { length: 160 }).notNull(),
+  sourceChecksumSha256: varchar("source_checksum_sha256", { length: 64 }),
+  status: conveyancingEvidenceStatusEnum("status").notNull().default("pending"),
+  reviewNotes: text("review_notes"),
+  submittedBy: integer("submitted_by").notNull().references(() => users.id),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  metadata: jsonb("metadata").notNull().default({}),
+}, (table) => ({
+  matterStatusIdx: index("conveyancing_matter_evidence_matter_status_idx").on(table.matterId, table.status),
+}));
+
+export const conveyancingMatterEvents = pgTable("conveyancing_matter_events", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  matterId: bigint("matter_id", { mode: "number" }).notNull().references(() => conveyancingMatters.id, { onDelete: "cascade" }),
+  eventType: varchar("event_type", { length: 64 }).notNull(),
+  previousStatus: conveyancingMatterStatusEnum("previous_status"),
+  nextStatus: conveyancingMatterStatusEnum("next_status"),
+  actorId: integer("actor_id").notNull().references(() => users.id),
+  description: text("description").notNull(),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  matterCreatedIdx: index("conveyancing_matter_events_matter_created_idx").on(table.matterId, table.createdAt),
+}));
+
+export type ConveyancingMatter = typeof conveyancingMatters.$inferSelect;
+
+/** Field Survey and Parcel Inspection commercial workspace. */
+export const fieldAssignmentStatusEnum = pgEnum("field_assignment_status", ["assigned", "in_progress", "submitted", "under_review", "accepted", "returned", "cancelled"]);
+export const fieldEvidenceStatusEnum = pgEnum("field_evidence_status", ["pending", "accepted", "rejected"]);
+
+export const fieldSurveyAssignments = pgTable("field_survey_assignments", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  assignmentKey: varchar("assignment_key", { length: 96 }).notNull().unique(),
+  accountId: bigint("account_id", { mode: "number" }).notNull().references(() => commercialAccounts.id),
+  parcelId: integer("parcel_id").notNull().references(() => parcels.id),
+  assignedTo: integer("assigned_to").notNull().references(() => users.id),
+  assignedBy: integer("assigned_by").notNull().references(() => users.id),
+  status: fieldAssignmentStatusEnum("status").notNull().default("assigned"),
+  instructions: text("instructions").notNull(),
+  scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+  dueAt: timestamp("due_at", { withTimezone: true }),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewNotes: text("review_notes"),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  accountStatusUpdatedIdx: index("field_assignments_account_status_updated_idx").on(table.accountId, table.status, table.updatedAt),
+  assigneeStatusIdx: index("field_assignments_assignee_status_idx").on(table.assignedTo, table.status, table.dueAt),
+}));
+
+export const fieldSurveyEvidence = pgTable("field_survey_evidence", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  evidenceKey: varchar("evidence_key", { length: 96 }).notNull().unique(),
+  assignmentId: bigint("assignment_id", { mode: "number" }).notNull().references(() => fieldSurveyAssignments.id, { onDelete: "cascade" }),
+  evidenceType: varchar("evidence_type", { length: 64 }).notNull(),
+  sourceReference: varchar("source_reference", { length: 160 }).notNull(),
+  sourceChecksumSha256: varchar("source_checksum_sha256", { length: 64 }),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+  latitude: numeric("latitude", { precision: 9, scale: 6 }),
+  longitude: numeric("longitude", { precision: 9, scale: 6 }),
+  geometry: jsonb("geometry"),
+  qualityFlags: jsonb("quality_flags").notNull().default([]),
+  status: fieldEvidenceStatusEnum("status").notNull().default("pending"),
+  reviewNotes: text("review_notes"),
+  submittedBy: integer("submitted_by").notNull().references(() => users.id),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  metadata: jsonb("metadata").notNull().default({}),
+}, (table) => ({
+  assignmentStatusIdx: index("field_evidence_assignment_status_idx").on(table.assignmentId, table.status),
+}));
+
+export const fieldSurveyEvents = pgTable("field_survey_events", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  assignmentId: bigint("assignment_id", { mode: "number" }).notNull().references(() => fieldSurveyAssignments.id, { onDelete: "cascade" }),
+  eventType: varchar("event_type", { length: 64 }).notNull(),
+  previousStatus: fieldAssignmentStatusEnum("previous_status"),
+  nextStatus: fieldAssignmentStatusEnum("next_status"),
+  actorId: integer("actor_id").notNull().references(() => users.id),
+  description: text("description").notNull(),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  assignmentCreatedIdx: index("field_events_assignment_created_idx").on(table.assignmentId, table.createdAt),
+}));
+
+export type FieldSurveyAssignment = typeof fieldSurveyAssignments.$inferSelect;

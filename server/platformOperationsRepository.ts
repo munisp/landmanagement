@@ -17,7 +17,7 @@ export interface ReadinessDomain {
   recommendedActions: string[];
 }
 
-export interface SyntheticJourneyResult {
+export interface DerivedOperationalCheck {
   id: string;
   name: string;
   status: JourneyStatus;
@@ -55,7 +55,7 @@ export interface PlatformOperationsOverview {
     bruteForceProtection: boolean;
     summary: string;
   };
-  syntheticJourneys: SyntheticJourneyResult[];
+  derivedOperationalChecks: DerivedOperationalCheck[];
   externalServiceEndpoints: {
     goBridgeConfigured: boolean;
     rustControlPlaneConfigured: boolean;
@@ -168,7 +168,7 @@ async function fetchJsonSignal(url: string | undefined): Promise<Record<string, 
   }
 }
 
-function buildSyntheticJourneys(domains: ReadinessDomain[], backupPosture: PlatformOperationsOverview['backupPosture'], abuseDefensePosture: PlatformOperationsOverview['abuseDefensePosture']): SyntheticJourneyResult[] {
+function buildDerivedOperationalChecks(domains: ReadinessDomain[], backupPosture: PlatformOperationsOverview['backupPosture'], abuseDefensePosture: PlatformOperationsOverview['abuseDefensePosture']): DerivedOperationalCheck[] {
   const domainMap = new Map(domains.map((domain) => [domain.name, domain]));
   const identity = domainMap.get('Identity & Policy');
   const workflow = domainMap.get('Workflow & Messaging');
@@ -182,7 +182,7 @@ function buildSyntheticJourneys(domains: ReadinessDomain[], backupPosture: Platf
       name: 'Public verification and intake',
       dependencies: ['Identity & Policy', 'Gateway & Security'],
       score: Math.round(((identity?.score ?? 50) + (security?.score ?? 50) + (abuseDefensePosture.publicFormDefense === 'healthy' ? 90 : abuseDefensePosture.publicFormDefense === 'degraded' ? 65 : 35)) / 3),
-      summary: 'Evaluates whether public-facing verification and intake routes have sufficient identity, gateway, and abuse-defense support.',
+      summary: 'Derived from live identity, gateway, and abuse-defense dependency signals; it is not a simulated user transaction.',
       recommendedActions: abuseDefensePosture.publicFormDefense === 'healthy' ? [] : ['Strengthen CAPTCHA or challenge configuration for public routes.', 'Review CORS allow-list and auth throttling posture.'],
     },
     {
@@ -190,7 +190,7 @@ function buildSyntheticJourneys(domains: ReadinessDomain[], backupPosture: Platf
       name: 'Field capture and offline sync recovery',
       dependencies: ['Workflow & Messaging', 'Identity & Policy'],
       score: Math.round(((workflow?.score ?? 50) + (identity?.score ?? 50)) / 2),
-      summary: 'Estimates whether queued field operations can be synchronized safely once connectivity is restored.',
+      summary: 'Derived from live workflow and identity dependency signals; it does not replace an exercised device synchronization test.',
       recommendedActions: workflow?.status === 'healthy' ? [] : ['Review Temporal, Dapr, Fluvio, or Kafka connectivity for sync orchestration.'],
     },
     {
@@ -198,7 +198,7 @@ function buildSyntheticJourneys(domains: ReadinessDomain[], backupPosture: Platf
       name: 'Settlement and title transfer orchestration',
       dependencies: ['Settlement & Ledger', 'Workflow & Messaging'],
       score: Math.round(((settlement?.score ?? 50) + (workflow?.score ?? 50)) / 2),
-      summary: 'Evaluates the multi-step payment, ledger, and transfer backbone that supports secure transaction completion.',
+      summary: 'Derived from live settlement and workflow dependency signals; it does not attest to completion of a financial transfer.',
       recommendedActions: settlement?.status === 'healthy' ? [] : ['Review Mojaloop, TigerBeetle, and Fabric connectivity before high-value settlement operations.'],
     },
     {
@@ -206,7 +206,7 @@ function buildSyntheticJourneys(domains: ReadinessDomain[], backupPosture: Platf
       name: 'Analytics, search, and decision support',
       dependencies: ['Analytics & Discovery'],
       score: analytics?.score ?? 50,
-      summary: 'Estimates whether search, analytics, explainability, and intelligence surfaces can operate with dependable backend support.',
+      summary: 'Derived from live analytics and discovery dependency signals; it does not replace an exercised analytical workload.',
       recommendedActions: analytics?.status === 'healthy' ? [] : ['Review Elasticsearch and lakehouse readiness before relying on advanced discovery or analytics.'],
     },
     {
@@ -214,7 +214,7 @@ function buildSyntheticJourneys(domains: ReadinessDomain[], backupPosture: Platf
       name: 'Backup, recovery, and regional resilience',
       dependencies: ['Backup posture'],
       score: Math.round((backupPosture.geoRedundancyStatus === 'healthy' ? 90 : backupPosture.geoRedundancyStatus === 'degraded' ? 65 : 35) - Math.min(backupPosture.recentFailureCount * 10, 30)),
-      summary: 'Assesses whether current backup execution and geo-redundancy posture support resilient recovery operations.',
+      summary: 'Derived from recorded backup state and configured location; it does not replace a completed restore drill.',
       recommendedActions: backupPosture.recentFailureCount === 0 ? [] : ['Investigate recent failed backups and validate restore-point freshness.'],
     },
   ];
@@ -304,7 +304,7 @@ export async function getPlatformOperationsOverview(): Promise<PlatformOperation
       : 'Brute-force throttling is present, but public challenge verification is not yet configured.',
   };
 
-  const syntheticJourneys = buildSyntheticJourneys(domains, backupPosture, abuseDefensePosture);
+  const derivedOperationalChecks = buildDerivedOperationalChecks(domains, backupPosture, abuseDefensePosture);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -314,7 +314,7 @@ export async function getPlatformOperationsOverview(): Promise<PlatformOperation
     domains,
     backupPosture,
     abuseDefensePosture,
-    syntheticJourneys,
+    derivedOperationalChecks,
     externalServiceEndpoints: {
       goBridgeConfigured: Boolean(process.env.GO_OPS_BRIDGE_URL),
       rustControlPlaneConfigured: Boolean(process.env.RUST_CONTROL_PLANE_URL),

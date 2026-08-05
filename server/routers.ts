@@ -50,6 +50,7 @@ import { caseConciergeRouter } from './api/routers/case-concierge';
 import { operationalEventsRouter } from './api/routers/operational-events';
 import { commandCenterRouter } from './api/routers/command-center';
 import { platformOperationsRouter } from './api/routers/platform-operations';
+import { commercialLenderRouter } from './api/routers/commercial-lender';
 import { publicSecurityRouter } from './api/routers/public-security';
 import { parcelSubscriptionsRouter, notificationPreferencesRouter, notificationInboxRouter } from './api/routers/parcel-subscriptions';
 import { identityRouter } from './api/routers/identity';
@@ -200,6 +201,7 @@ export const appRouter = router({
   operationalEvents: operationalEventsRouter,
   commandCenter: commandCenterRouter,
   platformOperations: platformOperationsRouter,
+  commercialLender: commercialLenderRouter,
   publicSecurity: publicSecurityRouter,
   parcelSubscriptions: parcelSubscriptionsRouter,
   notificationPreferences: notificationPreferencesRouter,

@@ -7,10 +7,8 @@ fn main() {
     let port = env::var("PORT").expect("PORT must be configured for the middleware control plane");
     let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).expect("bind listener");
 
-    for stream in listener.incoming() {
-        if let Ok(stream) = stream {
-            handle_stream(stream);
-        }
+    for stream in listener.incoming().flatten() {
+        handle_stream(stream);
     }
 }
 

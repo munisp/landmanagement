@@ -29,18 +29,10 @@ type ReadinessDomain struct {
 	Items   []ServiceHealth `json:"items"`
 }
 
-type SyntheticJourney struct {
-	Name         string   `json:"name"`
-	Status       string   `json:"status"`
-	Score        int      `json:"score"`
-	Dependencies []string `json:"dependencies"`
-}
-
 type ReadinessResponse struct {
-	GeneratedAt string             `json:"generatedAt"`
-	Overall     string             `json:"overall"`
-	Domains     []ReadinessDomain  `json:"domains"`
-	Journeys    []SyntheticJourney `json:"journeys"`
+	GeneratedAt string            `json:"generatedAt"`
+	Overall     string            `json:"overall"`
+	Domains     []ReadinessDomain `json:"domains"`
 }
 
 func main() {
@@ -55,16 +47,6 @@ func main() {
 		services := collectHealth()
 		readiness := buildReadiness(services)
 		writeJSON(w, http.StatusOK, readiness)
-	})
-
-	mux.HandleFunc("/synthetic", func(w http.ResponseWriter, r *http.Request) {
-		services := collectHealth()
-		readiness := buildReadiness(services)
-		writeJSON(w, http.StatusOK, map[string]any{
-			"generatedAt": readiness.GeneratedAt,
-			"overall":     readiness.Overall,
-			"journeys":    readiness.Journeys,
-		})
 	})
 
 	mux.HandleFunc("/check/", func(w http.ResponseWriter, r *http.Request) {
@@ -114,12 +96,6 @@ func buildReadiness(services []ServiceHealth) ReadinessResponse {
 		summarizeDomain("Workflow Plane", filterServices(services, "temporal")),
 		summarizeDomain("Settlement Plane", filterServices(services, "tigerbeetle")),
 	}
-	data.Journeys = []SyntheticJourney{
-		buildJourney("Field sync recovery", []string{"Workflow Plane", "Data Plane"}, data.Domains),
-		buildJourney("Settlement confirmation", []string{"Settlement Plane", "Workflow Plane"}, data.Domains),
-		buildJourney("Operational recovery", []string{"Data Plane"}, data.Domains),
-	}
-
 	return data
 }
 
@@ -159,25 +135,6 @@ func summarizeDomain(name string, items []ServiceHealth) ReadinessDomain {
 	return ReadinessDomain{Name: name, Status: status, Score: score, Summary: summary, Items: items}
 }
 
-func buildJourney(name string, dependencies []string, domains []ReadinessDomain) SyntheticJourney {
-	score := 0
-	matched := 0
-	for _, dependency := range dependencies {
-		for _, domain := range domains {
-			if domain.Name == dependency {
-				score += domain.Score
-				matched++
-			}
-		}
-	}
-	if matched == 0 {
-		score = 40
-	} else {
-		score = score / matched
-	}
-	return SyntheticJourney{Name: name, Status: journeyStatus(score), Score: score, Dependencies: dependencies}
-}
-
 func serviceScore(svc ServiceHealth) int {
 	if !svc.Configured {
 		return 35
@@ -196,16 +153,6 @@ func normalizeStatus(score int) string {
 		return "degraded"
 	}
 	return "unhealthy"
-}
-
-func journeyStatus(score int) string {
-	if score >= 80 {
-		return "passing"
-	}
-	if score >= 50 {
-		return "warning"
-	}
-	return "failing"
 }
 
 func firstNonEmpty(values ...string) string {
