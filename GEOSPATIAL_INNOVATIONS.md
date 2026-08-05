@@ -132,6 +132,21 @@ The following checks were performed against the code and a real local PostgreSQL
 
 The production PWA build reported existing large-chunk optimization warnings for broader platform bundles. The new `GeospatialInnovationHub` is emitted as an independently named bundle; the warnings are performance optimization opportunities, not build failures.
 
+### Final main-branch consolidation
+
+After the implementation release, all fifteen previously open Dependabot pull requests were merged into `main`. The consolidation updated the Lakehouse runtime declarations (FastAPI, Shapely, scikit-learn, psycopg2-binary, and PySpark) and the Node.js workspace graph (Express 5, Temporal Worker 1.21, UI/build tooling, localization, token, and parsing dependencies). Three lockfile-conflicted updates were reconciled through explicit merge commits that retain the original pull-request branch as a parent, so GitHub records each pull request as merged rather than merely superseded.
+
+The Express 5 merge exposed a stricter request-parameter type for the authenticated local-file route. The release corrects that route to use Express 5 named wildcard syntax (`/api/files/{*splat}`), normalizes only the named wildcard segments, and continues to pass the result through the existing path-traversal-safe resolver. The final main branch was revalidated after this correction.
+
+| Final consolidation gate | Result | Evidence |
+| --- | --- | --- |
+| Pull-request state | Passed | All previously open pull requests are merged; the repository has no open pull requests. |
+| Final root static check | Passed | `pnpm check` passed with the final Express 5 and Temporal Worker dependency graph. |
+| Final fresh-database regression | Passed | A recreated PostgreSQL/PostGIS validation database was migrated and the full suite passed: 27 files, 312 tests passed, 1 skipped. |
+| Final native validation | Passed | `mobile pnpm check`, `mobile pnpm test` (3/3), and Android Expo export all passed. |
+| Final production build | Passed | `pnpm build` passed and emitted the PWA/server artifacts with `GeospatialInnovationHub` as a named bundle. |
+| Final Lakehouse innovation suite | Passed | 4/4 focused Geo Innovation processing tests passed. |
+
 ## References
 
 [1]: https://stacspec.org/ "STAC Specification"
