@@ -28,6 +28,7 @@ import { geoAnalyticsRouter } from './api/routers/geo-analytics';
 import { geospatialIntelligenceRouter } from './api/routers/geospatial-intelligence';
 import { geolibreRouter } from './api/routers/geolibre';
 import { geospatialRouter } from './api/routers/geospatial';
+import { geospatialDeliveryRouter } from './api/routers/geospatial-delivery';
 import { geoaiRouter } from './api/routers/geoai';
 import { geoInnovationsRouter } from './api/routers/geo-innovations';
 import { mortgageApplicationsRouter } from './api/routers/mortgage-applications';
@@ -175,6 +176,7 @@ export const appRouter = router({
   geospatialIntelligence: geospatialIntelligenceRouter,
   geolibre: geolibreRouter,
   geospatial: geospatialRouter,
+  geospatialDelivery: geospatialDeliveryRouter,
   geoai: geoaiRouter,
   geoInnovations: geoInnovationsRouter,
   mortgageApplications: mortgageApplicationsRouter,
@@ -1000,20 +1002,25 @@ export const appRouter = router({
         notes: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
+        let created;
         try {
-          return await parcelService.post('/api/v1/parcels', {
+          created = await parcelService.post('/api/v1/parcels', {
             ...input,
             surveyorId: ctx.user.id,
+            ownerId: ctx.user.id,
           });
-        } catch (error) {
-          const created = await createParcel({
+        } catch {
+          created = await createParcel({
             ...input,
             surveyorId: String(ctx.user.id),
+            ownerId: ctx.user.id,
           });
           const { invalidateParcelQueryCaches } = await import('./productionQueryCache');
           await invalidateParcelQueryCaches(created.id, created.parcelNumber);
-          return created;
         }
+        const { synchronizeParcelResourceRelations } = await import('./permifyService');
+        await synchronizeParcelResourceRelations({ parcelId: created.id, ownerId: ctx.user.id });
+        return created;
       }),
 
     update: protectedProcedure

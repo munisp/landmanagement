@@ -524,3 +524,210 @@ export type GeoFeatureCollection = {
 
 export const getGeoInnovationParcelFeatures = (input: { bbox?: [number, number, number, number]; state?: string; lga?: string; status?: string; limit?: number } = {}, token?: string | null) =>
   trpcQuery<GeoFeatureCollection>("geoInnovations.getParcelFeatureCollection", input, token);
+
+
+export type MobileEvidenceManifestAsset = {
+  assetId: string;
+  parcelId: number | null;
+  assetType: GeoAssetType;
+  checksumSha256: string | null;
+  sourceCrs: string | null;
+  verticalCrs: string | null;
+  evidenceStatus: GeoEvidenceStatus;
+  acquiredAt: string | null;
+  updatedAt: string | null;
+};
+
+export type MobileEvidenceManifest = {
+  generatedAt: string;
+  parcelIds: number[];
+  evidence: MobileEvidenceManifestAsset[];
+  limitations: string[];
+};
+
+export type MobileEvidenceResult = {
+  manifest: MobileEvidenceManifest;
+  source: "network" | "secure_cache";
+  expiresAt: string;
+};
+
+const MOBILE_EVIDENCE_CACHE_PREFIX = "idlr.mobile.geo_evidence.v1";
+const MOBILE_EVIDENCE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const MOBILE_EVIDENCE_REVALIDATE_MS = 6 * 60 * 60 * 1000;
+const MOBILE_EVIDENCE_MAX_ASSETS = 100;
+
+type MobileEvidenceCacheIndex = {
+  generatedAt: string;
+  parcelIds: number[];
+  expiresAt: string;
+  assetCount: number;
+  limitations: string[];
+};
+
+function mobileEvidenceIndexKey(parcelId: number) {
+  return `${MOBILE_EVIDENCE_CACHE_PREFIX}.${parcelId}.index`;
+}
+
+function mobileEvidenceAssetKey(parcelId: number, index: number) {
+  return `${MOBILE_EVIDENCE_CACHE_PREFIX}.${parcelId}.asset.${index}`;
+}
+
+function safeManifestAsset(value: unknown): MobileEvidenceManifestAsset | null {
+  if (!value || typeof value !== "object") return null;
+  const asset = value as Record<string, unknown>;
+  const assetId = typeof asset.assetId === "string" ? asset.assetId : null;
+  const assetType = typeof asset.assetType === "string" ? asset.assetType as GeoAssetType : null;
+  const evidenceStatus = typeof asset.evidenceStatus === "string" ? asset.evidenceStatus as GeoEvidenceStatus : null;
+  if (!assetId || !assetType || !evidenceStatus) return null;
+  const optionalText = (field: string): string | null => {
+    const candidate = asset[field];
+    return typeof candidate === "string" ? candidate : null;
+  };
+  const parcelId = typeof asset.parcelId === "number" && Number.isInteger(asset.parcelId) && asset.parcelId > 0 ? asset.parcelId : null;
+  return {
+    assetId,
+    parcelId,
+    assetType,
+    checksumSha256: optionalText("checksumSha256"),
+    sourceCrs: optionalText("sourceCrs"),
+    verticalCrs: optionalText("verticalCrs"),
+    evidenceStatus,
+    acquiredAt: optionalText("acquiredAt"),
+    updatedAt: optionalText("updatedAt"),
+  };
+}
+
+function safeManifest(value: unknown): MobileEvidenceManifest | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Record<string, unknown>;
+  const generatedAt = typeof candidate.generatedAt === "string" ? candidate.generatedAt : null;
+  const parcelIds = Array.isArray(candidate.parcelIds)
+    ? candidate.parcelIds.filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0)
+    : [];
+  const evidence = Array.isArray(candidate.evidence)
+    ? candidate.evidence.map(safeManifestAsset).filter((asset): asset is MobileEvidenceManifestAsset => asset !== null).slice(0, MOBILE_EVIDENCE_MAX_ASSETS)
+    : [];
+  const limitations = Array.isArray(candidate.limitations)
+    ? candidate.limitations.filter((item): item is string => typeof item === "string").slice(0, 16)
+    : [];
+  if (!generatedAt || !parcelIds.length) return null;
+  return { generatedAt, parcelIds: [...new Set(parcelIds)].sort((a, b) => a - b), evidence, limitations };
+}
+
+async function writeMobileEvidenceCache(parcelId: number, manifest: MobileEvidenceManifest): Promise<string> {
+  const expiresAt = new Date(Date.now() + MOBILE_EVIDENCE_CACHE_MAX_AGE_MS).toISOString();
+  const safeAssets = manifest.evidence.slice(0, MOBILE_EVIDENCE_MAX_ASSETS);
+  const previous = await readMobileEvidenceCacheIndex(parcelId);
+  await Promise.all([
+    ...Array.from({ length: previous?.assetCount ?? 0 }, (_, index) => SecureStore.deleteItemAsync(mobileEvidenceAssetKey(parcelId, index))),
+    ...safeAssets.map((asset, index) => SecureStore.setItemAsync(mobileEvidenceAssetKey(parcelId, index), JSON.stringify(asset))),
+    SecureStore.setItemAsync(mobileEvidenceIndexKey(parcelId), JSON.stringify({
+      generatedAt: manifest.generatedAt,
+      parcelIds: manifest.parcelIds,
+      expiresAt,
+      assetCount: safeAssets.length,
+      limitations: manifest.limitations,
+    } satisfies MobileEvidenceCacheIndex)),
+  ]);
+  return expiresAt;
+}
+
+async function readMobileEvidenceCacheIndex(parcelId: number): Promise<MobileEvidenceCacheIndex | null> {
+  const raw = await SecureStore.getItemAsync(mobileEvidenceIndexKey(parcelId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<MobileEvidenceCacheIndex>;
+    const assetCount = parsed.assetCount;
+    if (
+      typeof parsed.generatedAt !== "string" ||
+      typeof parsed.expiresAt !== "string" ||
+      !Array.isArray(parsed.parcelIds) ||
+      !Number.isInteger(assetCount) ||
+      typeof assetCount !== "number" ||
+      assetCount < 0 ||
+      assetCount > MOBILE_EVIDENCE_MAX_ASSETS ||
+      !Array.isArray(parsed.limitations)
+    ) return null;
+    return {
+      generatedAt: parsed.generatedAt,
+      expiresAt: parsed.expiresAt,
+      parcelIds: parsed.parcelIds.filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0),
+      assetCount,
+      limitations: parsed.limitations.filter((item): item is string => typeof item === "string").slice(0, 16),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function clearMobileEvidenceCache(parcelId: number): Promise<void> {
+  const index = await readMobileEvidenceCacheIndex(parcelId);
+  await Promise.all([
+    SecureStore.deleteItemAsync(mobileEvidenceIndexKey(parcelId)),
+    ...Array.from({ length: index?.assetCount ?? 0 }, (_, item) => SecureStore.deleteItemAsync(mobileEvidenceAssetKey(parcelId, item))),
+  ]);
+}
+
+export async function readMobileEvidenceCache(parcelId: number): Promise<MobileEvidenceResult | null> {
+  const index = await readMobileEvidenceCacheIndex(parcelId);
+  if (!index) return null;
+  const expiry = Date.parse(index.expiresAt);
+  if (!Number.isFinite(expiry) || expiry <= Date.now() || !index.parcelIds.includes(parcelId)) {
+    await clearMobileEvidenceCache(parcelId);
+    return null;
+  }
+  const records = await Promise.all(Array.from({ length: index.assetCount }, (_, item) => SecureStore.getItemAsync(mobileEvidenceAssetKey(parcelId, item))));
+  const evidence = records.flatMap((raw) => {
+    if (!raw) return [];
+    try {
+      const asset = safeManifestAsset(JSON.parse(raw));
+      return asset ? [asset] : [];
+    } catch {
+      return [];
+    }
+  });
+  return {
+    manifest: { generatedAt: index.generatedAt, parcelIds: index.parcelIds, evidence, limitations: index.limitations },
+    source: "secure_cache",
+    expiresAt: index.expiresAt,
+  };
+}
+
+export async function getMobileParcelEvidence(parcelId: number, token?: string | null): Promise<MobileEvidenceResult> {
+  if (!Number.isInteger(parcelId) || parcelId <= 0) throw new MobileApiError("A valid parcel identifier is required", "BAD_REQUEST", 400);
+  const cached = await readMobileEvidenceCache(parcelId);
+  const cacheAge = cached ? Date.now() - Date.parse(cached.manifest.generatedAt) : Number.POSITIVE_INFINITY;
+  if (!(await isOnline())) {
+    if (cached) return cached;
+    throw new MobileApiError("No secure offline evidence cache exists for this parcel", "OFFLINE", 503);
+  }
+  if (cached && Number.isFinite(cacheAge) && cacheAge < MOBILE_EVIDENCE_REVALIDATE_MS) return cached;
+
+  try {
+    const accessToken = token ?? await getAuthToken();
+    if (!accessToken) throw new MobileApiError("Sign in is required before accessing protected geospatial evidence", "UNAUTHORIZED", 401);
+    const grant = await trpcMutation<{ capability: string; endpoint: string; expiresAt: string }>(
+      "geospatialDelivery.issueMobileEvidenceCapability",
+      { parcelIds: [parcelId], purpose: "mobile.evidence-view" },
+      accessToken,
+    );
+    const response = await fetch(`${getApiBaseUrl()}${grant.endpoint}`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        "X-Geospatial-Capability": `Bearer ${grant.capability}`,
+      },
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new MobileApiError("The governed mobile evidence service rejected this request", "DELIVERY_DENIED", response.status, payload);
+    const manifest = safeManifest(payload);
+    if (!manifest || !manifest.parcelIds.includes(parcelId)) {
+      throw new MobileApiError("The governed mobile evidence response was incomplete", "INVALID_RESPONSE", 502);
+    }
+    const expiresAt = await writeMobileEvidenceCache(parcelId, manifest);
+    return { manifest, source: "network", expiresAt };
+  } catch (error) {
+    if (cached) return cached;
+    throw error;
+  }
+}

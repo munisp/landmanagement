@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { trpc } from '@/lib/trpc';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MapLibreParcelWorkbench } from '@/components/MapLibreParcelWorkbench';
+const CesiumParcelViewer = lazy(async () => {
+  const module = await import('@/components/CesiumParcelViewer');
+  return { default: module.CesiumParcelViewer };
+});
 import { AlertTriangle, BrainCircuit, Compass, Layers3, Map, MapPinned, Radar, Route, Satellite, Trees, Waves } from 'lucide-react';
 
 export default function AdvancedGeospatialCenter() {
@@ -73,7 +77,8 @@ export default function AdvancedGeospatialCenter() {
               This workbench now integrates a dedicated MapLibre surface, Sedona-aligned lakehouse analytics, AI/CV/NLP-ready photo-analysis hooks, and a direct launch path into the exact upstream GeoLibre companion workspace.
             </div>
             <div className="flex flex-wrap gap-2 text-sm">
-              <Badge variant="outline">MapLibre enabled</Badge>
+              <Badge variant="outline">MapLibre vector tiles governed</Badge>
+              <Badge variant="outline">CesiumJS 3D Tiles governed</Badge>
               <Badge variant="outline">GeoLibre connected</Badge>
               <Badge variant="outline">Sedona-aligned analytics</Badge>
               <Badge variant="outline">AI / CV / NLP enabled</Badge>
@@ -97,6 +102,18 @@ export default function AdvancedGeospatialCenter() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle><Layers3 className="mr-2 inline h-4 w-4" />CesiumJS 3D parcel evidence</CardTitle>
+            <CardDescription>Authorized 3D Tiles stream through the same-origin delivery gateway with capability expiry, manifest validation, and explicit evidence status.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Suspense fallback={<div className="flex h-[460px] items-center justify-center rounded-xl border text-sm text-muted-foreground">Loading CesiumJS 3D viewer…</div>}>
+              <CesiumParcelViewer parcelId={workbench?.parcel?.id ?? activeParcelId} className="h-[460px] w-full rounded-xl border" />
+            </Suspense>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle><Radar className="mr-2 inline h-4 w-4" />Parcel intelligence summary</CardTitle>

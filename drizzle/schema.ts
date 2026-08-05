@@ -4203,6 +4203,7 @@ export const mlModelRuns = pgTable("ml_model_runs", {
 export type MlTrainingExample = typeof mlTrainingExamples.$inferSelect;
 export type MlModelRun = typeof mlModelRuns.$inferSelect;
 
+
 // ---------------------------------------------------------------------------
 // GeoAI policy, evidence, and guarded-operation domain
 // ---------------------------------------------------------------------------
@@ -4220,6 +4221,9 @@ export const geoAssetTypeEnum = pgEnum("geo_asset_type", [
 export const geoCheckpointStatusEnum = pgEnum("geo_checkpoint_status", ["pending", "passed", "failed", "waived"]);
 export const geoArcgisOperationStatusEnum = pgEnum("geo_arcgis_operation_status", [
   "requested", "approved", "rejected", "running", "completed", "failed", "cancelled",
+]);
+export const geoDeliveryAudienceEnum = pgEnum("geo_delivery_audience", [
+  "vector_tiles", "cesium_assets", "geo_analysis", "mobile_evidence",
 ]);
 
 export const geoAssetCatalog = pgTable("geo_asset_catalog", {
@@ -4244,6 +4248,50 @@ export const geoAssetCatalog = pgTable("geo_asset_catalog", {
 }, (table) => ({
   parcelTypeAcquiredIdx: index("geo_asset_catalog_parcel_type_idx").on(table.parcelId, table.assetType, table.acquiredAt),
   statusCreatedIdx: index("geo_asset_catalog_status_idx").on(table.evidenceStatus, table.createdAt),
+}));
+
+export const geo3dAssets = pgTable("geo_3d_assets", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  assetKey: varchar("asset_key", { length: 128 }).notNull().unique(),
+  parcelId: integer("parcel_id").references(() => parcels.id, { onDelete: "set null" }),
+  sourceAssetId: varchar("source_asset_id", { length: 128 }).references(() => geoAssetCatalog.assetId, { onDelete: "set null" }),
+  assetKind: varchar("asset_kind", { length: 32 }).notNull(),
+  evidenceStatus: geoEvidenceStatusEnum("evidence_status").notNull().default("insufficient_evidence"),
+  contentRootRelative: text("content_root_relative").notNull(),
+  tilesetRelativePath: text("tileset_relative_path"),
+  terrainRelativePath: text("terrain_relative_path"),
+  manifestChecksumSha256: varchar("manifest_checksum_sha256", { length: 64 }).notNull(),
+  sourceChecksumSha256: varchar("source_checksum_sha256", { length: 64 }),
+  processingVersion: varchar("processing_version", { length: 128 }).notNull(),
+  provenance: jsonb("provenance").notNull().default({}),
+  limitations: jsonb("limitations").notNull().default([]),
+  active: boolean("active").notNull().default(true),
+  registeredBy: integer("registered_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  parcelActiveIdx: index("geo_3d_assets_parcel_active_idx").on(table.parcelId, table.active, table.createdAt),
+}));
+
+export const geoDeliveryAccessAudit = pgTable("geo_delivery_access_audit", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  requestId: varchar("request_id", { length: 128 }).notNull(),
+  capabilityFingerprintSha256: varchar("capability_fingerprint_sha256", { length: 64 }).notNull(),
+  capabilityId: varchar("capability_id", { length: 128 }).notNull(),
+  audience: geoDeliveryAudienceEnum("audience").notNull(),
+  purpose: varchar("purpose", { length: 128 }).notNull(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  parcelIds: jsonb("parcel_ids").notNull(),
+  assetKey: varchar("asset_key", { length: 128 }).references(() => geo3dAssets.assetKey, { onDelete: "set null" }),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  outcome: varchar("outcome", { length: 32 }).notNull().default("issued"),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userCreatedIdx: index("geo_delivery_access_audit_user_created_idx").on(table.userId, table.createdAt),
+  capabilityIdx: index("geo_delivery_access_audit_capability_idx").on(table.capabilityId, table.createdAt),
+  assetIdx: index("geo_delivery_access_audit_asset_idx").on(table.assetKey, table.createdAt),
 }));
 
 export const geoAnalysisRuns = pgTable("geo_analysis_runs", {

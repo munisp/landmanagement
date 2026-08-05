@@ -29,7 +29,7 @@ entity parcel {
     relation editor @user
     relation approver @user
 
-    action view = owner or editor or approver or platform.view
+    action view = owner or editor or approver or platform.admin or platform.registrar or platform.surveyor
     action create = platform.create
     action update = owner or editor or approver or platform.update
     action delete = platform.delete

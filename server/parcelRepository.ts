@@ -246,12 +246,16 @@ export async function createParcel(input: {
   landUseType: string;
   notes?: string;
   surveyorId: string;
+  ownerId?: number;
   country?: string;
 }): Promise<ParcelRecord> {
   if (!Number.isFinite(input.areaSquareMeters) || input.areaSquareMeters <= 0) {
     throw new Error("areaSquareMeters must be a positive number");
   }
   const surveyorId = input.surveyorId?.trim();
+  if (input.ownerId !== undefined && (!Number.isSafeInteger(input.ownerId) || input.ownerId <= 0)) {
+    throw new Error("ownerId must be a positive safe integer when supplied");
+  }
   if (!input.surveyPlanNumber.trim() || !input.landUseType.trim() || !surveyorId) {
     throw new Error("surveyPlanNumber, landUseType, and surveyorId are required");
   }
@@ -262,6 +266,7 @@ export async function createParcel(input: {
   const [row] = await db.insert(parcels).values({
     parcelId: parcelNumber,
     parcelNumber,
+    ownerId: input.ownerId ?? null,
     surveyPlanNumber: input.surveyPlanNumber.trim(),
     state: input.state.trim(),
     lga: input.lga.trim(),

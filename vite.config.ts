@@ -150,7 +150,50 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+function vitePluginCesiumRuntime(): Plugin {
+  const cesiumRuntimeRoot = path.resolve(PROJECT_ROOT, "node_modules", "cesium", "Build", "Cesium");
+  let outputRoot = path.resolve(PROJECT_ROOT, "dist", "public");
+  const contentType = (filePath: string) => {
+    const extension = path.extname(filePath).toLowerCase();
+    return ({ ".js": "application/javascript", ".json": "application/json", ".css": "text/css", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml", ".wasm": "application/wasm" } as Record<string, string>)[extension] ?? "application/octet-stream";
+  };
+  return {
+    name: "idlr-cesium-runtime",
+    configResolved(config) {
+      outputRoot = config.build.outDir;
+    },
+    configureServer(server) {
+      server.middlewares.use("/cesium", (req, res, next) => {
+        try {
+          const requested = decodeURIComponent(new URL(req.url ?? "/", "http://localhost").pathname);
+          const candidate = path.resolve(cesiumRuntimeRoot, `.${requested}`);
+          if (!candidate.startsWith(`${cesiumRuntimeRoot}${path.sep}`) || !fs.existsSync(candidate) || fs.statSync(candidate).isDirectory()) {
+            return next();
+          }
+          res.setHeader("Content-Type", contentType(candidate));
+          res.setHeader("Cache-Control", "public, max-age=3600");
+          fs.createReadStream(candidate).pipe(res);
+        } catch {
+          next();
+        }
+      });
+    },
+    closeBundle() {
+      const target = path.resolve(outputRoot, "cesium");
+      fs.rmSync(target, { recursive: true, force: true });
+      fs.cpSync(cesiumRuntimeRoot, target, { recursive: true });
+    },
+  };
+}
+
+const plugins = [
+  react(),
+  tailwindcss(),
+  vitePluginCesiumRuntime(),
+  jsxLocPlugin(),
+  vitePluginManusRuntime(),
+  vitePluginManusDebugCollector(),
+];
 
 export default defineConfig({
   plugins,

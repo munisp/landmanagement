@@ -15,12 +15,13 @@ import hmac
 import os
 import sys
 import json
+import time
 
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json, execute_values
 from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 # Add parent directory to path for imports
@@ -33,6 +34,7 @@ except ImportError:
 
 from api.geoai_service import router as geoai_router
 from api.geo_innovations_service import router as geo_innovations_router
+from api.geo_authority_service import router as geo_authority_router
 from ml.title_risk_model import (
     FEATURE_NAMES,
     MODEL_NAME,
@@ -47,6 +49,10 @@ app = FastAPI(
     description="Data analytics and ingestion API for IDLR platform",
     version="1.2.0",
 )
+
+_lakehouse_started_at = time.monotonic()
+_lakehouse_request_total = 0
+_lakehouse_request_errors_total = 0
 
 def configured_cors_origins() -> List[str]:
     raw_origins = os.getenv("LAKEHOUSE_CORS_ORIGINS", "")
@@ -66,10 +72,24 @@ app.add_middleware(
 
 
 @app.middleware("http")
+async def collect_lakehouse_metrics(request: Request, call_next):
+    global _lakehouse_request_total, _lakehouse_request_errors_total
+    _lakehouse_request_total += 1
+    try:
+        response = await call_next(request)
+        if response.status_code >= 500:
+            _lakehouse_request_errors_total += 1
+        return response
+    except Exception:
+        _lakehouse_request_errors_total += 1
+        raise
+
+
+@app.middleware("http")
 async def require_lakehouse_service_key(request: Request, call_next):
     # Health remains probeable by the container platform; every data, model, and
     # analytics endpoint requires the internal service credential.
-    if request.url.path == "/health":
+    if request.url.path in {"/health", "/metrics"}:
         return await call_next(request)
     expected = os.getenv("LAKEHOUSE_API_KEY", "").strip()
     if not expected:
@@ -206,6 +226,23 @@ async def health_check():
         "postgres_available": postgres_available,
         "postgres_message": postgres_message,
     }
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+async def metrics():
+    uptime = max(0.0, time.monotonic() - _lakehouse_started_at)
+    return "\n".join([
+        "# HELP idlr_lakehouse_requests_total Total requests handled by the Lakehouse API.",
+        "# TYPE idlr_lakehouse_requests_total counter",
+        f"idlr_lakehouse_requests_total {_lakehouse_request_total}",
+        "# HELP idlr_lakehouse_request_errors_total Total unhandled or 5xx Lakehouse requests.",
+        "# TYPE idlr_lakehouse_request_errors_total counter",
+        f"idlr_lakehouse_request_errors_total {_lakehouse_request_errors_total}",
+        "# HELP idlr_lakehouse_uptime_seconds Lakehouse process uptime in seconds.",
+        "# TYPE idlr_lakehouse_uptime_seconds gauge",
+        f"idlr_lakehouse_uptime_seconds {uptime:.6f}",
+        "",
+    ])
 
 
 @app.post("/analytics/parcels")
@@ -892,6 +929,7 @@ async def geospatial_spatial_workbench(request: SedonaSpatialWorkbenchRequest):
 # the entire authenticated route set in every import and worker mode.
 app.include_router(geoai_router)
 app.include_router(geo_innovations_router)
+app.include_router(geo_authority_router)
 
 if __name__ == "__main__":
     import uvicorn

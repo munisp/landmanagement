@@ -20,6 +20,7 @@ import { dashboardWS } from "../dashboardWebSocketService";
 import { realtimeWebSocketService } from "../realtimeWebSocketService";
 import { externalApiRouter } from "../externalApi";
 import { geoInteroperabilityHttpRouter } from "../geoInteroperabilityHttp";
+import { geospatialDeliveryHttpRouter } from "../geospatialDeliveryHttp";
 import { startEmailQueueProcessor } from "../emailQueueService";
 import { healthCheck, livenessProbe, readinessProbe, startupProbe } from "./healthCheck";
 import { advancedSecurityHeaders, idsMiddleware, wafMiddleware } from "./advancedSecurity";
@@ -134,6 +135,11 @@ export function configureApp(app: express.Express): void {
   // global security middleware and applies strict permission checks to protected
   // discovery routes; only approved privacy-preserving releases are public.
   app.use("/api/geo", geoInteroperabilityHttpRouter);
+
+  // Same-origin policy gateway for MapLibre vector tiles, Cesium 3D assets,
+  // authoritative Python analyses, and mobile evidence manifests. The router
+  // validates a short-lived capability and the session before forwarding.
+  app.use("/api/geospatial-delivery", geospatialDeliveryHttpRouter);
 
   // tRPC API
   app.use(

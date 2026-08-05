@@ -87,6 +87,14 @@ services:
       # Lakehouse / ML
       LAKEHOUSE_API_URL: http://lakehouse-api:8000
       LAKEHOUSE_API_KEY: ${LAKEHOUSE_API_KEY:?LAKEHOUSE_API_KEY must be set}
+      # Governed cross-language geospatial delivery
+      GEO_DELIVERY_CAPABILITY_SECRET: ${GEO_DELIVERY_CAPABILITY_SECRET:?GEO_DELIVERY_CAPABILITY_SECRET must contain at least 32 characters}
+      GEO_TILE_SERVICE_URL: http://vector-tile-service:7021
+      GEO_CESIUM_ASSET_SERVICE_URL: http://cesium-asset-service:7022
+      GEO_SPATIAL_AUTHORITY_URL: http://lakehouse-api:8000
+      GEO_TILE_SERVICE_TIMEOUT_MS: ${GEO_TILE_SERVICE_TIMEOUT_MS:-10000}
+      GEO_CESIUM_ASSET_SERVICE_TIMEOUT_MS: ${GEO_CESIUM_ASSET_SERVICE_TIMEOUT_MS:-20000}
+      GEO_SPATIAL_AUTHORITY_TIMEOUT_MS: ${GEO_SPATIAL_AUTHORITY_TIMEOUT_MS:-120000}
       # Mojaloop
       MOJALOOP_API_URL: http://mojaloop-simulator:3000
       # TigerBeetle
@@ -106,6 +114,12 @@ services:
         condition: service_healthy
       keycloak-bootstrap:
         condition: service_completed_successfully
+      lakehouse-api:
+        condition: service_healthy
+      vector-tile-service:
+        condition: service_healthy
+      cesium-asset-service:
+        condition: service_healthy
     volumes:
       - ./server/data:/app/server/data
     networks:
@@ -507,12 +521,15 @@ services:
       LAKEHOUSE_CORS_ORIGINS: ${LAKEHOUSE_CORS_ORIGINS:-}
       GEOAI_ALLOWED_ASSET_URI_PREFIXES: ${GEOAI_ALLOWED_ASSET_URI_PREFIXES:?GEOAI_ALLOWED_ASSET_URI_PREFIXES must be set}
       GEOAI_PDAL_BINARY: ${GEOAI_PDAL_BINARY:-}
+      GEO_DELIVERY_CAPABILITY_SECRET: ${GEO_DELIVERY_CAPABILITY_SECRET:?GEO_DELIVERY_CAPABILITY_SECRET must contain at least 32 characters}
+      GEO_3D_PREPARATION_ROOT: /data/geo-3d-assets
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MODEL_WEIGHTS_DIR: /app/ml/weights
       RAY_ADDRESS: auto
     volumes:
       - ./lakehouse/ml/weights:/app/ml/weights
       - lakehouse_data:/app/data
+      - geo_3d_assets:/data/geo-3d-assets
     ports:
       - "8000:8000"
     depends_on:
@@ -525,6 +542,63 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Governed cross-language geospatial delivery
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  vector-tile-service:
+    build:
+      context: ./go-services/vector-tile-service
+      dockerfile: Dockerfile
+    container_name: idlr-vector-tile-service
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      PORT: 7021
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      GEO_DELIVERY_CAPABILITY_SECRET: ${GEO_DELIVERY_CAPABILITY_SECRET:?GEO_DELIVERY_CAPABILITY_SECRET must contain at least 32 characters}
+      GEO_TILE_QUERY_TIMEOUT: ${GEO_TILE_QUERY_TIMEOUT:-8s}
+      GEO_TILE_READINESS_TIMEOUT: ${GEO_TILE_READINESS_TIMEOUT:-2s}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:7021/ready >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  cesium-asset-service:
+    build:
+      context: ./rust-services/cesium-asset-service
+      dockerfile: Dockerfile
+    container_name: idlr-cesium-asset-service
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      PORT: 7022
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      GEO_DELIVERY_CAPABILITY_SECRET: ${GEO_DELIVERY_CAPABILITY_SECRET:?GEO_DELIVERY_CAPABILITY_SECRET must contain at least 32 characters}
+      GEO_3D_ASSET_ROOT: /data/geo-3d-assets
+    volumes:
+      - geo_3d_assets:/data/geo-3d-assets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      lakehouse-api:
+        condition: service_healthy
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:7022/ready >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.13.0
@@ -969,6 +1043,7 @@ volumes:
   etcd_data:
   opensearch_data:
   lakehouse_data:
+  geo_3d_assets:
   mlflow_artifacts:
   prometheus_data:
   grafana_data:

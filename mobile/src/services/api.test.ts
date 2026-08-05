@@ -1,7 +1,9 @@
+const mockSecureValues = new Map<string, string>();
+
 jest.mock("expo-secure-store", () => ({
-  getItemAsync: jest.fn(async () => null),
-  setItemAsync: jest.fn(async () => undefined),
-  deleteItemAsync: jest.fn(async () => undefined),
+  getItemAsync: jest.fn(async (key: string) => mockSecureValues.get(key) ?? null),
+  setItemAsync: jest.fn(async (key: string, value: string) => { mockSecureValues.set(key, value); }),
+  deleteItemAsync: jest.fn(async (key: string) => { mockSecureValues.delete(key); }),
 }));
 
 jest.mock("@react-native-community/netinfo", () => ({
@@ -12,13 +14,14 @@ jest.mock("../lib/runtimeConfig", () => ({
   getApiBaseUrl: () => "https://platform.example.test",
 }));
 
-import { MobileApiError, trpcMutation, trpcQuery } from "./api";
+import { MobileApiError, getMobileParcelEvidence, trpcMutation, trpcQuery } from "./api";
 
 describe("native tRPC client", () => {
   const originalFetch = global.fetch;
 
   afterEach(() => {
     global.fetch = originalFetch;
+    mockSecureValues.clear();
     jest.restoreAllMocks();
   });
 
@@ -65,6 +68,40 @@ describe("native tRPC client", () => {
         body: expect.stringContaining("publish_feature_layer"),
       }),
     );
+  });
+
+  it("uses a separate scoped capability header for governed mobile evidence and persists no delivery token", async () => {
+    const generatedAt = new Date().toISOString();
+    const fetchSpy = jest.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        result: { data: { json: { capability: "delivery-capability-token", endpoint: "/api/geospatial-delivery/mobile-evidence", expiresAt: new Date(Date.now() + 300_000).toISOString() } } },
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        generatedAt,
+        parcelIds: [7],
+        evidence: [{ assetId: "survey-asset-001", parcelId: 7, assetType: "survey_plan", checksumSha256: "a".repeat(64), sourceCrs: "EPSG:4326", verticalCrs: null, evidenceStatus: "verified", acquiredAt: null, updatedAt: generatedAt }],
+        limitations: ["Provenance view only."],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    global.fetch = fetchSpy as unknown as typeof fetch;
+
+    const result = await getMobileParcelEvidence(7, "native-access-token");
+
+    expect(result.source).toBe("network");
+    expect(result.manifest.evidence).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenNthCalledWith(1,
+      "https://platform.example.test/trpc/geospatialDelivery.issueMobileEvidenceCapability",
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer native-access-token" }) }),
+    );
+    expect(fetchSpy).toHaveBeenNthCalledWith(2,
+      "https://platform.example.test/api/geospatial-delivery/mobile-evidence",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer native-access-token",
+          "X-Geospatial-Capability": "Bearer delivery-capability-token",
+        }),
+      }),
+    );
+    expect([...mockSecureValues.values()].join(" ")).not.toContain("delivery-capability-token");
   });
 
   it("fails closed before a protected request when no mobile identity token is available", async () => {

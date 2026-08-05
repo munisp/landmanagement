@@ -254,3 +254,43 @@ export async function grantPlatformResourceAccess(params: {
   });
   return schemaVersion;
 }
+
+/**
+ * Ensure a persisted parcel participates in the versioned parcel policy before
+ * a geospatial delivery capability is issued. This is intentionally idempotent
+ * so legacy rows that pre-date the policy receive the global platform relation
+ * on first governed access, while owner access is added only when ownership is
+ * explicitly recorded in PostgreSQL.
+ */
+export async function synchronizeParcelResourceRelations(params: {
+  parcelId: number;
+  ownerId?: number | null;
+}): Promise<string> {
+  if (!Number.isSafeInteger(params.parcelId) || params.parcelId <= 0) {
+    throw new Error("parcelId must be a positive safe integer");
+  }
+  if (params.ownerId !== undefined && params.ownerId !== null && (!Number.isSafeInteger(params.ownerId) || params.ownerId <= 0)) {
+    throw new Error("ownerId must be a positive safe integer when supplied");
+  }
+
+  const { tenantId } = getConfig();
+  const schemaVersion = await publishAuthorizationSchema(params.ownerId ?? undefined);
+  const tuples: Array<Record<string, unknown>> = [{
+    entity: { type: "parcel", id: String(params.parcelId) },
+    relation: "platform",
+    subject: { type: "platform", id: "global", relation: "" },
+  }];
+  if (params.ownerId) {
+    tuples.push({
+      entity: { type: "parcel", id: String(params.parcelId) },
+      relation: "owner",
+      subject: { type: "user", id: String(params.ownerId), relation: "" },
+    });
+  }
+
+  await permifyRequest(`/v1/tenants/${encodeURIComponent(tenantId)}/data/write`, {
+    metadata: { schema_version: schemaVersion },
+    tuples,
+  });
+  return schemaVersion;
+}

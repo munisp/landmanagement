@@ -1,0 +1,2 @@
+process.env.MICROSERVICES_ENABLED = 'false';
+process.env.GEO_DELIVERY_CAPABILITY_SECRET = '0123456789abcdef0123456789abcdef';
