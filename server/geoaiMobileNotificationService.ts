@@ -133,3 +133,72 @@ export async function publishGeoAiMobileNotification(run: GeoAiMobileRun, event:
     }).catch(() => undefined);
   }
 }
+
+
+/**
+ * Delivers a durable inbox and optional Expo push for an evidence-bearing
+ * geospatial alert. The alert itself has already been persisted; any device
+ * delivery failure is sent to the outbox for recovery and never suppresses
+ * the alert or fabricates a resolution.
+ */
+export async function publishGeoInnovationAlertNotification(input: {
+  recipientId: number | null | undefined;
+  alertId: number;
+  alertKey: string;
+  runId: number;
+  severity: "low" | "medium" | "high" | "critical";
+  summary: string;
+}): Promise<void> {
+  if (!input.recipientId) return;
+  const priority: NotificationContent["priority"] = input.severity === "critical" ? "critical" : input.severity === "high" ? "high" : "medium";
+  const title = `Geospatial evidence alert: ${input.severity}`;
+  const message = input.summary;
+  const metadata = {
+    domain: "geo_innovation",
+    event: "change_alert_created",
+    alertId: input.alertId,
+    alertKey: input.alertKey,
+    runId: input.runId,
+    route: "/innovation",
+    severity: input.severity,
+  };
+  const db = await requireDb();
+  await db.insert(adminNotifications).values({
+    recipientId: input.recipientId,
+    type: "verification_request",
+    priority,
+    title,
+    message,
+    metadata,
+  });
+
+  const [preferences] = await db
+    .select({ pushEnabled: notificationPreferences.pushEnabled, pushToken: notificationPreferences.pushToken })
+    .from(notificationPreferences)
+    .where(eq(notificationPreferences.userId, input.recipientId))
+    .limit(1);
+  if (!preferences?.pushEnabled || !preferences.pushToken || !isExpoPushToken(preferences.pushToken)) return;
+
+  try {
+    await deliverExpoPush({
+      token: preferences.pushToken,
+      title,
+      body: message,
+      data: metadata,
+      priority: priority === "high" || priority === "critical" ? "high" : "default",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Expo push delivery failure";
+    await queueEvent({
+      backend: "dapr_pubsub",
+      topic: "geo-innovation-mobile-notification-failed",
+      eventType: "geo_innovation.mobile_notification.failed.v1",
+      aggregateType: "geo_change_alert",
+      aggregateId: String(input.alertId),
+      partitionKey: String(input.recipientId),
+      payload: { ...metadata, error: message },
+      deliveryStatus: "pending",
+      availableAt: new Date(),
+    }).catch(() => undefined);
+  }
+}

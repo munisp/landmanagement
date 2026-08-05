@@ -58,3 +58,40 @@ export function inspectGeoAiLidar(payload: JsonRecord) {
 export function validateGeoAiModelEvidence(payload: JsonRecord) {
   return postGeoAi<JsonRecord>("/geoai/models/validate-evidence", payload);
 }
+
+
+export function assessGeometryQuality(payload: JsonRecord) {
+  return postGeoAi<JsonRecord>("/geo-innovations/geometry/quality", payload);
+}
+
+export function buildHazardProfile(payload: JsonRecord) {
+  return postGeoAi<JsonRecord>("/geo-innovations/hazards/profile", payload);
+}
+
+export function inspectCogReadiness(payload: JsonRecord) {
+  return postGeoAi<JsonRecord>("/geo-innovations/raster/cog-readiness", payload);
+}
+
+export function validateStacCatalogItem(payload: JsonRecord) {
+  return postGeoAi<JsonRecord>("/geo-innovations/catalog/stac-validate", payload);
+}
+
+export function vectorizeChangeAlerts(payload: JsonRecord) {
+  return postGeoAi<JsonRecord>("/geo-innovations/imagery/change-vectorization", payload);
+}
+
+export function evaluateAccessibilityEquity(payload: JsonRecord) {
+  return postGeoAi<JsonRecord>("/geo-innovations/network/accessibility-equity", payload);
+}
+
+export function verifyFieldGeofence(payload: JsonRecord) {
+  return postGeoAi<JsonRecord>("/geo-innovations/field/geofence-verify", payload);
+}
+
+export function computeZonalStatistics(payload: JsonRecord) {
+  return postGeoAi<JsonRecord>("/geo-innovations/raster/zonal-statistics", payload);
+}
+
+export function preparePrivacyRelease(payload: JsonRecord) {
+  return postGeoAi<JsonRecord>("/geo-innovations/privacy/release-feature", payload);
+}

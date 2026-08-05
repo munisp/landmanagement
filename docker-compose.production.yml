@@ -720,6 +720,33 @@ services:
     networks:
       - idlr_net
 
+  geo-innovation-temporal-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idlr-geo-innovation-temporal-scheduler
+    <<: *default-restart
+    logging: *default-logging
+    command: ["pnpm", "worker:geo-innovation-scheduler"]
+    environment:
+      NODE_ENV: production
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_GEOAI_TASK_QUEUE: ${TEMPORAL_GEOAI_TASK_QUEUE:?TEMPORAL_GEOAI_TASK_QUEUE must be set}
+      TEMPORAL_TLS_ENABLED: ${TEMPORAL_TLS_ENABLED:-true}
+      TEMPORAL_TLS_CERT: ${TEMPORAL_TLS_CERT:-}
+      TEMPORAL_TLS_KEY: ${TEMPORAL_TLS_KEY:-}
+      GEO_INNOVATION_MONITOR_POLL_SECONDS: ${GEO_INNOVATION_MONITOR_POLL_SECONDS:-300}
+      GEO_INNOVATION_MONITOR_LIMIT: ${GEO_INNOVATION_MONITOR_LIMIT:-25}
+      GEO_INNOVATION_MONITOR_WORKFLOW_ID: ${GEO_INNOVATION_MONITOR_WORKFLOW_ID:-geo-innovation-monitor-scheduler-v1}
+    depends_on:
+      temporal:
+        condition: service_healthy
+      geoai-temporal-worker:
+        condition: service_started
+    networks:
+      - idlr_net
+
   event-outbox-worker:
     build:
       context: .

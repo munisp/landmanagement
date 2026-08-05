@@ -110,7 +110,7 @@ async function registerForPushNotifications(): Promise<string | null> {
 
 function routeNotificationPayload(data: Record<string, unknown>, router: ReturnType<typeof useRouter>) {
   const route = typeof data.route === "string" ? data.route : null;
-  if (route && (route.startsWith("/geoai/") || route.startsWith("/arcgis"))) {
+  if (route && (route.startsWith("/geoai/") || route.startsWith("/arcgis") || route === "/innovation")) {
     router.push(route as any);
     return;
   }

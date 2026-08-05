@@ -75,6 +75,7 @@ const InfrastructureDevelopmentCenter = lazy(() => import('./pages/Infrastructur
 const AdvancedGeospatialCenter = lazy(() => import('./pages/AdvancedGeospatialCenter'));
 const GeoLibreWorkspace = lazy(() => import('./pages/GeoLibreWorkspace'));
 const GeoAIOperationsCenter = lazy(() => import('./pages/GeoAIOperationsCenter'));
+const GeospatialInnovationHub = lazy(() => import('./pages/GeospatialInnovationHub'));
 const AccessibilityCenter = lazy(() => import('./pages/AccessibilityCenter'));
 const TrainingSupportCenter = lazy(() => import('./pages/TrainingSupportCenter'));
 const DataGovernanceCenter = lazy(() => import('./pages/DataGovernanceCenter'));
@@ -243,6 +244,7 @@ function Router() {
       <Route path="/advanced-geospatial-center" component={AdvancedGeospatialCenter} />
       <Route path="/geolibre-workspace" component={GeoLibreWorkspace} />
       <Route path="/geoai-operations" component={GeoAIOperationsCenter} />
+      <Route path="/geospatial-innovations" component={GeospatialInnovationHub} />
       <Route path="/accessibility-center" component={AccessibilityCenter} />
       <Route path="/training-support-center" component={TrainingSupportCenter} />
       <Route path="/data-governance-center" component={DataGovernanceCenter} />

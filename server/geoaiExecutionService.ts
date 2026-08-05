@@ -5,13 +5,23 @@ import {
   markGeoAnalysisRunning,
   parseGeoAnalysisManifest,
 } from "./geoaiEvidenceService";
+import { recordChangeAlerts } from "./geoInnovationService";
 import {
+  assessGeometryQuality,
+  buildHazardProfile,
   computeNetworkAccessibility,
+  computeZonalStatistics,
+  evaluateAccessibilityEquity,
+  inspectCogReadiness,
   inspectGeoAiImagery,
   inspectGeoAiLidar,
   performGeoAiChangeDetection,
+  preparePrivacyRelease,
   validateGeoAiModelEvidence,
   validateSpatialGeometry,
+  validateStacCatalogItem,
+  vectorizeChangeAlerts,
+  verifyFieldGeofence,
 } from "./geoaiLakehouseClient";
 
 function recordValue(value: unknown, field: string): Record<string, unknown> {
@@ -23,6 +33,16 @@ function requiredNumber(value: unknown, field: string): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(parsed)) throw new Error(`${field} must be a finite number`);
   return parsed;
+}
+
+function requiredString(value: unknown, field: string): string {
+  if (typeof value !== "string" || !value.trim()) throw new Error(`${field} must be a non-empty string`);
+  return value;
+}
+
+function requiredArray(value: unknown, field: string): unknown[] {
+  if (!Array.isArray(value) || value.length === 0) throw new Error(`${field} must be a non-empty array`);
+  return value;
 }
 
 function findSourceAsset(manifest: ReturnType<typeof parseGeoAnalysisManifest>, allowedTypes: string[]) {
@@ -173,13 +193,161 @@ export async function executeGeoAnalysisRun(runId: number) {
         uncertaintySummary = recordValue(parameters.uncertaintyMetrics, "methodParameters.uncertaintyMetrics");
         break;
       }
+      case "geometry_quality": {
+        const source = findSourceAsset(manifest, ["parcel_geometry"]);
+        resultSummary = await assessGeometryQuality({
+          geometry: recordValue(parameters.geometry, "methodParameters.geometry"),
+          source_crs: requiredString(source.sourceCrs, "parcel geometry sourceCrs"),
+          analysis_crs: requiredString(manifest.analysisCrs, "analysisCrs"),
+          source_asset_id: source.assetId,
+          source_checksum_sha256: source.checksumSha256,
+          reported_horizontal_accuracy_m: requiredNumber(parameters.reportedHorizontalAccuracyM, "methodParameters.reportedHorizontalAccuracyM"),
+          expected_horizontal_accuracy_m: requiredNumber(parameters.expectedHorizontalAccuracyM, "methodParameters.expectedHorizontalAccuracyM"),
+          lineage_completeness_pct: requiredNumber(parameters.lineageCompletenessPct, "methodParameters.lineageCompletenessPct"),
+          required_geometry_type: parameters.requiredGeometryType ?? "Polygon",
+        });
+        uncertaintySummary = { status: "requires_surveyor_review", statement: "The score records declared evidence quality components and does not certify a cadastral boundary." };
+        break;
+      }
+      case "hazard_profile": {
+        const source = findSourceAsset(manifest, ["parcel_geometry"]);
+        resultSummary = await buildHazardProfile({
+          parcel_geometry: recordValue(parameters.geometry, "methodParameters.geometry"),
+          parcel_source_crs: requiredString(source.sourceCrs, "parcel geometry sourceCrs"),
+          analysis_crs: requiredString(manifest.analysisCrs, "analysisCrs"),
+          parcel_asset_id: source.assetId,
+          parcel_checksum_sha256: source.checksumSha256,
+          hazards: requiredArray(parameters.hazardSources, "methodParameters.hazardSources"),
+        });
+        uncertaintySummary = { status: "source-dependent", statement: "Hazard overlays report declared source coverage and severity; they do not predict loss or replace statutory hazard determinations." };
+        break;
+      }
+      case "cog_readiness": {
+        const source = findSourceAsset(manifest, ["orthophoto", "satellite_scene", "raster", "dem", "dtm", "dsm"]);
+        resultSummary = await inspectCogReadiness({ asset: rasterRequest(source) });
+        uncertaintySummary = { status: "distribution-check-required", statement: "Raster layout is inspected; governed HTTP distribution must separately demonstrate range-read behavior." };
+        break;
+      }
+      case "stac_catalog": {
+        const item = recordValue(parameters.stacItem, "methodParameters.stacItem");
+        resultSummary = await validateStacCatalogItem({
+          item_id: requiredString(item.itemId, "methodParameters.stacItem.itemId"),
+          collection_key: requiredString(parameters.collectionKey, "methodParameters.collectionKey"),
+          geometry: recordValue(item.geometry, "methodParameters.stacItem.geometry"),
+          bbox: requiredArray(item.bbox, "methodParameters.stacItem.bbox"),
+          datetime: typeof item.datetime === "string" ? item.datetime : undefined,
+          start_datetime: typeof item.startDatetime === "string" ? item.startDatetime : undefined,
+          end_datetime: typeof item.endDatetime === "string" ? item.endDatetime : undefined,
+          properties: item.properties && typeof item.properties === "object" ? item.properties : {},
+          assets: recordValue(item.assets, "methodParameters.stacItem.assets"),
+        });
+        uncertaintySummary = { status: "metadata-valid", statement: "Validation confirms supplied STAC-compatible structure only; catalog publication and access controls are separate governed actions." };
+        break;
+      }
+      case "change_vectorization": {
+        const imagery = manifest.sourceAssets.filter((asset) => ["orthophoto", "satellite_scene", "raster"].includes(asset.assetType));
+        if (imagery.length < 2 || !manifest.temporalWindow) throw new Error("Change vectorization requires two imagery assets and a temporalWindow");
+        resultSummary = await vectorizeChangeAlerts({
+          before: rasterRequest(imagery[0]),
+          after: rasterRequest(imagery[1]),
+          threshold: requiredNumber(parameters.threshold, "methodParameters.threshold"),
+          min_mapping_unit_m2: requiredNumber(parameters.minMappingUnitM2, "methodParameters.minMappingUnitM2"),
+          seasonal_comparable: manifest.temporalWindow.seasonalComparable,
+          mutual_valid_coverage_pct: manifest.temporalWindow.mutualValidCoveragePct,
+          comparison_band: parameters.comparisonBand ?? 1,
+        });
+        uncertaintySummary = { status: "requires_alert_review", statement: "Vectorized changes remain provisional until a reviewer evaluates source comparability, minimum mapping unit, and false-positive risk." };
+        break;
+      }
+      case "accessibility_equity": {
+        if (!manifest.networkAssumptions) throw new Error("Accessibility equity execution requires networkAssumptions");
+        resultSummary = await evaluateAccessibilityEquity({
+          nodes: requiredArray(parameters.nodes, "methodParameters.nodes"),
+          edges: requiredArray(parameters.edges, "methodParameters.edges"),
+          origin_groups: requiredArray(parameters.originGroups, "methodParameters.originGroups"),
+          destination_node_ids: requiredArray(parameters.destinationNodeIds, "methodParameters.destinationNodeIds"),
+          mode: manifest.networkAssumptions.mode,
+          impedance: manifest.networkAssumptions.impedance,
+          declared_router_source: manifest.networkAssumptions.routerSource,
+        });
+        uncertaintySummary = { status: "requires_operational_review", statement: "Group comparison is limited to declared operational groups and never infers protected or sensitive characteristics." };
+        break;
+      }
+      case "field_geofence": {
+        const parcel = findSourceAsset(manifest, ["parcel_geometry"]);
+        resultSummary = await verifyFieldGeofence({
+          parcel_geometry: recordValue(parameters.geometry, "methodParameters.geometry"),
+          parcel_source_crs: requiredString(parcel.sourceCrs, "parcel geometry sourceCrs"),
+          analysis_crs: requiredString(manifest.analysisCrs, "analysisCrs"),
+          parcel_asset_id: parcel.assetId,
+          parcel_checksum_sha256: parcel.checksumSha256,
+          track_points: requiredArray(parameters.trackPoints, "methodParameters.trackPoints"),
+          geofence_buffer_m: requiredNumber(parameters.geofenceBufferM, "methodParameters.geofenceBufferM"),
+          max_accepted_accuracy_m: requiredNumber(parameters.maxAcceptedAccuracyM, "methodParameters.maxAcceptedAccuracyM"),
+        });
+        uncertaintySummary = { status: "not_a_survey", statement: "GPS geofence evidence establishes capture proximity only; it cannot certify legal boundary location or survey accuracy." };
+        break;
+      }
+      case "zonal_statistics": {
+        const zone = findSourceAsset(manifest, ["parcel_geometry"]);
+        const raster = findSourceAsset(manifest, ["orthophoto", "satellite_scene", "raster", "dem", "dtm", "dsm"]);
+        resultSummary = await computeZonalStatistics({
+          raster: rasterRequest(raster),
+          zone_geometry: recordValue(parameters.geometry, "methodParameters.geometry"),
+          zone_source_crs: requiredString(zone.sourceCrs, "parcel geometry sourceCrs"),
+          zone_asset_id: zone.assetId,
+          zone_checksum_sha256: zone.checksumSha256,
+          band: parameters.band ?? 1,
+        });
+        uncertaintySummary = { status: "source-resolution-dependent", statement: "Statistics are bounded by the declared raster resolution, nodata mask, band semantics, and source acquisition conditions." };
+        break;
+      }
+      case "privacy_release": {
+        const source = findSourceAsset(manifest, ["parcel_geometry"]);
+        resultSummary = await preparePrivacyRelease({
+          geometry: recordValue(parameters.geometry, "methodParameters.geometry"),
+          source_crs: requiredString(source.sourceCrs, "parcel geometry sourceCrs"),
+          analysis_crs: requiredString(manifest.analysisCrs, "analysisCrs"),
+          output_crs: manifest.outputCrs ?? "EPSG:4326",
+          method: requiredString(parameters.privacyMethod, "methodParameters.privacyMethod"),
+          grid_size_m: parameters.gridSizeM,
+          source_asset_id: source.assetId,
+          source_checksum_sha256: source.checksumSha256,
+          license: requiredString(parameters.license, "methodParameters.license"),
+          legal_notice: requiredString(parameters.legalNotice, "methodParameters.legalNotice"),
+        });
+        uncertaintySummary = { status: "requires_publication_approval", statement: "The generalized feature is prepared for approval only and is explicitly non-authoritative for legal, regulatory, title, or survey use." };
+        break;
+      }
+      case "ogc_features": {
+        resultSummary = {
+          status: "prepared_for_interoperable_feature_publication",
+          collectionKey: requiredString(parameters.collectionKey, "methodParameters.collectionKey"),
+          outputCrs: requiredString(manifest.outputCrs, "outputCrs"),
+          sourceAssetIds: manifest.sourceAssets.map((asset) => asset.assetId),
+        };
+        uncertaintySummary = { status: "requires_collection_policy_review", statement: "Interoperable feature publication is governed by collection-level evidence, privacy, and access policy." };
+        break;
+      }
       case "suitability_analysis":
       case "cartography_review":
       case "arcgis_automation":
         throw new Error(`${manifest.analysisType} execution is controlled by the dedicated evidence-aware presentation and ArcGIS operation path; it cannot be auto-executed as a generic Lakehouse job`);
     }
 
-    return await completeGeoAnalysisRun({ runId, resultSummary, uncertaintySummary });
+    const completed = await completeGeoAnalysisRun({ runId, resultSummary, uncertaintySummary });
+    if (manifest.analysisType === "change_vectorization") {
+      const monitorSubscriptionId = Number(parameters.monitorSubscriptionId);
+      await recordChangeAlerts({
+        runId,
+        parcelId: stored.run.parcelId ?? undefined,
+        subscriptionId: Number.isInteger(monitorSubscriptionId) && monitorSubscriptionId > 0 ? monitorSubscriptionId : undefined,
+        resultSummary,
+        evidenceStatus: "provisional",
+        recipientId: stored.run.requestedBy,
+      });
+    }
+    return completed;
   } catch (error) {
     const message = error instanceof Error ? error.message : "GeoAI execution failed";
     await failGeoAnalysisRun(runId, message);

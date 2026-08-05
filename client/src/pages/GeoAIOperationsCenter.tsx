@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
-import { AlertTriangle, CheckCircle2, ClipboardCheck, FileText, Loader2, Map, Play, RefreshCw, ShieldCheck, Workflow } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, FileText, Loader2, Map, Play, RefreshCw, ShieldCheck, Sparkles, Workflow } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
@@ -90,7 +90,7 @@ export default function GeoAIOperationsCenter() {
       <header className="border-b bg-card">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <Link href="/advanced-geospatial-center"><Button variant="ghost">← Geospatial Center</Button></Link>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><ShieldCheck className="h-4 w-4" /> Evidence-gated operations</div>
+          <div className="flex items-center gap-2"><Link href="/geospatial-innovations"><Button size="sm" variant="outline"><Sparkles className="mr-2 h-4 w-4" /> Innovation Hub</Button></Link><div className="flex items-center gap-2 text-sm text-muted-foreground"><ShieldCheck className="h-4 w-4" /> Evidence-gated operations</div></div>
         </div>
       </header>
 

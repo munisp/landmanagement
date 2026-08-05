@@ -165,7 +165,17 @@ export type GeoAnalysisType =
   | "suitability_analysis"
   | "cartography_review"
   | "arcgis_automation"
-  | "field_evidence_review";
+  | "field_evidence_review"
+  | "geometry_quality"
+  | "hazard_profile"
+  | "cog_readiness"
+  | "stac_catalog"
+  | "change_vectorization"
+  | "accessibility_equity"
+  | "field_geofence"
+  | "zonal_statistics"
+  | "privacy_release"
+  | "ogc_features";
 export type GeoAssetType =
   | "parcel_geometry"
   | "survey_plan"
@@ -391,3 +401,126 @@ export const approveGeoAiArcgisOperation = (operationId: number, externalJobId?:
 
 export const executeApprovedGeoAiArcgisOperation = (operationId: number, token?: string | null) =>
   trpcMutation<GeoArcgisOperation>("geoai.executeArcgisOperation", { operationId }, token);
+
+
+export type GeoStacCollection = {
+  id: number;
+  collectionKey: string;
+  title: string;
+  description: string;
+  license: string;
+  spatialExtent: Record<string, unknown>;
+  temporalExtent: Record<string, unknown>;
+  providers: unknown[];
+  keywords: unknown[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GeoMonitor = {
+  id: number;
+  subscriptionKey: string;
+  parcelId: number | null;
+  innovationType: "change_vectorization" | "hazard_profile" | "field_geofence" | "zonal_statistics";
+  scheduleHint: string;
+  settings: Record<string, unknown>;
+  status: "active" | "paused" | "disabled";
+  nextEvaluationAt: string | null;
+  lastEvaluationAt: string | null;
+  createdAt: string;
+};
+
+export type GeoChangeAlert = {
+  id: number;
+  alertKey: string;
+  parcelId: number | null;
+  runId: number;
+  subscriptionId: number | null;
+  alertType: string;
+  severity: "low" | "medium" | "high" | "critical";
+  status: "open" | "acknowledged" | "investigating" | "resolved" | "dismissed";
+  evidenceStatus: GeoEvidenceStatus;
+  alertGeometryGeojson: Record<string, unknown> | null;
+  evidence: Record<string, unknown>;
+  summary: string;
+  resolutionNotes: string | null;
+  createdAt: string;
+};
+
+export type GeoPublicRelease = {
+  id: number;
+  releaseKey: string;
+  parcelId: number | null;
+  sourceRunId: number | null;
+  privacyMethod: string;
+  privacyParameters: Record<string, unknown>;
+  releasedFeature: Record<string, unknown> | null;
+  license: string;
+  legalNotice: string;
+  status: "draft" | "approved" | "published" | "revoked";
+  publishedAt: string | null;
+  createdAt: string;
+};
+
+export const listGeoInnovationCollections = (token?: string | null) =>
+  trpcQuery<GeoStacCollection[]>("geoInnovations.listStacCollections", undefined, token);
+
+export const createGeoInnovationCollection = (input: {
+  collectionKey: string;
+  title: string;
+  description: string;
+  license: string;
+  spatialExtent: Record<string, unknown>;
+  temporalExtent: Record<string, unknown>;
+  providers?: unknown[];
+  keywords?: string[];
+}, token?: string | null) => trpcMutation<GeoStacCollection>("geoInnovations.createStacCollection", input, token);
+
+export const listGeoInnovationMonitors = (input: { parcelId?: number; includeAll?: boolean } = {}, token?: string | null) =>
+  trpcQuery<GeoMonitor[]>("geoInnovations.listMonitors", input, token);
+
+export const createGeoInnovationMonitor = (input: {
+  parcelId?: number;
+  innovationType: GeoMonitor["innovationType"];
+  scheduleHint: string;
+  settings: Record<string, unknown>;
+  nextEvaluationAt?: string;
+}, token?: string | null) => trpcMutation<GeoMonitor>("geoInnovations.createMonitor", input, token);
+
+export const setGeoInnovationMonitorStatus = (subscriptionId: number, status: GeoMonitor["status"], token?: string | null) =>
+  trpcMutation<GeoMonitor>("geoInnovations.setMonitorStatus", { subscriptionId, status }, token);
+
+export const listGeoInnovationAlerts = (input: { parcelId?: number; runId?: number; status?: GeoChangeAlert["status"]; limit?: number } = {}, token?: string | null) =>
+  trpcQuery<GeoChangeAlert[]>("geoInnovations.listChangeAlerts", input, token);
+
+export const acknowledgeGeoInnovationAlert = (alertId: number, status: "acknowledged" | "investigating", token?: string | null) =>
+  trpcMutation<GeoChangeAlert>("geoInnovations.acknowledgeChangeAlert", { alertId, status }, token);
+
+export const resolveGeoInnovationAlert = (alertId: number, status: "resolved" | "dismissed", resolutionNotes: string, token?: string | null) =>
+  trpcMutation<GeoChangeAlert>("geoInnovations.resolveChangeAlert", { alertId, status, resolutionNotes }, token);
+
+export const listGeoInnovationReleases = (input: { status?: GeoPublicRelease["status"]; limit?: number } = {}, token?: string | null) =>
+  trpcQuery<GeoPublicRelease[]>("geoInnovations.listPublicReleases", input, token);
+
+export const requestGeoInnovationRelease = (runId: number, parcelId?: number, token?: string | null) =>
+  trpcMutation<GeoPublicRelease>("geoInnovations.requestPublicRelease", { runId, parcelId }, token);
+
+export const approveGeoInnovationRelease = (releaseId: number, token?: string | null) =>
+  trpcMutation<GeoPublicRelease>("geoInnovations.approvePublicRelease", { releaseId }, token);
+
+export const publishGeoInnovationRelease = (releaseId: number, token?: string | null) =>
+  trpcMutation<GeoPublicRelease>("geoInnovations.publishPublicRelease", { releaseId }, token);
+
+export const revokeGeoInnovationRelease = (releaseId: number, token?: string | null) =>
+  trpcMutation<GeoPublicRelease>("geoInnovations.revokePublicRelease", { releaseId }, token);
+
+export type GeoFeatureCollection = {
+  type: "FeatureCollection";
+  timeStamp: string;
+  numberReturned: number;
+  features: Array<{ type: "Feature"; id: string; geometry: Record<string, unknown>; properties: Record<string, unknown> }>;
+  metadata: Record<string, unknown>;
+};
+
+export const getGeoInnovationParcelFeatures = (input: { bbox?: [number, number, number, number]; state?: string; lga?: string; status?: string; limit?: number } = {}, token?: string | null) =>
+  trpcQuery<GeoFeatureCollection>("geoInnovations.getParcelFeatureCollection", input, token);

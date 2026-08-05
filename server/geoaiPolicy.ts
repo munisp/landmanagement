@@ -19,6 +19,16 @@ export const geoAnalysisTypeSchema = z.enum([
   "suitability_analysis",
   "cartography_review",
   "arcgis_automation",
+  "geometry_quality",
+  "hazard_profile",
+  "cog_readiness",
+  "stac_catalog",
+  "change_vectorization",
+  "accessibility_equity",
+  "field_geofence",
+  "zonal_statistics",
+  "privacy_release",
+  "ogc_features",
 ]);
 export type GeoAnalysisType = z.infer<typeof geoAnalysisTypeSchema>;
 
@@ -198,6 +208,56 @@ export function defaultGeoCheckpoints(manifest: GeoAnalysisManifest): GeoCheckpo
         { key: "recovery-plan", name: "Recovery plan and backup target attached", required: true },
         { key: "human-approval", name: "Authorized human approval recorded before external execution", required: true },
       ];
+    case "geometry_quality":
+      return [...common,
+        { key: "geometry-repair-audit", name: "Geometry repair, topology defects, and measurement CRS evidence attached", required: true },
+        { key: "quality-score-components", name: "Completeness, positional, topology, and lineage score components attached", required: true },
+      ];
+    case "hazard_profile":
+      return [...common,
+        { key: "hazard-source-lineage", name: "Every hazard input source, acquisition time, and coverage limitation is recorded", required: true },
+        { key: "hazard-overlay-accounting", name: "Hazard overlay area and exposure accounting is attached", required: true },
+      ];
+    case "cog_readiness":
+      return [...common,
+        { key: "cog-layout", name: "TIFF tiling, overviews, georeferencing, and HTTP range-read readiness inspected", required: true },
+      ];
+    case "stac_catalog":
+      return [...common,
+        { key: "stac-core", name: "STAC item, collection, temporal, spatial, and asset metadata validation attached", required: true },
+      ];
+    case "change_vectorization":
+      return [...common,
+        { key: "co-registration", name: "Temporal co-registration quality is measured and accepted", required: true },
+        { key: "vectorization-threshold", name: "Connected-component and minimum mapping-unit thresholds are recorded", required: true },
+        { key: "alert-review", name: "Evidence-bearing alert geometry is reviewed before operational action", required: true },
+      ];
+    case "accessibility_equity":
+      return [...common,
+        { key: "origin-group-lineage", name: "Origin groups and destination definitions are recorded without inferring sensitive demographics", required: true },
+        { key: "unreachable-audit", name: "Unreachable origin-destination pairs are explicitly reported", required: true },
+        { key: "equity-metric", name: "Group accessibility distribution and disparity metric are attached", required: true },
+      ];
+    case "field_geofence":
+      return [...common,
+        { key: "track-quality", name: "GPS accuracy, timestamp, and sample-count quality checks are attached", required: true },
+        { key: "geofence-audit", name: "Parcel buffer, in-geofence fraction, and excluded points are recorded", required: true },
+      ];
+    case "zonal_statistics":
+      return [...common,
+        { key: "raster-mask", name: "Raster nodata mask, band, CRS, and parcel zone accounting are attached", required: true },
+        { key: "zonal-summary", name: "Pixel count and summary statistics are attached", required: true },
+      ];
+    case "privacy_release":
+      return [...common,
+        { key: "privacy-method", name: "Redaction method, parameters, and legal non-authoritative notice are attached", required: true },
+        { key: "release-approval", name: "Authorized publication approval is recorded before release", required: true },
+      ];
+    case "ogc_features":
+      return [...common,
+        { key: "collection-metadata", name: "Interoperable collection metadata, CRS, and query limits are attached", required: true },
+        { key: "release-policy", name: "Feature-level access policy and evidence-status constraints are attached", required: true },
+      ];
   }
 }
 
@@ -275,6 +335,55 @@ export function validateGeoAnalysisManifest(rawManifest: unknown): GeoAnalysisMa
       if (!manifest.methodParameters.operationPlan || !manifest.methodParameters.recoveryPlan) {
         errors.push("ArcGIS automation requires methodParameters.operationPlan and methodParameters.recoveryPlan");
       }
+      break;
+    case "geometry_quality":
+      requireMetricCrs(manifest, errors);
+      requireAssetType(manifest, "parcel_geometry", errors);
+      requireAssetCrs(manifest, ["parcel_geometry"], errors);
+      break;
+    case "hazard_profile":
+      requireMetricCrs(manifest, errors);
+      requireAssetType(manifest, "parcel_geometry", errors);
+      if (!Array.isArray(manifest.methodParameters.hazardSources) || manifest.methodParameters.hazardSources.length === 0) errors.push("Hazard profiling requires non-empty methodParameters.hazardSources");
+      break;
+    case "cog_readiness":
+      if (!manifest.sourceAssets.some((asset) => ["orthophoto", "satellite_scene", "raster", "dem", "dtm", "dsm"].includes(asset.assetType))) errors.push("COG readiness requires an imagery or raster source asset");
+      requireAssetCrs(manifest, ["orthophoto", "satellite_scene", "raster", "dem", "dtm", "dsm"], errors);
+      break;
+    case "stac_catalog":
+      if (!manifest.methodParameters.collectionKey || typeof manifest.methodParameters.collectionKey !== "string") errors.push("STAC cataloging requires methodParameters.collectionKey");
+      break;
+    case "change_vectorization": {
+      const imagery = manifest.sourceAssets.filter((asset) => ["orthophoto", "satellite_scene", "raster"].includes(asset.assetType));
+      if (imagery.length < 2) errors.push("Change vectorization requires at least two imagery assets");
+      if (!manifest.temporalWindow?.seasonalComparable) errors.push("Change vectorization requires seasonally comparable observations");
+      if (!Number.isFinite(Number(manifest.methodParameters.minMappingUnitM2)) || Number(manifest.methodParameters.minMappingUnitM2) <= 0) errors.push("Change vectorization requires positive methodParameters.minMappingUnitM2");
+      requireAssetCrs(manifest, ["orthophoto", "satellite_scene", "raster"], errors);
+      break;
+    }
+    case "accessibility_equity":
+      requireMetricCrs(manifest, errors);
+      requireAssetType(manifest, "road_network", errors);
+      if (!manifest.networkAssumptions) errors.push("Accessibility equity requires networkAssumptions");
+      if (!Array.isArray(manifest.methodParameters.originGroups) || manifest.methodParameters.originGroups.length < 2) errors.push("Accessibility equity requires at least two declared origin groups");
+      break;
+    case "field_geofence":
+      requireAssetType(manifest, "parcel_geometry", errors);
+      requireAssetType(manifest, "field_observation", errors);
+      if (!Number.isFinite(Number(manifest.methodParameters.geofenceBufferM)) || Number(manifest.methodParameters.geofenceBufferM) <= 0) errors.push("Field geofence verification requires positive methodParameters.geofenceBufferM");
+      break;
+    case "zonal_statistics":
+      requireMetricCrs(manifest, errors);
+      requireAssetType(manifest, "parcel_geometry", errors);
+      if (!manifest.sourceAssets.some((asset) => ["orthophoto", "satellite_scene", "raster", "dem", "dtm", "dsm"].includes(asset.assetType))) errors.push("Zonal statistics requires a raster source asset");
+      break;
+    case "privacy_release":
+      requireAssetType(manifest, "parcel_geometry", errors);
+      if (!manifest.methodParameters.privacyMethod || !manifest.methodParameters.license || !manifest.methodParameters.legalNotice) errors.push("Privacy release requires methodParameters.privacyMethod, license, and legalNotice");
+      break;
+    case "ogc_features":
+      requireAssetType(manifest, "parcel_geometry", errors);
+      if (!manifest.outputCrs) errors.push("OGC feature publication requires outputCrs");
       break;
   }
 

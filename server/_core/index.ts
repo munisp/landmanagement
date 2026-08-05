@@ -19,6 +19,7 @@ import { notificationWS } from "../notificationWebSocketService";
 import { dashboardWS } from "../dashboardWebSocketService";
 import { realtimeWebSocketService } from "../realtimeWebSocketService";
 import { externalApiRouter } from "../externalApi";
+import { geoInteroperabilityHttpRouter } from "../geoInteroperabilityHttp";
 import { startEmailQueueProcessor } from "../emailQueueService";
 import { healthCheck, livenessProbe, readinessProbe, startupProbe } from "./healthCheck";
 import { advancedSecurityHeaders, idsMiddleware, wafMiddleware } from "./advancedSecurity";
@@ -126,6 +127,11 @@ export function configureApp(app: express.Express): void {
 
   // External integrator API (x-api-key authenticated, read-only)
   app.use("/api/v1/external", externalApiRouter);
+
+  // Standards-inspired geospatial interoperability API. This router sits after
+  // global security middleware and applies strict permission checks to protected
+  // discovery routes; only approved privacy-preserving releases are public.
+  app.use("/api/geo", geoInteroperabilityHttpRouter);
 
   // tRPC API
   app.use(

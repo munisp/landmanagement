@@ -32,6 +32,7 @@ except ImportError:
     get_catalog = None
 
 from api.geoai_service import router as geoai_router
+from api.geo_innovations_service import router as geo_innovations_router
 from ml.title_risk_model import (
     FEATURE_NAMES,
     MODEL_NAME,
@@ -890,6 +891,7 @@ async def geospatial_spatial_workbench(request: SedonaSpatialWorkbenchRequest):
 # existing endpoint declarations. This ensures a single final app instance owns
 # the entire authenticated route set in every import and worker mode.
 app.include_router(geoai_router)
+app.include_router(geo_innovations_router)
 
 if __name__ == "__main__":
     import uvicorn

@@ -4354,3 +4354,121 @@ export type GeoAnalysisArtifact = typeof geoAnalysisArtifacts.$inferSelect;
 export type GeoAnalysisCheckpoint = typeof geoAnalysisCheckpoints.$inferSelect;
 export type GeoModelEvidence = typeof geoModelEvidence.$inferSelect;
 export type GeoArcgisOperationRequest = typeof geoArcgisOperationRequests.$inferSelect;
+
+
+// ============================================================================
+// GeoAI Innovation Catalog, Monitoring, and Governed Release Contracts
+// ============================================================================
+
+export const geoMonitorStatusEnum = pgEnum("geo_monitor_status", ["active", "paused", "disabled"]);
+export const geoAlertStatusEnum = pgEnum("geo_alert_status", ["open", "acknowledged", "investigating", "resolved", "dismissed"]);
+export const geoReleaseStatusEnum = pgEnum("geo_release_status", ["draft", "approved", "published", "revoked"]);
+
+export const geoStacCollections = pgTable("geo_stac_collections", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  collectionKey: varchar("collection_key", { length: 128 }).notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  license: varchar("license", { length: 255 }).notNull(),
+  spatialExtent: jsonb("spatial_extent").notNull(),
+  temporalExtent: jsonb("temporal_extent").notNull(),
+  providers: jsonb("providers").notNull().default([]),
+  keywords: jsonb("keywords").notNull().default([]),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const geoStacItems = pgTable("geo_stac_items", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  itemKey: varchar("item_key", { length: 128 }).notNull().unique(),
+  collectionId: bigint("collection_id", { mode: "number" }).notNull().references(() => geoStacCollections.id, { onDelete: "cascade" }),
+  assetId: varchar("asset_id", { length: 128 }).references(() => geoAssetCatalog.assetId, { onDelete: "set null" }),
+  parcelId: integer("parcel_id").references(() => parcels.id, { onDelete: "set null" }),
+  geometryGeojson: jsonb("geometry_geojson"),
+  bbox: jsonb("bbox").notNull(),
+  itemDatetime: timestamp("item_datetime", { withTimezone: true }),
+  startDatetime: timestamp("start_datetime", { withTimezone: true }),
+  endDatetime: timestamp("end_datetime", { withTimezone: true }),
+  properties: jsonb("properties").notNull().default({}),
+  links: jsonb("links").notNull().default([]),
+  evidenceStatus: geoEvidenceStatusEnum("evidence_status").notNull().default("insufficient_evidence"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  collectionDatetimeIdx: index("geo_stac_items_collection_datetime_idx").on(table.collectionId, table.itemDatetime),
+  assetCreatedIdx: index("geo_stac_items_asset_idx").on(table.assetId, table.createdAt),
+}));
+
+export const geoMonitorSubscriptions = pgTable("geo_monitor_subscriptions", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  subscriptionKey: varchar("subscription_key", { length: 128 }).notNull().unique(),
+  parcelId: integer("parcel_id").references(() => parcels.id, { onDelete: "cascade" }),
+  requestedBy: integer("requested_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  innovationType: varchar("innovation_type", { length: 64 }).notNull(),
+  status: geoMonitorStatusEnum("status").notNull().default("active"),
+  scheduleHint: varchar("schedule_hint", { length: 128 }).notNull(),
+  settings: jsonb("settings").notNull(),
+  lastRunId: bigint("last_run_id", { mode: "number" }).references(() => geoAnalysisRuns.id, { onDelete: "set null" }),
+  lastEvaluatedAt: timestamp("last_evaluated_at", { withTimezone: true }),
+  nextEvaluationAt: timestamp("next_evaluation_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  statusNextIdx: index("geo_monitor_subscriptions_status_next_idx").on(table.status, table.nextEvaluationAt),
+  parcelTypeIdx: index("geo_monitor_subscriptions_parcel_type_idx").on(table.parcelId, table.innovationType, table.status),
+}));
+
+export const geoChangeAlerts = pgTable("geo_change_alerts", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  alertKey: varchar("alert_key", { length: 128 }).notNull().unique(),
+  parcelId: integer("parcel_id").references(() => parcels.id, { onDelete: "set null" }),
+  runId: bigint("run_id", { mode: "number" }).references(() => geoAnalysisRuns.id, { onDelete: "set null" }),
+  subscriptionId: bigint("subscription_id", { mode: "number" }).references(() => geoMonitorSubscriptions.id, { onDelete: "set null" }),
+  alertType: varchar("alert_type", { length: 64 }).notNull(),
+  severity: varchar("severity", { length: 16 }).notNull(),
+  status: geoAlertStatusEnum("status").notNull().default("open"),
+  evidenceStatus: geoEvidenceStatusEnum("evidence_status").notNull().default("insufficient_evidence"),
+  alertGeometryGeojson: jsonb("alert_geometry_geojson"),
+  evidence: jsonb("evidence").notNull(),
+  summary: text("summary").notNull(),
+  acknowledgedBy: integer("acknowledged_by").references(() => users.id, { onDelete: "set null" }),
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  resolvedBy: integer("resolved_by").references(() => users.id, { onDelete: "set null" }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  resolutionNotes: text("resolution_notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  parcelStatusCreatedIdx: index("geo_change_alerts_parcel_status_created_idx").on(table.parcelId, table.status, table.createdAt),
+  runCreatedIdx: index("geo_change_alerts_run_idx").on(table.runId, table.createdAt),
+}));
+
+export const geoPublicReleases = pgTable("geo_public_releases", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  releaseKey: varchar("release_key", { length: 128 }).notNull().unique(),
+  parcelId: integer("parcel_id").references(() => parcels.id, { onDelete: "set null" }),
+  sourceRunId: bigint("source_run_id", { mode: "number" }).references(() => geoAnalysisRuns.id, { onDelete: "set null" }),
+  requestedBy: integer("requested_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  approvedBy: integer("approved_by").references(() => users.id, { onDelete: "set null" }),
+  status: geoReleaseStatusEnum("status").notNull().default("draft"),
+  privacyMethod: varchar("privacy_method", { length: 64 }).notNull(),
+  privacyParameters: jsonb("privacy_parameters").notNull(),
+  releasedFeature: jsonb("released_feature"),
+  license: varchar("license", { length: 255 }).notNull(),
+  legalNotice: text("legal_notice").notNull(),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  statusCreatedIdx: index("geo_public_releases_status_created_idx").on(table.status, table.createdAt),
+}));
+
+export type GeoStacCollection = typeof geoStacCollections.$inferSelect;
+export type GeoStacItem = typeof geoStacItems.$inferSelect;
+export type GeoMonitorSubscription = typeof geoMonitorSubscriptions.$inferSelect;
+export type GeoChangeAlert = typeof geoChangeAlerts.$inferSelect;
+export type GeoPublicRelease = typeof geoPublicReleases.$inferSelect;
