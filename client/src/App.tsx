@@ -48,6 +48,10 @@ const MortgageApplicationPage = lazy(() => import('./pages/MortgageApplicationPa
 const MortgageDashboard = lazy(() => import('./pages/MortgageDashboard'));
 const LoanOfficerDashboard = lazy(() => import('./pages/LoanOfficerDashboard'));
 const LenderCollateralControl = lazy(() => import('./pages/LenderCollateralControl'));
+const RegistryOperationsCloud = lazy(() => import('./pages/RegistryOperationsCloud'));
+const RightOfWayManager = lazy(() => import('./pages/RightOfWayManager'));
+const ValuationTaxOperations = lazy(() => import('./pages/ValuationTaxOperations'));
+const PortfolioProductHub = lazy(() => import('./pages/PortfolioProductHub'));
 const BorrowerPaymentPortal = lazy(() => import('./pages/BorrowerPaymentPortal'));
 const BrokerDashboard = lazy(() => import('./pages/BrokerDashboard'));
 const InvestorDashboard = lazy(() => import('./pages/InvestorDashboard'));
@@ -221,6 +225,10 @@ function Router() {
       <Route path="/mortgage-dashboard" component={MortgageDashboard} />
       <Route path="/loan-officer-dashboard" component={LoanOfficerDashboard} />
       <Route path="/lender-collateral-control" component={LenderCollateralControl} />
+      <Route path="/registry-operations-cloud" component={RegistryOperationsCloud} />
+      <Route path="/right-of-way-manager" component={RightOfWayManager} />
+      <Route path="/valuation-tax-operations" component={ValuationTaxOperations} />
+      <Route path="/commercial-portfolio" component={PortfolioProductHub} />
       <Route path="/borrower-payment-portal" component={BorrowerPaymentPortal} />
       <Route path="/broker-dashboard" component={BrokerDashboard} />
       <Route path="/investor-dashboard" component={InvestorDashboard} />

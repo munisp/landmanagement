@@ -22,6 +22,7 @@ import { externalApiRouter } from "../externalApi";
 import { geoInteroperabilityHttpRouter } from "../geoInteroperabilityHttp";
 import { geospatialDeliveryHttpRouter } from "../geospatialDeliveryHttp";
 import { contextGlobeHttpRouter } from "../contextGlobeHttp";
+import { propertyDataApiRouter } from "../propertyDataApiHttp";
 import { startEmailQueueProcessor } from "../emailQueueService";
 import { healthCheck, livenessProbe, readinessProbe, startupProbe } from "./healthCheck";
 import { advancedSecurityHeaders, idsMiddleware, wafMiddleware } from "./advancedSecurity";
@@ -146,6 +147,10 @@ export function configureApp(app: express.Express): void {
   // delivered only after a session and a short-lived layer-scoped capability
   // are validated; browsers never call upstream public providers directly.
   app.use("/api/context-globe", contextGlobeHttpRouter);
+
+  // Purpose-bound commercial Property Data API. Its own commercial client key
+  // verification and immutable usage recording run after global HTTP hardening.
+  app.use("/api/property-data", propertyDataApiRouter);
 
   // tRPC API
   app.use(

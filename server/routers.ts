@@ -51,6 +51,10 @@ import { operationalEventsRouter } from './api/routers/operational-events';
 import { commandCenterRouter } from './api/routers/command-center';
 import { platformOperationsRouter } from './api/routers/platform-operations';
 import { commercialLenderRouter } from './api/routers/commercial-lender';
+import { registryOperationsRouter } from './api/routers/registry-operations';
+import { rightOfWayRouter } from './api/routers/right-of-way';
+import { taxOperationsRouter } from './api/routers/tax-operations';
+import { portfolioProductsRouter } from './api/routers/portfolio-products';
 import { publicSecurityRouter } from './api/routers/public-security';
 import { parcelSubscriptionsRouter, notificationPreferencesRouter, notificationInboxRouter } from './api/routers/parcel-subscriptions';
 import { identityRouter } from './api/routers/identity';
@@ -202,6 +206,10 @@ export const appRouter = router({
   commandCenter: commandCenterRouter,
   platformOperations: platformOperationsRouter,
   commercialLender: commercialLenderRouter,
+  registryOperations: registryOperationsRouter,
+  rightOfWay: rightOfWayRouter,
+  taxOperations: taxOperationsRouter,
+  portfolioProducts: portfolioProductsRouter,
   publicSecurity: publicSecurityRouter,
   parcelSubscriptions: parcelSubscriptionsRouter,
   notificationPreferences: notificationPreferencesRouter,

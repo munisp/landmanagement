@@ -41,6 +41,7 @@ from api.geoai_service import router as geoai_router
 from api.geo_innovations_service import router as geo_innovations_router
 from api.geo_authority_service import router as geo_authority_router
 from api.context_globe_service import router as context_globe_router
+from api.portfolio_service import router as portfolio_analytics_router
 from ml.title_risk_model import (
     FEATURE_NAMES,
     MODEL_NAME,
@@ -996,6 +997,7 @@ app.include_router(geoai_router)
 app.include_router(geo_innovations_router)
 app.include_router(geo_authority_router)
 app.include_router(context_globe_router)
+app.include_router(portfolio_analytics_router)
 
 if __name__ == "__main__":
     import uvicorn
