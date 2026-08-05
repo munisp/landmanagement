@@ -4,6 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import * as MapLibre from "@maplibre/maplibre-react-native";
 
 import { AppScreen } from "../../components/AppScreen";
+import {
+  MobileMetricTile,
+  MobilePageHeader,
+  MobileSection,
+  MobileStatusBanner,
+  mobileExperienceStyles as ux,
+} from "../../components/MobileExperiencePrimitives";
 import { getApiBaseUrl } from "../../lib/runtimeConfig";
 import { useMobileSession } from "../../providers/MobileSessionProvider";
 import {
@@ -26,11 +33,11 @@ type ContextLayer = {
 type WindowHours = 1 | 24 | 168 | 720;
 type Position = [number, number];
 
-const WINDOW_OPTIONS: Array<{ hours: WindowHours; label: string }> = [
-  { hours: 1, label: "1h" },
-  { hours: 24, label: "24h" },
-  { hours: 168, label: "7d" },
-  { hours: 720, label: "30d" },
+const WINDOW_OPTIONS: Array<{ hours: WindowHours; label: string; detail: string }> = [
+  { hours: 1, label: "1h", detail: "Immediate" },
+  { hours: 24, label: "24h", detail: "Today" },
+  { hours: 168, label: "7d", detail: "Week" },
+  { hours: 720, label: "30d", detail: "Month" },
 ];
 
 function styleUrl(): string { return `${getApiBaseUrl()}/geospatial-delivery/basemap/style.json`; }
@@ -81,50 +88,87 @@ export function MobileContextGlobeScreen() {
   };
 
   const summary = contextQuery.data?.summary;
-  return (
-    <AppScreen scroll>
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>GOVERNED PUBLIC CONTEXT</Text>
-        <Text style={styles.title}>Context Globe</Text>
-        <Text style={styles.subtitle}>Live, read-only seismic and weather awareness. This screen cannot edit parcel records, evidence, transactions, or field observations.</Text>
-      </View>
+  const onRefresh = async () => { await Promise.all([layerQuery.refetch(), contextQuery.refetch()]); };
 
-      <View style={styles.controlCard}>
-        <Text style={styles.section}>Approved layers</Text>
-        {layerQuery.isLoading ? <View style={styles.loadingRow}><ActivityIndicator color="#0369a1" /><Text style={styles.muted}>Loading layer policy…</Text></View> : null}
-        {layerQuery.isError ? <Text style={styles.error}>Layer preferences are unavailable. Reconnect and retry.</Text> : null}
+  return (
+    <AppScreen scroll refreshing={layerQuery.isRefetching || contextQuery.isRefetching} onRefresh={() => void onRefresh()}>
+      <MobilePageHeader
+        eyebrow="Governed public context"
+        title="Context Globe"
+        description="Read-only seismic and weather awareness for situational context. This screen cannot edit parcel records, evidence, transactions, or field observations."
+      />
+      <MobileStatusBanner tone="blue" icon="shield-checkmark-outline" title="Read-only, online-only context" description="Every event is delivered through an approved source and attribution path. Reconnect before relying on current conditions." />
+
+      <MobileSection title="What you are viewing" description="Turn only approved layers on. Your preferences stay within this governed workspace.">
+        {layerQuery.isLoading ? <View style={styles.loadingRow}><ActivityIndicator color="#1D4ED8" /><Text style={ux.muted}>Loading approved layer policy…</Text></View> : null}
+        {layerQuery.isError ? <Text style={ux.error}>Layer preferences are unavailable. Pull down to reconnect and retry.</Text> : null}
         {(layerQuery.data ?? []).map((layer) => {
           const selected = selectedLayers.includes(layer.key);
-          return <Pressable key={layer.key} onPress={() => void toggleLayer(layer)} style={({ pressed }) => [styles.layerRow, selected && styles.layerRowSelected, pressed && styles.pressed]} accessibilityRole="switch" accessibilityState={{ checked: selected }}><View style={[styles.layerDot, { backgroundColor: layer.key === "seismic" ? "#dc2626" : "#d97706" }]} /><View style={styles.layerText}><Text style={styles.layerName}>{layer.displayName}</Text><Text style={styles.layerDetail}>Refreshes up to every {layer.refreshSeconds}s</Text></View><Text style={[styles.layerState, selected && styles.layerStateSelected]}>{selected ? "Shown" : "Hidden"}</Text></Pressable>;
+          const weatherLayer = layer.key === "weather-alerts";
+          return <Pressable key={layer.key} accessibilityRole="switch" accessibilityState={{ checked: selected }} onPress={() => void toggleLayer(layer)} style={({ pressed }) => [ux.choice, selected && ux.choiceSelected, pressed && styles.pressed]}><View style={[styles.layerIcon, { backgroundColor: weatherLayer ? "#FFF7ED" : "#FEF2F2" }]}><View style={[styles.layerDot, { backgroundColor: weatherLayer ? "#D97706" : "#DC2626" }]} /></View><View style={styles.choiceCopy}><Text style={ux.choiceTitle}>{layer.displayName}</Text><Text style={ux.choiceMeta}>{layer.description} · refreshes up to every {layer.refreshSeconds}s</Text></View><View style={[styles.toggle, selected && styles.toggleSelected]}><View style={[styles.toggleKnob, selected && styles.toggleKnobSelected]} /></View></Pressable>;
         })}
-        <Text style={[styles.section, styles.windowHeading]}>Time window</Text>
-        <View style={styles.windowRow}>{WINDOW_OPTIONS.map((option) => <Pressable key={option.hours} onPress={() => setHours(option.hours)} style={({ pressed }) => [styles.windowButton, hours === option.hours && styles.windowButtonActive, pressed && styles.pressed]} accessibilityRole="button" accessibilityState={{ selected: hours === option.hours }}><Text style={[styles.windowText, hours === option.hours && styles.windowTextActive]}>{option.label}</Text></Pressable>)}</View>
+      </MobileSection>
+
+      <MobileSection title="Time window" description="Choose a bounded view of approved public events.">
+        <View style={styles.windowRow}>{WINDOW_OPTIONS.map((option) => <Pressable key={option.hours} accessibilityRole="button" accessibilityState={{ selected: hours === option.hours }} onPress={() => setHours(option.hours)} style={({ pressed }) => [styles.windowButton, hours === option.hours && styles.windowButtonSelected, pressed && styles.pressed]}><Text style={[styles.windowLabel, hours === option.hours && styles.windowLabelSelected]}>{option.label}</Text><Text style={[styles.windowDetail, hours === option.hours && styles.windowDetailSelected]}>{option.detail}</Text></Pressable>)}</View>
+      </MobileSection>
+
+      <View style={styles.mapCard}>
+        <View style={styles.mapHeader}><View><Text style={styles.mapTitle}>Live contextual map</Text><Text style={styles.mapSubtitle}>{selectedLayers.length ? `${selectedLayers.length} approved layer${selectedLayers.length === 1 ? "" : "s"} shown` : "Choose an approved layer to request context"}</Text></View><View style={styles.mapLive}><View style={styles.liveDot} /><Text style={styles.mapLiveText}>{contextQuery.isFetching ? "Updating" : "Online"}</Text></View></View>
+        <View style={styles.mapWrap}>
+          <MapLibre.MapView style={styles.map} mapStyle={styleUrl()} logoEnabled attributionEnabled compassEnabled rotateEnabled pitchEnabled>
+            <MapLibre.Camera centerCoordinate={[0, 20] as Position} zoomLevel={1.4} animationDuration={0} />
+            <MapLibre.ShapeSource id="context-seismic" shape={seismic}><MapLibre.CircleLayer id="context-seismic-points" style={{ circleColor: "#DC2626", circleRadius: 6, circleStrokeColor: "#FFFFFF", circleStrokeWidth: 1.5 }} /></MapLibre.ShapeSource>
+            <MapLibre.ShapeSource id="context-weather" shape={weather}><MapLibre.FillLayer id="context-weather-fill" style={{ fillColor: "#F59E0B", fillOpacity: 0.25 }} /><MapLibre.LineLayer id="context-weather-line" style={{ lineColor: "#D97706", lineWidth: 2 }} /><MapLibre.CircleLayer id="context-weather-points" style={{ circleColor: "#F59E0B", circleRadius: 5, circleStrokeColor: "#FFFFFF", circleStrokeWidth: 1.5 }} /></MapLibre.ShapeSource>
+          </MapLibre.MapView>
+          {contextQuery.isFetching ? <View style={styles.mapStatus}><ActivityIndicator size="small" color="#FFFFFF" /><Text style={styles.mapStatusText}>Requesting signed delivery…</Text></View> : null}
+        </View>
       </View>
 
-      <View style={styles.mapWrap}>
-        <MapLibre.MapView style={styles.map} mapStyle={styleUrl()} logoEnabled attributionEnabled compassEnabled rotateEnabled pitchEnabled>
-          <MapLibre.Camera centerCoordinate={[0, 20] as Position} zoomLevel={1.4} animationDuration={0} />
-          <MapLibre.ShapeSource id="context-seismic" shape={seismic}><MapLibre.CircleLayer id="context-seismic-points" style={{ circleColor: "#dc2626", circleRadius: 6, circleStrokeColor: "#ffffff", circleStrokeWidth: 1.5 }} /></MapLibre.ShapeSource>
-          <MapLibre.ShapeSource id="context-weather" shape={weather}><MapLibre.FillLayer id="context-weather-fill" style={{ fillColor: "#f59e0b", fillOpacity: 0.25 }} /><MapLibre.LineLayer id="context-weather-line" style={{ lineColor: "#d97706", lineWidth: 2 }} /><MapLibre.CircleLayer id="context-weather-points" style={{ circleColor: "#f59e0b", circleRadius: 5, circleStrokeColor: "#ffffff", circleStrokeWidth: 1.5 }} /></MapLibre.ShapeSource>
-        </MapLibre.MapView>
-        {contextQuery.isFetching ? <View style={styles.mapStatus}><ActivityIndicator size="small" color="#ffffff" /><Text style={styles.mapStatusText}>Requesting signed delivery…</Text></View> : null}
-      </View>
+      <MobileSection title="Active observations" description={summary ? `Window: ${prettyTime(summary.windowStart)} to ${prettyTime(summary.windowEnd)}` : "Select an approved layer to request an online-only summary."}>
+        {contextQuery.isError ? <MobileStatusBanner tone="red" icon="alert-circle-outline" title="Context delivery is unavailable" description={contextQuery.error.message || "Pull down to retry signed delivery."} /> : null}
+        {summary ? <View style={styles.metricRow}>{summary.layers.map((layer) => <MobileMetricTile key={layer.layerKey} icon={layer.layerKey === "seismic" ? "pulse-outline" : "thunderstorm-outline"} label={layer.layerKey === "seismic" ? "Seismic events" : "Weather alerts"} value={layer.activeEvents} tone={layer.layerKey === "seismic" ? "red" : "amber"} />)}</View> : null}
+        {!contextQuery.isFetching && !contextQuery.isError && selectedLayers.length > 0 && !observations.length ? <Text style={ux.muted}>No active approved public-context events were returned for this time window.</Text> : null}
+        {observations.map((feature, index) => <View key={feature.id ?? `${feature.properties.layerKey}-${index}`} style={styles.observation}><View style={[styles.observationBar, { backgroundColor: feature.properties.layerKey === "seismic" ? "#DC2626" : "#D97706" }]} /><View style={styles.choiceCopy}><Text style={ux.choiceTitle}>{labelFor(feature)}</Text><Text style={ux.choiceMeta}>Observed {prettyTime(feature.properties.sourceObservedAt)}</Text>{feature.properties.severity ? <Text style={ux.choiceMeta}>Severity: {feature.properties.severity}{feature.properties.urgency ? ` · ${feature.properties.urgency}` : ""}</Text> : null}</View></View>)}
+      </MobileSection>
 
-      <View style={styles.summaryCard}>
-        <Text style={styles.section}>Active observations</Text>
-        {!selectedLayers.length ? <Text style={styles.muted}>Select an approved layer to request an online-only summary.</Text> : null}
-        {contextQuery.isError ? <><Text style={styles.error}>{contextQuery.error.message || "Context delivery is unavailable."}</Text><Pressable onPress={() => void contextQuery.refetch()} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}><Text style={styles.retryText}>Retry securely</Text></Pressable></> : null}
-        {summary ? <><View style={styles.countRow}>{summary.layers.map((layer) => <View key={layer.layerKey} style={styles.countPill}><Text style={styles.countNumber}>{layer.activeEvents}</Text><Text style={styles.countLabel}>{layer.layerKey === "seismic" ? "seismic" : "weather"}</Text></View>)}</View><Text style={styles.muted}>Window: {prettyTime(summary.windowStart)} to {prettyTime(summary.windowEnd)}</Text></> : null}
-        {!contextQuery.isFetching && !contextQuery.isError && selectedLayers.length > 0 && !observations.length ? <Text style={styles.muted}>No active approved public-context events were returned for this window.</Text> : null}
-        {observations.map((feature, index) => <View key={feature.id ?? `${feature.properties.layerKey}-${index}`} style={styles.observation}><View style={[styles.observationBar, { backgroundColor: feature.properties.layerKey === "seismic" ? "#dc2626" : "#d97706" }]} /><View style={styles.observationText}><Text style={styles.observationTitle}>{labelFor(feature)}</Text><Text style={styles.observationMeta}>Observed {prettyTime(feature.properties.sourceObservedAt)}</Text>{feature.properties.severity ? <Text style={styles.observationMeta}>Severity: {feature.properties.severity}{feature.properties.urgency ? ` · ${feature.properties.urgency}` : ""}</Text> : null}</View></View>)}
-      </View>
-
-      <View style={styles.notice}><Text style={styles.noticeTitle}>Online-only public context</Text><Text style={styles.noticeText}>{summary?.offlinePolicy || "Context events remain online-only; no public-event package is retained by this client."} Reconnect before relying on current conditions, and follow applicable emergency, operational, survey, and land-record procedures.</Text></View>
-      <View style={styles.attribution}><Text style={styles.attributionTitle}>Attribution</Text>{(layerQuery.data ?? []).filter((layer) => selectedLayers.includes(layer.key)).map((layer) => <Text key={layer.key} style={styles.attributionText}>{layer.displayName}: {layer.attribution}</Text>)}</View>
+      <MobileStatusBanner tone="amber" icon="information-circle-outline" title="Use context responsibly" description={`${summary?.offlinePolicy || "Context events remain online-only; no public-event package is retained by this client."} Follow applicable emergency, operational, survey, and land-record procedures.`} />
+      <MobileSection title="Source attribution" description="Sources remain visible so users can understand the origin of contextual information.">
+        {(layerQuery.data ?? []).filter((layer) => selectedLayers.includes(layer.key)).map((layer) => <Text key={layer.key} style={ux.muted}>{layer.displayName}: {layer.attribution}</Text>)}
+      </MobileSection>
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: 16, paddingTop: 14, gap: 6 }, eyebrow: { fontSize: 11, letterSpacing: 1.4, fontWeight: "800", color: "#0369a1" }, title: { fontSize: 28, lineHeight: 34, fontWeight: "900", color: "#0f172a" }, subtitle: { fontSize: 14, lineHeight: 21, color: "#475569" }, controlCard: { margin: 16, marginBottom: 12, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, backgroundColor: "#ffffff", padding: 14, gap: 10 }, section: { fontSize: 16, fontWeight: "800", color: "#0f172a" }, loadingRow: { flexDirection: "row", alignItems: "center", gap: 8 }, muted: { fontSize: 13, lineHeight: 19, color: "#475569" }, error: { fontSize: 13, lineHeight: 19, color: "#b91c1c" }, layerRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#e2e8f0", borderRadius: 11, padding: 11, gap: 10 }, layerRowSelected: { borderColor: "#7dd3fc", backgroundColor: "#f0f9ff" }, layerDot: { width: 10, height: 10, borderRadius: 5 }, layerText: { flex: 1, gap: 2 }, layerName: { color: "#0f172a", fontSize: 14, fontWeight: "800" }, layerDetail: { color: "#64748b", fontSize: 11 }, layerState: { color: "#64748b", fontSize: 11, fontWeight: "800", textTransform: "uppercase" }, layerStateSelected: { color: "#0369a1" }, windowHeading: { marginTop: 4 }, windowRow: { flexDirection: "row", gap: 8 }, windowButton: { flex: 1, alignItems: "center", borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 9, paddingVertical: 9 }, windowButtonActive: { backgroundColor: "#0369a1", borderColor: "#0369a1" }, windowText: { color: "#334155", fontWeight: "800", fontSize: 12 }, windowTextActive: { color: "#ffffff" }, pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] }, mapWrap: { height: 420, marginHorizontal: 16, overflow: "hidden", borderRadius: 14, borderColor: "#cbd5e1", borderWidth: 1, backgroundColor: "#e2e8f0" }, map: { flex: 1 }, mapStatus: { position: "absolute", left: 12, bottom: 12, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 8, backgroundColor: "rgba(15,23,42,0.9)", paddingHorizontal: 10, paddingVertical: 7 }, mapStatusText: { color: "#ffffff", fontWeight: "700", fontSize: 11 }, summaryCard: { margin: 16, marginBottom: 12, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, backgroundColor: "#ffffff", padding: 14, gap: 10 }, countRow: { flexDirection: "row", gap: 8 }, countPill: { minWidth: 100, borderRadius: 10, backgroundColor: "#f1f5f9", padding: 10, gap: 1 }, countNumber: { color: "#0f172a", fontSize: 20, fontWeight: "900" }, countLabel: { color: "#475569", fontSize: 11, fontWeight: "700", textTransform: "uppercase" }, retryButton: { alignItems: "center", borderWidth: 1, borderColor: "#93c5fd", borderRadius: 9, padding: 11 }, retryText: { color: "#075985", fontWeight: "800" }, observation: { flexDirection: "row", borderWidth: 1, borderColor: "#e2e8f0", borderRadius: 10, overflow: "hidden" }, observationBar: { width: 5 }, observationText: { flex: 1, padding: 10, gap: 3 }, observationTitle: { color: "#0f172a", fontSize: 13, lineHeight: 18, fontWeight: "800" }, observationMeta: { color: "#64748b", fontSize: 11, lineHeight: 16 }, notice: { marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: "#fde68a", borderRadius: 12, backgroundColor: "#fffbeb", padding: 13, gap: 5 }, noticeTitle: { color: "#92400e", fontSize: 13, fontWeight: "900" }, noticeText: { color: "#92400e", fontSize: 12, lineHeight: 18 }, attribution: { marginHorizontal: 16, marginBottom: 24, borderTopWidth: 1, borderColor: "#e2e8f0", paddingTop: 12, gap: 3 }, attributionTitle: { color: "#0f172a", fontSize: 13, fontWeight: "800" }, attributionText: { color: "#64748b", fontSize: 12, lineHeight: 17 },
+  loadingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  choiceCopy: { flex: 1, minWidth: 0 },
+  layerIcon: { width: 35, height: 35, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  layerDot: { width: 11, height: 11, borderRadius: 99 },
+  toggle: { width: 38, height: 23, borderRadius: 99, backgroundColor: "#CBD5E1", padding: 3, justifyContent: "center" },
+  toggleSelected: { backgroundColor: "#2563EB", alignItems: "flex-end" },
+  toggleKnob: { width: 17, height: 17, borderRadius: 99, backgroundColor: "#FFFFFF" },
+  toggleKnobSelected: { shadowColor: "#0F172A", shadowOpacity: 0.15, shadowRadius: 2, elevation: 2 },
+  windowRow: { flexDirection: "row", gap: 7 },
+  windowButton: { flex: 1, minHeight: 58, borderRadius: 13, borderWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", gap: 1 },
+  windowButtonSelected: { borderColor: "#93C5FD", backgroundColor: "#EFF6FF" },
+  windowLabel: { color: "#334155", fontSize: 14, fontWeight: "900" },
+  windowLabelSelected: { color: "#1D4ED8" },
+  windowDetail: { color: "#94A3B8", fontSize: 10, fontWeight: "700" },
+  windowDetailSelected: { color: "#2563EB" },
+  mapCard: { marginHorizontal: 20, marginTop: 14, overflow: "hidden", borderRadius: 18, borderWidth: 1, borderColor: "#DCE5F0", backgroundColor: "#FFFFFF", shadowColor: "#0F172A", shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
+  mapHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, padding: 15, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
+  mapTitle: { color: "#0F172A", fontSize: 16, fontWeight: "900" },
+  mapSubtitle: { marginTop: 2, color: "#64748B", fontSize: 12 },
+  mapLive: { flexDirection: "row", gap: 5, alignItems: "center", borderRadius: 99, backgroundColor: "#ECFDF5", paddingHorizontal: 8, paddingVertical: 5 },
+  liveDot: { width: 6, height: 6, borderRadius: 99, backgroundColor: "#10B981" },
+  mapLiveText: { color: "#047857", fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
+  mapWrap: { height: 360, backgroundColor: "#E2E8F0" },
+  map: { flex: 1 },
+  mapStatus: { position: "absolute", left: 12, bottom: 12, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, backgroundColor: "rgba(15,23,42,0.9)", paddingHorizontal: 10, paddingVertical: 7 },
+  mapStatusText: { color: "#FFFFFF", fontWeight: "700", fontSize: 11 },
+  metricRow: { flexDirection: "row", gap: 10 },
+  observation: { flexDirection: "row", overflow: "hidden", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 13, backgroundColor: "#FFFFFF" },
+  observationBar: { width: 5 },
+  pressed: { opacity: 0.78, transform: [{ scale: 0.99 }] },
 });
