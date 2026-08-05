@@ -28,6 +28,9 @@ import {
   surveyorGpsTracks,
 } from '../drizzle/schema';
 import { eq, and, sql, inArray } from 'drizzle-orm';
+import { parsePersistedWktGeometry } from './geospatialGeometry';
+
+export { parsePersistedWktGeometry } from './geospatialGeometry';
 
 // ============================================================================
 // GeoLibre Project Format (matches GeoLibre's internal project JSON schema)
@@ -241,9 +244,10 @@ export async function buildGeoLibreProject(options: ParcelGeoLibreOptions = {}):
   // --- Flood Zones layer (optional) ---
   if (options.includeFloodZones) {
     const floodRows = await db.select().from(floodZones).limit(500);
-    const floodFeatures: GeoJSON.Feature[] = floodRows
-      .filter((fz) => fz.geomWkt)
-      .map((fz) => ({
+    const floodFeatures: GeoJSON.Feature[] = floodRows.flatMap((fz) => {
+      const geometry = fz.geomWkt ? parsePersistedWktGeometry(fz.geomWkt) : null;
+      if (!geometry) return [];
+      return [{
         type: 'Feature',
         properties: {
           id: fz.id,
@@ -256,8 +260,9 @@ export async function buildGeoLibreProject(options: ParcelGeoLibreOptions = {}):
           lga: fz.lga,
           _riskColor: FLOOD_RISK_COLORS[fz.riskLevel] ?? '#94a3b8',
         },
-        geometry: wktToGeoJSON(fz.geomWkt!),
-      } as GeoJSON.Feature));
+        geometry,
+      } as GeoJSON.Feature];
+    });
 
     if (floodFeatures.length > 0) {
       layers.push({
@@ -286,9 +291,10 @@ export async function buildGeoLibreProject(options: ParcelGeoLibreOptions = {}):
       .where(eq(adminBoundaries.boundaryType, 'lga'))
       .limit(200);
 
-    const adminFeatures: GeoJSON.Feature[] = adminRows
-      .filter((ab) => ab.geomWkt)
-      .map((ab) => ({
+    const adminFeatures: GeoJSON.Feature[] = adminRows.flatMap((ab) => {
+      const geometry = ab.geomWkt ? parsePersistedWktGeometry(ab.geomWkt) : null;
+      if (!geometry) return [];
+      return [{
         type: 'Feature',
         properties: {
           id: ab.id,
@@ -298,8 +304,9 @@ export async function buildGeoLibreProject(options: ParcelGeoLibreOptions = {}):
           population: ab.population,
           areaKm2: ab.areaKm2,
         },
-        geometry: wktToGeoJSON(ab.geomWkt!),
-      } as GeoJSON.Feature));
+        geometry,
+      } as GeoJSON.Feature];
+    });
 
     if (adminFeatures.length > 0) {
       layers.push({
@@ -391,9 +398,10 @@ export async function buildGeoLibreProject(options: ParcelGeoLibreOptions = {}):
       .where(eq(topologyViolations.status, 'open'))
       .limit(200);
 
-    const violationFeatures: GeoJSON.Feature[] = violations
-      .filter((v) => v.overlapGeomWkt)
-      .map((v) => ({
+    const violationFeatures: GeoJSON.Feature[] = violations.flatMap((v) => {
+      const geometry = v.overlapGeomWkt ? parsePersistedWktGeometry(v.overlapGeomWkt) : null;
+      if (!geometry) return [];
+      return [{
         type: 'Feature',
         properties: {
           id: v.id,
@@ -405,8 +413,9 @@ export async function buildGeoLibreProject(options: ParcelGeoLibreOptions = {}):
           status: v.status,
           _severityColor: SEVERITY_COLORS[v.severity] ?? '#6b7280',
         },
-        geometry: wktToGeoJSON(v.overlapGeomWkt!),
-      } as GeoJSON.Feature));
+        geometry,
+      } as GeoJSON.Feature];
+    });
 
     if (violationFeatures.length > 0) {
       layers.push({
@@ -1139,43 +1148,6 @@ function buildPolygonFromBoundary(
   return buildPointGeometry(lat, lng);
 }
 
-/**
- * Minimal WKT to GeoJSON converter for common geometry types.
- * For production, use a proper WKT parser library.
- */
-function wktToGeoJSON(wkt: string): GeoJSON.Geometry {
-  if (!wkt) return { type: 'Point', coordinates: [0, 0] };
-
-  try {
-    if (wkt.startsWith('POINT')) {
-      const match = wkt.match(/POINT\s*\(([^)]+)\)/);
-      if (match) {
-        const [lng, lat] = match[1].split(' ').map(Number);
-        return { type: 'Point', coordinates: [lng, lat] };
-      }
-    }
-
-    if (wkt.startsWith('POLYGON')) {
-      const match = wkt.match(/POLYGON\s*\(\(([^)]+)\)\)/);
-      if (match) {
-        const coords = match[1].split(',').map((pair) => {
-          const [lng, lat] = pair.trim().split(' ').map(Number);
-          return [lng, lat];
-        });
-        return { type: 'Polygon', coordinates: [coords] };
-      }
-    }
-
-    if (wkt.startsWith('MULTIPOLYGON')) {
-      // Simplified MULTIPOLYGON parsing
-      return { type: 'Point', coordinates: [0, 0] };
-    }
-  } catch {
-    // Fall through
-  }
-
-  return { type: 'Point', coordinates: [0, 0] };
-}
 
 const STATUS_COLORS: Record<string, string> = {
   registered: '#22c55e',

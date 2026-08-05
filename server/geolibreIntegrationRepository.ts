@@ -1,9 +1,21 @@
 import { getParcelById, searchParcels, type ParcelRecord } from './parcelRepository';
 
 function geoLibreBaseUrl(): string {
-  const baseUrl = process.env.GEOLIBRE_BASE_URL?.trim();
-  if (!baseUrl) throw new Error('GEOLIBRE_BASE_URL must be configured for GeoLibre integration');
-  return baseUrl;
+  const configured = process.env.GEOLIBRE_BASE_URL?.trim();
+  if (!configured) throw new Error('GEOLIBRE_BASE_URL must be configured for GeoLibre integration');
+  let url: URL;
+  try {
+    url = new URL(configured);
+  } catch {
+    throw new Error('GEOLIBRE_BASE_URL must be an absolute http(s) URL');
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new Error('GEOLIBRE_BASE_URL must use the http or https protocol');
+  }
+  if (url.username || url.password) {
+    throw new Error('GEOLIBRE_BASE_URL must not include embedded credentials');
+  }
+  return url.toString();
 }
 
 function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
@@ -113,9 +125,11 @@ export async function getGeoLibreLaunchContext(parcelId: number) {
     ],
   };
 
+  const baseUrl = geoLibreBaseUrl();
   return {
     provider: 'GeoLibre',
-      baseUrl: geoLibreBaseUrl(),
+    baseUrl,
+    origin: new URL(baseUrl).origin,
     launchUrl: buildLaunchUrl(),
     embedMode: 'iframe-maponly',
     parcel: {

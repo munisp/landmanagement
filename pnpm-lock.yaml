@@ -50,6 +50,9 @@ importers:
       '@fluvio/client':
         specifier: ^0.14.9
         version: 0.14.9
+      '@geolibre/embed':
+        specifier: 2.4.0
+        version: 2.4.0
       '@grpc/grpc-js':
         specifier: ^1.14.4
         version: 1.14.4
@@ -188,6 +191,9 @@ importers:
       '@temporalio/workflow':
         specifier: ^1.15.0
         version: 1.15.0
+      '@terraformer/wkt':
+        specifier: 2.2.2
+        version: 2.2.2
       '@trpc/client':
         specifier: ^11.18.0
         version: 11.18.0(@trpc/server@11.18.0(typescript@5.9.3))(typescript@5.9.3)
@@ -2523,6 +2529,9 @@ packages:
 
   '@fluvio/client@0.14.9':
     resolution: {integrity: sha512-1ls958lJu9o+PA+Pc9nvPwoD2wPB9ju9k3Mq6X4oMK2BKYnLm/OWu3qS6s9ixA7ADh9MWE8FFe2ZvdoF0vE/8g==}
+
+  '@geolibre/embed@2.4.0':
+    resolution: {integrity: sha512-cWN76HbDfq5wo+otGjBgQbkU44HtMzv8UQlWZ+Z9Df+JK8sCWptN4AzRRSc0sYHWCPhqPkQ3Th/Xmsum6LDwWg==}
 
   '@graphql-typed-document-node/core@3.2.0':
     resolution: {integrity: sha512-mB9oAsNCm9aM3/SOv4YtBMqZbYj10R7dkq8byBqxGY/ncFwhf2oQzMV+LCRlWoDSEBJ3COiR1yeDvMtsoOsuFQ==}
@@ -5830,6 +5839,9 @@ packages:
   '@temporalio/workflow@1.21.1':
     resolution: {integrity: sha512-Tsoe9RnB0mL75DGVo3wJJrgTl+QnHYUysPjqRkzQdzgeKravN8RxE0HCfS3cYRZej3eEVwoDftgbo7/KR0NXWQ==}
     engines: {node: '>= 20.3.0'}
+
+  '@terraformer/wkt@2.2.2':
+    resolution: {integrity: sha512-BR7eAEip+LeveDPFRf+z/pi3zAm1TCp08V9XzxhRIUaFTnnk7k/PfHYjhCQliVYAuEwbHmBg3rYSjbm9cfl90Q==}
 
   '@tootallnate/once@2.0.1':
     resolution: {integrity: sha512-HqmEUIGRJ5fSXchkVgR5F7qn48bDBzv0kWj/Kfu5e6uci4UlEeng4331LnBkWffb++Ei3FOVLxo8JJWMFBDMeQ==}
@@ -15960,6 +15972,8 @@ snapshots:
 
   '@fluvio/client@0.14.9': {}
 
+  '@geolibre/embed@2.4.0': {}
+
   '@graphql-typed-document-node/core@3.2.0(graphql@15.8.0)':
     dependencies:
       graphql: 15.8.0
@@ -20261,6 +20275,8 @@ snapshots:
       '@temporalio/common': 1.21.1
       '@temporalio/proto': 1.21.1
       nexus-rpc: 0.0.2
+
+  '@terraformer/wkt@2.2.2': {}
 
   '@tootallnate/once@2.0.1': {}
 

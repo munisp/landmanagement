@@ -33,6 +33,7 @@ import {
   recordGpsTrack,
   getSurveyorTrackGeoJSON,
   getParcelMVTile,
+  parsePersistedWktGeometry,
   DUCKDB_SPATIAL_QUERIES,
   SEDONA_SQL_QUERIES,
 } from '../../geolibreEmbedBridge';
@@ -220,7 +221,14 @@ export const geospatialRouter = router({
         .limit(input.limit)
         .offset(offset);
 
-      return { violations: rows, page: input.page, limit: input.limit };
+      return {
+        violations: rows.map((violation) => ({
+          ...violation,
+          overlapGeometry: violation.overlapGeomWkt ? parsePersistedWktGeometry(violation.overlapGeomWkt) : null,
+        })),
+        page: input.page,
+        limit: input.limit,
+      };
     }),
 
   resolveTopologyViolation: protectedProcedure

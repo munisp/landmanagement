@@ -14,6 +14,7 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
+    "test:geospatial-geometry": "vitest --config vitest.geospatial-geometry.config.ts run",
     "test:regression": "vitest run server/api/routers/phase4.test.ts server/notifications.presence.test.ts",
     "test:load": "node tests/load/comprehensive-load-test.js",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
@@ -27,6 +28,7 @@
     "@deck.gl/layers": "^9.3.7",
     "@elastic/elasticsearch": "^9.3.1",
     "@fluvio/client": "^0.14.9",
+    "@geolibre/embed": "2.4.0",
     "@grpc/grpc-js": "^1.14.4",
     "@grpc/proto-loader": "^0.8.0",
     "@hookform/resolvers": "^5.2.2",
@@ -73,6 +75,7 @@
     "@temporalio/client": "^1.15.0",
     "@temporalio/worker": "^1.21.1",
     "@temporalio/workflow": "^1.15.0",
+    "@terraformer/wkt": "2.2.2",
     "@trpc/client": "^11.18.0",
     "@trpc/react-query": "^11.18.0",
     "@trpc/server": "^11.18.0",

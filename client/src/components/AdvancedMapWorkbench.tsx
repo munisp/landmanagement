@@ -103,7 +103,6 @@ const BASEMAP_STYLES: Record<string, string> = {
   liberty: 'https://tiles.openfreemap.org/styles/liberty',
   positron: 'https://tiles.openfreemap.org/styles/positron',
   dark: 'https://tiles.openfreemap.org/styles/dark',
-  satellite: 'https://api.maptiler.com/maps/satellite/style.json?key=get_your_own_key',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -358,27 +357,18 @@ export function AdvancedMapWorkbench({
           setSelectedParcelInfo(props);
 
           const coordinates = e.lngLat;
-          const html = `
-            <div class="p-2 text-sm">
-              <div class="font-bold text-base mb-1">${props.parcelNumber ?? 'N/A'}</div>
-              <div class="grid grid-cols-2 gap-x-2 gap-y-0.5">
-                <span class="text-gray-500">Status</span>
-                <span class="font-medium capitalize">${props.status ?? '—'}</span>
-                <span class="text-gray-500">Land Use</span>
-                <span class="font-medium capitalize">${props.landUse ?? '—'}</span>
-                <span class="text-gray-500">Area</span>
-                <span class="font-medium">${props.area_m2 ? Number(props.area_m2).toLocaleString() + ' m²' : '—'}</span>
-                <span class="text-gray-500">Value</span>
-                <span class="font-medium">${props.estimatedValue ? '₦' + Number(props.estimatedValue).toLocaleString() : '—'}</span>
-                <span class="text-gray-500">State</span>
-                <span class="font-medium">${props.state ?? '—'}</span>
-                <span class="text-gray-500">LGA</span>
-                <span class="font-medium">${props.lga ?? '—'}</span>
-              </div>
-            </div>
-          `;
+          const details = [
+            `Parcel: ${String(props.parcelNumber ?? 'N/A')}`,
+            `Status: ${String(props.status ?? '—')}`,
+            `Land use: ${String(props.landUse ?? '—')}`,
+            `Area: ${props.area_m2 ? `${Number(props.area_m2).toLocaleString()} m²` : '—'}`,
+            `Value: ${props.estimatedValue ? `₦${Number(props.estimatedValue).toLocaleString()}` : '—'}`,
+            `State: ${String(props.state ?? '—')}`,
+            `LGA: ${String(props.lga ?? '—')}`,
+          ].join('\n');
 
-          popupRef.current?.setLngLat(coordinates).setHTML(html).addTo(map);
+          // `setText` intentionally treats persisted properties as text, not HTML.
+          popupRef.current?.setLngLat(coordinates).setText(details).addTo(map);
         });
 
         map.on('mouseenter', 'parcels-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
@@ -487,7 +477,7 @@ export function AdvancedMapWorkbench({
 
     const applyViolations = () => {
       const features: GeoJSON.Feature[] = topologyData.violations
-        .filter((v: any) => v.overlapGeomWkt)
+        .filter((v: any) => v.overlapGeometry?.type === 'Polygon' || v.overlapGeometry?.type === 'MultiPolygon')
         .map((v: any) => ({
           type: 'Feature',
           properties: {
@@ -498,7 +488,7 @@ export function AdvancedMapWorkbench({
             parcelIdA: v.parcelIdA,
             parcelIdB: v.parcelIdB,
           },
-          geometry: { type: 'Point', coordinates: [3.3792, 6.5244] }, // placeholder
+          geometry: v.overlapGeometry,
         } as GeoJSON.Feature));
 
       const data: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features };
@@ -507,19 +497,17 @@ export function AdvancedMapWorkbench({
         map.addSource('topology-violations-source', { type: 'geojson', data });
         map.addLayer({
           id: 'topology-violations-fill',
-          type: 'circle',
+          type: 'fill',
           source: 'topology-violations-source',
           paint: {
-            'circle-radius': 8,
-            'circle-color': ['match', ['get', 'severity'],
+            'fill-color': ['match', ['get', 'severity'],
               'critical', '#7f1d1d',
               'high', '#ef4444',
               'medium', '#f97316',
               '#fde047',
             ],
-            'circle-stroke-width': 2,
-            'circle-stroke-color': '#ffffff',
-            'circle-opacity': 0.9,
+            'fill-outline-color': '#ffffff',
+            'fill-opacity': 0.55,
           },
         });
       } else {
@@ -1153,7 +1141,7 @@ export function AdvancedMapWorkbench({
                   size="sm"
                   variant="outline"
                   className="w-full h-8 text-xs"
-                  onClick={() => window.open('https://geolibre.opengeos.org', '_blank')}
+                  onClick={() => window.location.assign(`/geolibre-workspace${parcelId ? `?parcelId=${parcelId}` : ''}`)}
                 >
                   <ChevronRight className="w-3.5 h-3.5 mr-1" />
                   Open GeoLibre Studio

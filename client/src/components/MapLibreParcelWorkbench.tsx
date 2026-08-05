@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import maplibregl, { LngLatBoundsLike, StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -12,14 +12,13 @@ const MAP_STYLE: StyleSpecification = {
       attribution: '© OpenStreetMap contributors',
     },
   },
-  layers: [
-    {
-      id: 'osm-base',
-      type: 'raster',
-      source: 'osm',
-    },
-  ],
+  layers: [{ id: 'osm-base', type: 'raster', source: 'osm' }],
 };
+
+const NEUTRAL_MAP_CENTER: [number, number] = [0, 20];
+const NEUTRAL_MAP_ZOOM = 1.5;
+
+type ParcelGeometry = GeoJSON.Polygon | GeoJSON.MultiPolygon;
 
 interface ParcelShape {
   id: number;
@@ -27,9 +26,9 @@ interface ParcelShape {
   estimatedValue?: number;
   status?: string;
   areaSquareMeters?: number;
-  coordinates?: { lat: number; lng: number };
-  geometryGeoJSON?: string;
-  boundaryCoordinates?: string;
+  coordinates?: { lat: number; lng: number } | null;
+  geometryGeoJSON?: string | null;
+  boundaryCoordinates?: string | null;
 }
 
 interface MapLibreParcelWorkbenchProps {
@@ -38,198 +37,207 @@ interface MapLibreParcelWorkbenchProps {
   className?: string;
 }
 
-function buildParcelPolygon(parcel?: ParcelShape | null): GeoJSON.Feature<GeoJSON.Polygon> | null {
-  if (!parcel) return null;
+function isValidLngLat(lng: unknown, lat: unknown): lng is number {
+  return typeof lng === 'number' && typeof lat === 'number' && Number.isFinite(lng) && Number.isFinite(lat)
+    && lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
+}
 
-  if (parcel.geometryGeoJSON) {
-    try {
-      const parsed = JSON.parse(parcel.geometryGeoJSON) as GeoJSON.Geometry;
-      if (parsed.type === 'Polygon') {
-        return { type: 'Feature', properties: { parcelNumber: parcel.parcelNumber }, geometry: parsed };
-      }
-      if (parsed.type === 'MultiPolygon' && parsed.coordinates?.[0]) {
-        return {
-          type: 'Feature',
-          properties: { parcelNumber: parcel.parcelNumber },
-          geometry: { type: 'Polygon', coordinates: parsed.coordinates[0] },
-        };
-      }
-    } catch {
-      // Ignore invalid GeoJSON and continue to fallbacks.
-    }
+function polygonFromBoundaryCoordinates(boundaryCoordinates: string): GeoJSON.Polygon | null {
+  const ring = boundaryCoordinates
+    .split(';')
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const [latText, lngText] = pair.split(',');
+      const lat = Number(latText);
+      const lng = Number(lngText);
+      return isValidLngLat(lng, lat) ? [lng, lat] as [number, number] : null;
+    })
+    .filter((coordinate): coordinate is [number, number] => coordinate !== null);
+
+  if (ring.length < 3) return null;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  const closed = first[0] === last[0] && first[1] === last[1] ? ring : [...ring, first];
+  return { type: 'Polygon', coordinates: [closed] };
+}
+
+function geometryFromUnknown(value: unknown): ParcelGeometry | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as { type?: string; geometry?: unknown; coordinates?: unknown };
+  const geometry = candidate.type === 'Feature' ? candidate.geometry : candidate;
+  if (!geometry || typeof geometry !== 'object') return null;
+  const typed = geometry as { type?: string; coordinates?: unknown };
+  if ((typed.type === 'Polygon' || typed.type === 'MultiPolygon') && Array.isArray(typed.coordinates)) {
+    return typed as ParcelGeometry;
   }
-
-  if (parcel.boundaryCoordinates) {
-    const polygon = String(parcel.boundaryCoordinates)
-      .split(';')
-      .map((pair) => pair.trim())
-      .filter(Boolean)
-      .map((pair) => {
-        const [lat, lng] = pair.split(',').map(Number);
-        return Number.isFinite(lat) && Number.isFinite(lng) ? [lng, lat] : null;
-      })
-      .filter((point): point is [number, number] => Array.isArray(point));
-
-    if (polygon.length >= 3) {
-      const first = polygon[0];
-      const closed = polygon[polygon.length - 1][0] === first[0] && polygon[polygon.length - 1][1] === first[1]
-        ? polygon
-        : [...polygon, first];
-      return {
-        type: 'Feature',
-        properties: { parcelNumber: parcel.parcelNumber },
-        geometry: { type: 'Polygon', coordinates: [closed] },
-      };
-    }
-  }
-
-  if (parcel.coordinates?.lat != null && parcel.coordinates?.lng != null) {
-    const lat = parcel.coordinates.lat;
-    const lng = parcel.coordinates.lng;
-    const area = Math.max(Number(parcel.areaSquareMeters || 400), 100);
-    const offset = Math.sqrt(area) / 111000 / 2;
-    const polygon: [number, number][] = [
-      [lng - offset, lat - offset],
-      [lng + offset, lat - offset],
-      [lng + offset, lat + offset],
-      [lng - offset, lat + offset],
-      [lng - offset, lat - offset],
-    ];
-    return {
-      type: 'Feature',
-      properties: { parcelNumber: parcel.parcelNumber },
-      geometry: { type: 'Polygon', coordinates: [polygon] },
-    };
-  }
-
   return null;
 }
 
+/**
+ * Returns only a persisted parcel polygon or multipolygon. A centroid is shown
+ * separately as a point; it is never expanded into an invented boundary.
+ */
+export function buildPersistedParcelGeometry(parcel?: ParcelShape | null): ParcelGeometry | null {
+  if (!parcel) return null;
+  if (parcel.geometryGeoJSON) {
+    try {
+      const geometry = geometryFromUnknown(JSON.parse(parcel.geometryGeoJSON));
+      if (geometry) return geometry;
+    } catch {
+      // The server remains the authoritative repair/validation path for malformed geometry.
+    }
+  }
+  return parcel.boundaryCoordinates ? polygonFromBoundaryCoordinates(parcel.boundaryCoordinates) : null;
+}
+
+function featureCollection(features: GeoJSON.Feature[]): GeoJSON.FeatureCollection {
+  return { type: 'FeatureCollection', features };
+}
+
+function pointFeature(parcel: ParcelShape): GeoJSON.Feature<GeoJSON.Point> | null {
+  const coordinates = parcel.coordinates;
+  if (!coordinates || !isValidLngLat(coordinates.lng, coordinates.lat)) return null;
+  return {
+    type: 'Feature',
+    properties: {
+      id: parcel.id,
+      parcelNumber: parcel.parcelNumber,
+      status: parcel.status ?? 'unknown',
+      estimatedValue: parcel.estimatedValue ?? null,
+    },
+    geometry: { type: 'Point', coordinates: [coordinates.lng, coordinates.lat] },
+  };
+}
+
+function polygonFeature(parcel: ParcelShape): GeoJSON.Feature<ParcelGeometry> | null {
+  const geometry = buildPersistedParcelGeometry(parcel);
+  return geometry
+    ? { type: 'Feature', properties: { id: parcel.id, parcelNumber: parcel.parcelNumber, status: parcel.status ?? 'unknown' }, geometry }
+    : null;
+}
+
+function collectPositions(geometry: GeoJSON.Geometry, positions: [number, number][]) {
+  if (geometry.type === 'Point') {
+    const [lng, lat] = geometry.coordinates;
+    if (isValidLngLat(lng, lat)) positions.push([lng, lat]);
+    return;
+  }
+  if (geometry.type === 'LineString' || geometry.type === 'MultiPoint') {
+    geometry.coordinates.forEach(([lng, lat]) => { if (isValidLngLat(lng, lat)) positions.push([lng, lat]); });
+    return;
+  }
+  if (geometry.type === 'Polygon' || geometry.type === 'MultiLineString') {
+    geometry.coordinates.flat().forEach(([lng, lat]) => { if (isValidLngLat(lng, lat)) positions.push([lng, lat]); });
+    return;
+  }
+  if (geometry.type === 'MultiPolygon') {
+    geometry.coordinates.flat(2).forEach(([lng, lat]) => { if (isValidLngLat(lng, lat)) positions.push([lng, lat]); });
+  }
+}
+
 function buildBounds(parcel?: ParcelShape | null, nearbyParcels: ParcelShape[] = []): LngLatBoundsLike | null {
-  const points: [number, number][] = [];
-  const polygon = buildParcelPolygon(parcel);
-  if (polygon) {
-    polygon.geometry.coordinates[0].forEach((coord) => points.push(coord as [number, number]));
+  const positions: [number, number][] = [];
+  const anchorPolygon = parcel ? polygonFeature(parcel) : null;
+  if (anchorPolygon) collectPositions(anchorPolygon.geometry, positions);
+  if (parcel) {
+    const anchorPoint = pointFeature(parcel);
+    if (anchorPoint) collectPositions(anchorPoint.geometry, positions);
   }
   nearbyParcels.forEach((candidate) => {
-    if (candidate.coordinates) {
-      points.push([candidate.coordinates.lng, candidate.coordinates.lat]);
-    }
+    const point = pointFeature(candidate);
+    if (point) collectPositions(point.geometry, positions);
   });
-
-  if (points.length === 0) return null;
-
-  const lngs = points.map((point) => point[0]);
-  const lats = points.map((point) => point[1]);
+  if (!positions.length) return null;
   return [
-    [Math.min(...lngs), Math.min(...lats)],
-    [Math.max(...lngs), Math.max(...lats)],
+    [Math.min(...positions.map(([lng]) => lng)), Math.min(...positions.map(([, lat]) => lat))],
+    [Math.max(...positions.map(([lng]) => lng)), Math.max(...positions.map(([, lat]) => lat))],
   ];
 }
 
 export function MapLibreParcelWorkbench({ parcel, nearbyParcels = [], className }: MapLibreParcelWorkbenchProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
-
-    mapRef.current = new maplibregl.Map({
+    const initialPoint = parcel ? pointFeature(parcel) : null;
+    const initialCenter: [number, number] = initialPoint
+      ? [initialPoint.geometry.coordinates[0]!, initialPoint.geometry.coordinates[1]!]
+      : NEUTRAL_MAP_CENTER;
+    const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: MAP_STYLE,
-      center: parcel?.coordinates ? [parcel.coordinates.lng, parcel.coordinates.lat] : [3.3792, 6.5244],
-      zoom: parcel?.coordinates ? 13 : 6,
+      center: initialCenter,
+      zoom: initialPoint ? 13 : NEUTRAL_MAP_ZOOM,
     });
-
-    mapRef.current.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true }), 'top-right');
+    const onError = (event: maplibregl.ErrorEvent) => setMapError(event.error?.message ?? 'The map could not load one of its approved sources.');
+    map.on('error', onError);
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true }), 'top-right');
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'metric' }), 'bottom-left');
+    mapRef.current = map;
 
     return () => {
-      mapRef.current?.remove();
+      map.off('error', onError);
+      map.remove();
       mapRef.current = null;
     };
-  }, [parcel]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) {
-      const timer = window.setTimeout(() => {
-        if (mapRef.current?.isStyleLoaded()) {
-          mapRef.current.resize();
-        }
-      }, 250);
-      return () => window.clearTimeout(timer);
-    }
+    if (!map) return;
 
     const applyData = () => {
-      const anchorPolygon = buildParcelPolygon(parcel);
-      const anchorPoint = parcel?.coordinates
-        ? {
-            type: 'FeatureCollection',
-            features: [{
-              type: 'Feature',
-              properties: { parcelNumber: parcel.parcelNumber, status: parcel.status || 'unknown' },
-              geometry: { type: 'Point', coordinates: [parcel.coordinates.lng, parcel.coordinates.lat] },
-            }],
-          }
-        : { type: 'FeatureCollection', features: [] };
-
-      const nearbyPoints = {
-        type: 'FeatureCollection',
-        features: nearbyParcels
-          .filter((candidate) => candidate.coordinates)
-          .map((candidate) => ({
-            type: 'Feature' as const,
-            properties: {
-              parcelNumber: candidate.parcelNumber,
-              status: candidate.status || 'unknown',
-              estimatedValue: candidate.estimatedValue || 0,
-            },
-            geometry: {
-              type: 'Point' as const,
-              coordinates: [candidate.coordinates!.lng, candidate.coordinates!.lat],
-            },
-          })),
-      };
-
-      const polygonCollection = {
-        type: 'FeatureCollection',
-        features: anchorPolygon ? [anchorPolygon] : [],
-      };
+      const anchorPolygon = parcel ? polygonFeature(parcel) : null;
+      const anchorPoint = parcel ? pointFeature(parcel) : null;
+      const nearbyPoints = featureCollection(nearbyParcels.flatMap((candidate) => {
+        const point = pointFeature(candidate);
+        return point ? [point] : [];
+      }));
+      const polygonCollection = featureCollection(anchorPolygon ? [anchorPolygon] : []);
+      const anchorPointCollection = featureCollection(anchorPoint ? [anchorPoint] : []);
 
       if (!map.getSource('anchor-polygon')) {
-        map.addSource('anchor-polygon', { type: 'geojson', data: polygonCollection as any });
+        map.addSource('anchor-polygon', { type: 'geojson', data: polygonCollection });
         map.addLayer({ id: 'anchor-polygon-fill', type: 'fill', source: 'anchor-polygon', paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.18 } });
         map.addLayer({ id: 'anchor-polygon-line', type: 'line', source: 'anchor-polygon', paint: { 'line-color': '#1d4ed8', 'line-width': 3 } });
       } else {
-        (map.getSource('anchor-polygon') as maplibregl.GeoJSONSource).setData(polygonCollection as any);
+        (map.getSource('anchor-polygon') as maplibregl.GeoJSONSource).setData(polygonCollection);
       }
 
       if (!map.getSource('anchor-point')) {
-        map.addSource('anchor-point', { type: 'geojson', data: anchorPoint as any });
+        map.addSource('anchor-point', { type: 'geojson', data: anchorPointCollection });
         map.addLayer({ id: 'anchor-point-layer', type: 'circle', source: 'anchor-point', paint: { 'circle-radius': 7, 'circle-color': '#111827', 'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff' } });
       } else {
-        (map.getSource('anchor-point') as maplibregl.GeoJSONSource).setData(anchorPoint as any);
+        (map.getSource('anchor-point') as maplibregl.GeoJSONSource).setData(anchorPointCollection);
       }
 
       if (!map.getSource('nearby-points')) {
-        map.addSource('nearby-points', { type: 'geojson', data: nearbyPoints as any });
+        map.addSource('nearby-points', { type: 'geojson', data: nearbyPoints });
         map.addLayer({ id: 'nearby-points-layer', type: 'circle', source: 'nearby-points', paint: { 'circle-radius': 5, 'circle-color': '#10b981', 'circle-opacity': 0.85, 'circle-stroke-width': 1, 'circle-stroke-color': '#ffffff' } });
       } else {
-        (map.getSource('nearby-points') as maplibregl.GeoJSONSource).setData(nearbyPoints as any);
+        (map.getSource('nearby-points') as maplibregl.GeoJSONSource).setData(nearbyPoints);
       }
 
       const bounds = buildBounds(parcel, nearbyParcels);
-      if (bounds) {
-        map.fitBounds(bounds, { padding: 40, maxZoom: 15, duration: 0 });
-      }
+      if (bounds) map.fitBounds(bounds, { padding: 40, maxZoom: 15, duration: 0 });
     };
 
-    if (map.loaded()) {
-      applyData();
-    } else {
-      map.once('load', applyData);
-    }
+    if (map.isStyleLoaded()) applyData();
+    else map.once('style.load', applyData);
+    return () => {
+      map.off('style.load', applyData);
+    };
   }, [parcel, nearbyParcels]);
 
-  return <div ref={mapContainerRef} className={className ?? 'h-[420px] w-full rounded-xl'} />;
+  const hasPersistedBoundary = Boolean(buildPersistedParcelGeometry(parcel));
+  return (
+    <div className="relative">
+      <div ref={mapContainerRef} className={className ?? 'h-[420px] w-full rounded-xl'} />
+      {mapError ? <p className="absolute bottom-3 left-3 right-3 rounded-md bg-destructive/95 p-2 text-xs text-destructive-foreground">{mapError}</p> : null}
+      {parcel && !hasPersistedBoundary ? <p className="absolute left-3 top-3 max-w-sm rounded-md bg-background/95 p-2 text-xs text-muted-foreground shadow">This parcel has no validated persisted boundary. The map shows only recorded centroid evidence; it does not infer a cadastral boundary.</p> : null}
+    </div>
+  );
 }

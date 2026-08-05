@@ -33,6 +33,20 @@ function configuredAllowedOrigins(): string[] {
   return [...new Set(origins)];
 }
 
+function configuredGeoLibreFrameOrigin(): string | null {
+  const configured = process.env.GEOLIBRE_BASE_URL?.trim();
+  if (!configured) return null;
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      throw new Error(`Unsupported GeoLibre protocol: ${url.protocol}`);
+    }
+    return url.origin;
+  } catch (error) {
+    throw new Error(`GEOLIBRE_BASE_URL must be an absolute http(s) URL: ${error instanceof Error ? error.message : 'invalid value'}`);
+  }
+}
+
 /**
  * Rate limiting configuration
  */
@@ -114,6 +128,7 @@ export function corsMiddleware() {
  * Helmet security headers configuration
  */
 export function helmetMiddleware() {
+  const geoLibreFrameOrigin = configuredGeoLibreFrameOrigin();
   return helmet({
     // Content Security Policy
     contentSecurityPolicy: {
@@ -134,7 +149,12 @@ export function helmetMiddleware() {
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
         imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
         connectSrc: ["'self'", 'https:', 'wss:'],
-        frameSrc: ["'self'"],
+        // MapLibre workers are created from the local bundle or a Blob URL;
+        // no remote worker execution is permitted.
+        workerSrc: ["'self'", 'blob:'],
+        // GeoLibre is allowed only from the operator-configured origin, never
+        // from a URL selected by the browser client.
+        frameSrc: ["'self'", ...(geoLibreFrameOrigin ? [geoLibreFrameOrigin] : [])],
         objectSrc: ["'none'"],
         upgradeInsecureRequests: NODE_ENV === 'production' ? [] : null,
       },
