@@ -13,6 +13,7 @@
     "worker:context-globe-scheduler": "tsx temporal/contextGlobeScheduler.ts",
     "worker:commercial-billing": "tsx temporal/commercialBillingWorker.ts",
     "worker:commercial-billing-scheduler": "tsx temporal/commercialBillingScheduler.ts",
+    "worker:onboarding-activation": "tsx temporal/onboardingActivationWorker.ts",
     "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { publicProcedure, protectedProcedure, router } from '../../_core/trpc';
+import { adminProcedure, protectedProcedure, router } from '../../_core/trpc';
 import {
   processDocumentVerification,
   getVerificationDetails,
@@ -54,7 +54,7 @@ export const documentVerificationRouter = router({
   /**
    * Update verification status (manual review)
    */
-  updateStatus: protectedProcedure
+  updateStatus: adminProcedure
     .input(
       z.object({
         verificationId: z.string(),
@@ -84,7 +84,7 @@ export const documentVerificationRouter = router({
   /**
    * Get verifications requiring review
    */
-  getVerificationsRequiringReview: protectedProcedure.query(async () => {
+  getVerificationsRequiringReview: adminProcedure.query(async () => {
     const result = await getVerificationsRequiringReview();
     return result;
   }),

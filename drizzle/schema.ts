@@ -5060,3 +5060,60 @@ export const ruralServiceCases=pgTable("rural_service_cases",{id:bigint("id",{mo
 export const serviceProviders=pgTable("service_providers",{id:bigint("id",{mode:"number"}).primaryKey().generatedAlwaysAsIdentity(),providerKey:varchar("provider_key",{length:96}).notNull().unique(),accountId:bigint("account_id",{mode:"number"}).notNull().references(()=>commercialAccounts.id,{onDelete:"cascade"}),legalName:varchar("legal_name",{length:255}).notNull(),serviceCategories:jsonb("service_categories").notNull(),serviceRadiusKm:integer("service_radius_km").notNull(),verificationStatus:providerVerificationStatusEnum("verification_status").notNull().default("pending"),verificationReference:varchar("verification_reference",{length:160}),reviewedBy:integer("reviewed_by").references(()=>users.id),reviewedAt:timestamp("reviewed_at",{withTimezone:true}),createdBy:integer("created_by").notNull().references(()=>users.id),createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),updatedAt:timestamp("updated_at",{withTimezone:true}).notNull().defaultNow()});
 export const serviceRequests=pgTable("service_requests",{id:bigint("id",{mode:"number"}).primaryKey().generatedAlwaysAsIdentity(),requestKey:varchar("request_key",{length:96}).notNull().unique(),accountId:bigint("account_id",{mode:"number"}).notNull().references(()=>commercialAccounts.id,{onDelete:"cascade"}),providerId:bigint("provider_id",{mode:"number"}).references(()=>serviceProviders.id),parcelId:integer("parcel_id").references(()=>parcels.id),serviceCategory:varchar("service_category",{length:96}).notNull(),consentReference:varchar("consent_reference",{length:160}).notNull(),status:serviceRequestStatusEnum("status").notNull().default("submitted"),requesterReference:varchar("requester_reference",{length:160}).notNull(),createdBy:integer("created_by").notNull().references(()=>users.id),createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),updatedAt:timestamp("updated_at",{withTimezone:true}).notNull().defaultNow()},(t)=>({accountIdx:index("service_request_account_idx").on(t.accountId,t.status)}));
 export const serviceDisputes=pgTable("service_disputes",{id:bigint("id",{mode:"number"}).primaryKey().generatedAlwaysAsIdentity(),disputeKey:varchar("dispute_key",{length:96}).notNull().unique(),requestId:bigint("request_id",{mode:"number"}).notNull().references(()=>serviceRequests.id,{onDelete:"cascade"}),grounds:text("grounds").notNull(),status:portfolioReviewStatusEnum("status").notNull().default("open"),resolutionNote:text("resolution_note"),filedBy:integer("filed_by").notNull().references(()=>users.id),reviewedBy:integer("reviewed_by").references(()=>users.id),createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),updatedAt:timestamp("updated_at",{withTimezone:true}).notNull().defaultNow()});
+
+// ── Provider-verified onboarding identity and document evidence ─────────────
+
+export const onboardingVerificationKindEnum = pgEnum("onboarding_verification_kind", ["identity", "document"]);
+export const onboardingVerificationOutcomeEnum = pgEnum("onboarding_verification_outcome", ["verified", "rejected", "requires_review"]);
+
+export const verificationProviderEvents = pgTable("verification_provider_events", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  providerEventId: varchar("provider_event_id", { length: 255 }).notNull().unique(),
+  provider: varchar("provider", { length: 120 }).notNull(),
+  eventType: varchar("event_type", { length: 120 }).notNull(),
+  payloadSha256: varchar("payload_sha256", { length: 64 }).notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  processingError: text("processing_error"),
+});
+
+export const onboardingVerificationEvidence = pgTable("onboarding_verification_evidence", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  onboardingId: integer("onboarding_id").notNull().references(() => stakeholderOnboarding.id, { onDelete: "cascade" }),
+  kind: onboardingVerificationKindEnum("kind").notNull(),
+  provider: varchar("provider", { length: 120 }).notNull(),
+  externalReference: varchar("external_reference", { length: 255 }).notNull(),
+  providerEventId: varchar("provider_event_id", { length: 255 }).references(() => verificationProviderEvents.providerEventId),
+  outcome: onboardingVerificationOutcomeEnum("outcome").notNull(),
+  evidenceSha256: varchar("evidence_sha256", { length: 64 }).notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  reviewedBy: integer("reviewed_by").references(() => users.id),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  onboardingKindIdx: index("onboarding_verification_evidence_onboarding_kind_idx").on(table.onboardingId, table.kind, table.createdAt),
+  outcomeIdx: index("onboarding_verification_evidence_outcome_idx").on(table.outcome, table.createdAt),
+  providerReferenceUnique: uniqueIndex("onboarding_verification_evidence_reference_unique").on(table.provider, table.externalReference),
+}));
+
+export type OnboardingVerificationEvidence = typeof onboardingVerificationEvidence.$inferSelect;
+
+// ── Idempotent Dapr delivery inbox ──────────────────────────────────────────
+
+export const daprInboxDeliveryStatusEnum = pgEnum("dapr_inbox_delivery_status", ["received", "processed", "failed"]);
+export const daprInboxDeliveries = pgTable("dapr_inbox_deliveries", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  cloudEventId: varchar("cloud_event_id", { length: 255 }).notNull().unique(),
+  topic: varchar("topic", { length: 255 }).notNull(),
+  eventType: varchar("event_type", { length: 255 }).notNull(),
+  payloadSha256: varchar("payload_sha256", { length: 64 }).notNull(),
+  status: daprInboxDeliveryStatusEnum("status").default("received").notNull(),
+  workflowId: varchar("workflow_id", { length: 255 }),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  errorMessage: text("error_message"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  statusReceivedIdx: index("dapr_inbox_deliveries_status_received_idx").on(table.status, table.receivedAt),
+}));

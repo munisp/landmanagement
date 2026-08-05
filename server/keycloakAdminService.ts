@@ -133,6 +133,17 @@ async function realmRole(roleName: string): Promise<KeycloakRole> {
   return result.payload;
 }
 
+/** Validate that the target-realm service account can support the onboarding provisioning contract. */
+export async function verifyKeycloakAdminReadiness(requiredRoles: readonly string[]): Promise<{ roleCount: number }> {
+  const config = getConfig();
+  if (config.adminRealm !== config.realm) {
+    throw new Error("KEYCLOAK_ADMIN_REALM must equal KEYCLOAK_REALM for target-realm provisioning");
+  }
+  await getAdminToken();
+  await Promise.all(requiredRoles.map((role) => realmRole(role)));
+  return { roleCount: requiredRoles.length };
+}
+
 export async function provisionKeycloakUser(params: {
   user: Pick<User, "id" | "openId" | "email" | "name">;
   realmRoles: string[];

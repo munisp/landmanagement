@@ -15,6 +15,7 @@ import {
   getProgressQuery,
 } from '../temporal/workflows/propertyTransactionWorkflow';
 import { geoAiAnalysisWorkflow, type GeoAiAnalysisWorkflowInput } from '../temporal/workflows/geoaiAnalysisWorkflow';
+import { onboardingActivationWorkflow } from '../temporal/workflows/onboardingActivationWorkflow';
 
 let client: Client | null = null;
 
@@ -30,6 +31,10 @@ function temporalTaskQueue(): string {
 
 function geoAiTemporalTaskQueue(): string {
   return requiredTemporalConfig('TEMPORAL_GEOAI_TASK_QUEUE');
+}
+
+function onboardingActivationTaskQueue(): string {
+  return requiredTemporalConfig('TEMPORAL_ONBOARDING_ACTIVATION_TASK_QUEUE');
 }
 
 /** Initialize Temporal client connection. */
@@ -106,6 +111,27 @@ export async function startGeoAiAnalysisWorkflow(input: GeoAiAnalysisWorkflowInp
     workflowTaskTimeout: '1 minute',
   });
   return { workflowId: handle.workflowId, runId: handle.firstExecutionRunId };
+}
+
+/** Start one idempotent activation reconciliation per Dapr CloudEvent. */
+export async function startOnboardingActivationWorkflow(input: { onboardingId: number; eventId: string }): Promise<{ workflowId: string; runId: string }> {
+  if (!client) await initializeTemporalClient();
+  const temporalClient = getTemporalClient();
+  const workflowId = `onboarding-activation-${input.eventId}`;
+  try {
+    const handle = await temporalClient.workflow.start(onboardingActivationWorkflow, {
+      taskQueue: onboardingActivationTaskQueue(),
+      workflowId,
+      args: [input],
+      workflowExecutionTimeout: '5 minutes',
+      workflowRunTimeout: '2 minutes',
+      workflowTaskTimeout: '30 seconds',
+    });
+    return { workflowId: handle.workflowId, runId: handle.firstExecutionRunId };
+  } catch (error) {
+    if (error instanceof Error && /already started|already exists/i.test(error.message)) return { workflowId, runId: 'existing' };
+    throw error;
+  }
 }
 
 /**

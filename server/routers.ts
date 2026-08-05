@@ -50,6 +50,7 @@ import { caseConciergeRouter } from './api/routers/case-concierge';
 import { operationalEventsRouter } from './api/routers/operational-events';
 import { commandCenterRouter } from './api/routers/command-center';
 import { platformOperationsRouter } from './api/routers/platform-operations';
+import { integrationReadinessRouter } from './api/routers/integration-readiness';
 import { commercialLenderRouter } from './api/routers/commercial-lender';
 import { registryOperationsRouter } from './api/routers/registry-operations';
 import { rightOfWayRouter } from './api/routers/right-of-way';
@@ -65,6 +66,7 @@ import { concessionsRouter } from "./api/routers/concessions";
 import { environmentalRouter } from "./api/routers/environmental";
 import { cofoWorkflowRouter } from "./api/routers/cofo-workflow";
 import { onboardingRouter } from "./api/routers/onboarding";
+import { onboardingVerificationRouter } from "./api/routers/onboarding-verification";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { notificationService } from "./notifications";
@@ -166,6 +168,7 @@ export const appRouter = router({
   environmental: environmentalRouter,
   cofoWorkflow: cofoWorkflowRouter,
   onboarding: onboardingRouter,
+  onboardingVerification: onboardingVerificationRouter,
   system: systemRouter,
   creditBureau: creditBureauRouter,
   mortgageInsurance: mortgageInsuranceRouter,
@@ -205,6 +208,7 @@ export const appRouter = router({
   operationalEvents: operationalEventsRouter,
   commandCenter: commandCenterRouter,
   platformOperations: platformOperationsRouter,
+  integrationReadiness: integrationReadinessRouter,
   commercialLender: commercialLenderRouter,
   registryOperations: registryOperationsRouter,
   rightOfWay: rightOfWayRouter,

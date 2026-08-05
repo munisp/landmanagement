@@ -140,6 +140,7 @@ export async function applyPermifyPolicies(onboardingId: number): Promise<void> 
  */
 export async function activateStakeholder(onboardingId: number): Promise<void> {
   const { db, onboarding } = await getOnboardingWithUser(onboardingId);
+  if (onboarding.onboardingStatus === "active") return;
   if (!onboarding.keycloakUserId || !onboarding.permifyPoliciesApplied) {
     throw new Error("Keycloak provisioning and Permify policy synchronization are required before activation");
   }
@@ -176,4 +177,15 @@ export async function activateStakeholder(onboardingId: number): Promise<void> {
       availableAt: new Date(),
     });
   });
+}
+
+/** Reconcile activation from a durable event without failing while other gated prerequisites remain outstanding. */
+export async function reconcileStakeholderActivation(onboardingId: number): Promise<{ activated: boolean; reason?: string }> {
+  const { onboarding } = await getOnboardingWithUser(onboardingId);
+  if (onboarding.onboardingStatus === "active") return { activated: true };
+  if (!onboarding.keycloakUserId || !onboarding.permifyPoliciesApplied) return { activated: false, reason: "identity_and_policy_provisioning_pending" };
+  if (!onboarding.ninVerified || !onboarding.documentsVerified) return { activated: false, reason: "verification_prerequisites_pending" };
+  if (onboarding.inviteExpiresAt && onboarding.inviteExpiresAt < new Date()) return { activated: false, reason: "invite_expired" };
+  await activateStakeholder(onboardingId);
+  return { activated: true };
 }

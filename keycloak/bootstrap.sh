@@ -5,14 +5,32 @@ KCADM="/opt/keycloak/bin/kcadm.sh"
 : "${KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME:?KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME is required}"
 : "${KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD:?KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD is required}"
 : "${KEYCLOAK_REALM:?KEYCLOAK_REALM is required}"
+: "${KEYCLOAK_ADMIN_REALM:?KEYCLOAK_ADMIN_REALM is required}"
 : "${KEYCLOAK_CLIENT_ID:?KEYCLOAK_CLIENT_ID is required}"
 : "${KEYCLOAK_CLIENT_SECRET:?KEYCLOAK_CLIENT_SECRET is required}"
 : "${KEYCLOAK_ADMIN_CLIENT_ID:?KEYCLOAK_ADMIN_CLIENT_ID is required}"
 : "${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET is required}"
 : "${KEYCLOAK_REDIRECT_URIS:?KEYCLOAK_REDIRECT_URIS must be a JSON array of approved redirect URIs}"
+: "${KEYCLOAK_WEB_ORIGINS:?KEYCLOAK_WEB_ORIGINS must be a JSON array of approved web origins}"
 
 base_url="${KEYCLOAK_BOOTSTRAP_URL:-http://keycloak:8080}"
 realm="${KEYCLOAK_REALM}"
+
+if [ "$KEYCLOAK_ADMIN_REALM" != "$realm" ]; then
+  echo "KEYCLOAK_ADMIN_REALM must equal KEYCLOAK_REALM; cross-realm admin clients are not permitted" >&2
+  exit 1
+fi
+case "$KEYCLOAK_REDIRECT_URIS" in
+  \[*\]) ;;
+  *) echo "KEYCLOAK_REDIRECT_URIS must be a JSON array" >&2; exit 1 ;;
+esac
+case "$KEYCLOAK_WEB_ORIGINS" in
+  \[*\]) ;;
+  *) echo "KEYCLOAK_WEB_ORIGINS must be a JSON array" >&2; exit 1 ;;
+esac
+case "$KEYCLOAK_WEB_ORIGINS" in
+  *'"*"'*|*'"+"'*) echo "KEYCLOAK_WEB_ORIGINS must not contain wildcard origins" >&2; exit 1 ;;
+esac
 
 attempt=0
 until "$KCADM" config credentials --server "$base_url" --realm master \
@@ -94,7 +112,8 @@ if ! client_exists "$KEYCLOAK_CLIENT_ID"; then
     -s standardFlowEnabled=true \
     -s directAccessGrantsEnabled=false \
     -s serviceAccountsEnabled=false \
-    -s "redirectUris=$KEYCLOAK_REDIRECT_URIS" >/dev/null
+    -s "redirectUris=$KEYCLOAK_REDIRECT_URIS" \
+    -s "webOrigins=$KEYCLOAK_WEB_ORIGINS" >/dev/null
 fi
 
 if ! client_exists "$KEYCLOAK_ADMIN_CLIENT_ID"; then
@@ -118,5 +137,11 @@ service_account="service-account-${KEYCLOAK_ADMIN_CLIENT_ID}"
   --rolename view-users \
   --rolename query-users \
   --rolename view-realm >/dev/null
+
+for role in $roles; do
+  "$KCADM" get "roles/$role" -r "$realm" >/dev/null
+done
+"$KCADM" get clients -r "$realm" -q "clientId=$KEYCLOAK_CLIENT_ID" >/dev/null
+"$KCADM" get clients -r "$realm" -q "clientId=$KEYCLOAK_ADMIN_CLIENT_ID" >/dev/null
 
 echo "Keycloak realm $realm is ready for IDLR platform provisioning"

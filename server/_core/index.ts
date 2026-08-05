@@ -23,6 +23,8 @@ import { geoInteroperabilityHttpRouter } from "../geoInteroperabilityHttp";
 import { geospatialDeliveryHttpRouter } from "../geospatialDeliveryHttp";
 import { contextGlobeHttpRouter } from "../contextGlobeHttp";
 import { propertyDataApiRouter } from "../propertyDataApiHttp";
+import { verificationWebhookHttpRouter } from "../verificationWebhookHttp";
+import { daprSubscriptionHttpRouter, daprSubscriptions } from "../daprSubscriptionHttp";
 import { startEmailQueueProcessor } from "../emailQueueService";
 import { healthCheck, livenessProbe, readinessProbe, startupProbe } from "./healthCheck";
 import { advancedSecurityHeaders, idsMiddleware, wafMiddleware } from "./advancedSecurity";
@@ -82,7 +84,14 @@ export function configureApp(app: express.Express): void {
   // documents uploaded as base64; tighten via MAX_REQUEST_SIZE at the edge.
   const maxBodySize = process.env.MAX_REQUEST_SIZE || "50mb";
   app.use(requestSizeLimiter(maxBodySize));
-  app.use(express.json({ limit: maxBodySize }));
+  app.use(express.json({
+    limit: maxBodySize,
+    verify: (req, _res, buffer) => {
+      if (req.url?.split("?")[0] === "/api/v1/verification/webhook") {
+        (req as typeof req & { rawVerificationBody?: Buffer }).rawVerificationBody = Buffer.from(buffer);
+      }
+    },
+  }));
   app.use(express.urlencoded({ limit: maxBodySize, extended: true }));
 
   // Inspect parsed request bodies as a last application-layer protection if the
@@ -151,6 +160,14 @@ export function configureApp(app: express.Express): void {
   // Purpose-bound commercial Property Data API. Its own commercial client key
   // verification and immutable usage recording run after global HTTP hardening.
   app.use("/api/property-data", propertyDataApiRouter);
+
+  // Provider callbacks use a HMAC over the raw JSON body retained during parsing.
+  // They never receive a session and cannot directly approve a document or activate a user.
+  app.use("/api/v1/verification/webhook", verificationWebhookHttpRouter);
+
+  // Dapr discovers subscriptions here and delivers only over the private sidecar network.
+  app.get("/dapr/subscribe", daprSubscriptions);
+  app.use("/api/internal/dapr", daprSubscriptionHttpRouter);
 
   // tRPC API
   app.use(

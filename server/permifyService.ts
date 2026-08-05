@@ -177,6 +177,13 @@ export async function synchronizePlatformRole(user: User): Promise<string> {
   return schemaVersion;
 }
 
+/** Publish or validate the authorization model and mandatory global relations before live onboarding. */
+export async function verifyPermifyReadiness(): Promise<{ schemaVersion: string }> {
+  const schemaVersion = await publishAuthorizationSchema();
+  await ensureGlobalGeoResourceRelations(schemaVersion);
+  return { schemaVersion };
+}
+
 export async function grantResourceRelation(params: {
   resourceType: Exclude<PermifyResourceType, "admin_surface" | "system">;
   resourceId: string;

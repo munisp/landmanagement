@@ -57,13 +57,20 @@ services:
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-idlr-pts}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-idlr-pts-app}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?KEYCLOAK_CLIENT_SECRET must be set}
-      KEYCLOAK_ADMIN_REALM: ${KEYCLOAK_ADMIN_REALM:-master}
+      KEYCLOAK_ADMIN_REALM: ${KEYCLOAK_ADMIN_REALM:-idlr-pts}
       KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:?KEYCLOAK_ADMIN_CLIENT_ID must be set}
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set}
       # Permify
       PERMIFY_URL: http://permify:3476
-      PERMIFY_TENANT_ID: ${PERMIFY_TENANT_ID:-idlr}
+      PERMIFY_TENANT_ID: ${PERMIFY_TENANT_ID:?PERMIFY_TENANT_ID must be set}
+      PERMIFY_AUTH_TOKEN: ${PERMIFY_AUTH_TOKEN:-}
       PERMIFY_TIMEOUT_MS: ${PERMIFY_TIMEOUT_MS:-5000}
+      # Private verification services and signed provider callbacks
+      IDENTITY_SERVICE_URL: ${IDENTITY_SERVICE_URL:?IDENTITY_SERVICE_URL must be set}
+      DOCUMENT_VERIFICATION_SERVICE_URL: ${DOCUMENT_VERIFICATION_SERVICE_URL:?DOCUMENT_VERIFICATION_SERVICE_URL must be set}
+      DOCUMENT_VERIFICATION_SERVICE_API_KEY: ${DOCUMENT_VERIFICATION_SERVICE_API_KEY:?DOCUMENT_VERIFICATION_SERVICE_API_KEY must be set}
+      VERIFICATION_WEBHOOK_SECRET: ${VERIFICATION_WEBHOOK_SECRET:?VERIFICATION_WEBHOOK_SECRET must contain at least 32 characters}
+      VERIFICATION_SERVICE_TIMEOUT_MS: ${VERIFICATION_SERVICE_TIMEOUT_MS:-10000}
       # APISIX
       APISIX_ADMIN_URL: http://apisix:9180
       APISIX_API_KEY: ${APISIX_ADMIN_KEY:?APISIX_ADMIN_KEY must be set}
@@ -83,7 +90,10 @@ services:
       # Dapr
       DAPR_HTTP_URL: http://localhost:3500
       DAPR_GRPC_PORT: 50001
-      DAPR_PUBSUB_NAME: idlr-pubsub
+      DAPR_APP_ID: ${DAPR_APP_ID:-idlr-pts}
+      DAPR_PUBSUB_NAME: ${DAPR_PUBSUB_NAME:-idlr-pubsub}
+      DAPR_STATE_STORE: ${DAPR_STATE_STORE:-idlr-statestore}
+      TEMPORAL_ONBOARDING_ACTIVATION_TASK_QUEUE: ${TEMPORAL_ONBOARDING_ACTIVATION_TASK_QUEUE:?TEMPORAL_ONBOARDING_ACTIVATION_TASK_QUEUE must be set}
       # Lakehouse / ML
       LAKEHOUSE_API_URL: http://lakehouse-api:8000
       LAKEHOUSE_API_KEY: ${LAKEHOUSE_API_KEY:?LAKEHOUSE_API_KEY must be set}
@@ -120,6 +130,8 @@ services:
         condition: service_healthy
       keycloak-bootstrap:
         condition: service_completed_successfully
+      permify:
+        condition: service_healthy
       lakehouse-api:
         condition: service_healthy
       vector-tile-service:
@@ -194,7 +206,7 @@ services:
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD must be set}
     volumes:
       - keycloak_db_data:/var/lib/postgresql/data
     networks:
@@ -215,7 +227,7 @@ services:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
       KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD must be set}
       KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-keycloak.idlr-pts.local}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
@@ -246,11 +258,13 @@ services:
       KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:?KEYCLOAK_ADMIN_USER must be set}
       KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD must be set}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-idlr-pts}
+      KEYCLOAK_ADMIN_REALM: ${KEYCLOAK_ADMIN_REALM:-idlr-pts}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-idlr-pts-app}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?KEYCLOAK_CLIENT_SECRET must be set}
       KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:?KEYCLOAK_ADMIN_CLIENT_ID must be set}
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set}
       KEYCLOAK_REDIRECT_URIS: ${KEYCLOAK_REDIRECT_URIS:?KEYCLOAK_REDIRECT_URIS must be set}
+      KEYCLOAK_WEB_ORIGINS: ${KEYCLOAK_WEB_ORIGINS:?KEYCLOAK_WEB_ORIGINS must be set}
     volumes:
       - ./keycloak/bootstrap.sh:/bootstrap.sh:ro
     depends_on:
@@ -271,7 +285,7 @@ services:
     environment:
       POSTGRES_DB: permify
       POSTGRES_USER: permify
-      POSTGRES_PASSWORD: ${PERMIFY_DB_PASSWORD:-permify_secret}
+      POSTGRES_PASSWORD: ${PERMIFY_DB_PASSWORD:?PERMIFY_DB_PASSWORD must be set}
     volumes:
       - permify_db_data:/var/lib/postgresql/data
     networks:
@@ -283,20 +297,17 @@ services:
       retries: 5
 
   permify:
-    image: ghcr.io/permify/permify:latest
+    image: ghcr.io/permify/permify:v1.7.2
     container_name: idlr-permify
     <<: *default-restart
     logging: *default-logging
     command: serve
     environment:
       PERMIFY_DATABASE_ENGINE: postgres
-      PERMIFY_DATABASE_URI: postgres://permify:${PERMIFY_DB_PASSWORD:-permify_secret}@permify-db:5432/permify
+      PERMIFY_DATABASE_URI: postgres://permify:${PERMIFY_DB_PASSWORD:?PERMIFY_DB_PASSWORD must be set}@permify-db:5432/permify
       PERMIFY_DATABASE_MAX_OPEN_CONNECTIONS: 20
       PERMIFY_SERVER_GRPC_PORT: 3478
       PERMIFY_SERVER_HTTP_PORT: 3476
-    ports:
-      - "3476:3476"
-      - "3478:3478"
     depends_on:
       permify-db:
         condition: service_healthy
@@ -1255,6 +1266,31 @@ services:
         condition: service_healthy
       commercial-billing-temporal-worker:
         condition: service_started
+    networks:
+      - idlr_net
+
+  onboarding-activation-temporal-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idlr-onboarding-activation-temporal-worker
+    <<: *default-restart
+    logging: *default-logging
+    command: ["pnpm", "worker:onboarding-activation"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_ONBOARDING_ACTIVATION_TASK_QUEUE: ${TEMPORAL_ONBOARDING_ACTIVATION_TASK_QUEUE:?TEMPORAL_ONBOARDING_ACTIVATION_TASK_QUEUE must be set}
+      TEMPORAL_TLS_ENABLED: ${TEMPORAL_TLS_ENABLED:-true}
+      TEMPORAL_TLS_CERT: ${TEMPORAL_TLS_CERT:-}
+      TEMPORAL_TLS_KEY: ${TEMPORAL_TLS_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
     networks:
       - idlr_net
 
