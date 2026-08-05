@@ -126,6 +126,32 @@ export const trpcQuery = <T>(procedure: string, input?: unknown, accessToken?: s
 export const trpcMutation = <T>(procedure: string, input?: unknown, accessToken?: string | null) =>
   requestTrpc<T>(procedure, "POST", input, accessToken);
 
+export type MobileOnboardingStep = {
+  id: string;
+  title: string;
+  status: "complete" | "current" | "blocked" | "information";
+  description: string;
+  owner: "participant" | "administrator" | "verifier" | "training_team";
+  href?: string;
+};
+
+export type MobileOnboardingJourney = {
+  role: string;
+  status: string;
+  steps: MobileOnboardingStep[];
+  next: {
+    title: string;
+    description: string;
+    owner: MobileOnboardingStep["owner"];
+    href?: string;
+    actionLabel?: string;
+  };
+  launch: { href: string; label: string; description: string };
+};
+
+export const getMobileOnboardingJourney = (token?: string | null) =>
+  trpcQuery<MobileOnboardingJourney>("onboarding.getMyJourney", undefined, token);
+
 export interface MobileNotification {
   id: number;
   type: string;

@@ -31,6 +31,7 @@ import {
   PanelLeft,
   ShieldCheck,
   ShoppingCart,
+  Sparkles,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -51,6 +52,7 @@ const menuGroups: NavigationGroup[] = [
     label: "Workspace",
     items: [
       { icon: LayoutDashboard, label: "Overview", path: "/dashboard", description: "Your operational pulse" },
+      { icon: Sparkles, label: "Getting started", path: "/getting-started", description: "Your guided next step" },
       { icon: Map, label: "Land & mapping", path: "/advanced-geospatial-center", description: "Parcels and spatial context" },
       { icon: FileText, label: "Cases & documents", path: "/legal-document-center", description: "Governed evidence and records" },
     ],

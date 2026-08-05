@@ -118,6 +118,7 @@ const TransactionLauncher = lazy(() => import('./pages/TransactionLauncher'));
 const PropertyTransactionWorkflowPage = lazy(() => import('./pages/PropertyTransactionWorkflow'));
 const CofOApplication = lazy(() => import('./pages/CofOApplication'));
 const StakeholderOnboarding = lazy(() => import('./pages/StakeholderOnboarding'));
+const GettingStarted = lazy(() => import('./pages/GettingStarted'));
 
 // Lazy load non-critical pages
 const AnalyticsDashboard = lazy(() => import('./pages/AnalyticsDashboard'));
@@ -180,6 +181,7 @@ function Router() {
       <Route path="/admin/users" component={AdminUserManagement} />
       <Route path="/admin/phase4" component={AdminPhase4Dashboard} />
       <Route path="/admin/stakeholder-onboarding" component={StakeholderOnboarding} />
+      <Route path="/getting-started" component={GettingStarted} />
       <Route path="/cofo-applications" component={CofOApplication} />
             <Route path="/verification" component={VerificationWorkflow} />
             <Route path="/reporting" component={ReportingDashboard} />
