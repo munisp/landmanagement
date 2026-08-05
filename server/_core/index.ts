@@ -96,7 +96,7 @@ export function configureApp(app: express.Express): void {
   // against the storage root with path-traversal protection. Uploaded land
   // documents (titles, surveys, identity documents) are sensitive, so a valid
   // session is required — these URLs must never be publicly guessable.
-  app.get("/api/files/*", async (req, res) => {
+  app.get("/api/files/{*splat}", async (req, res) => {
     try {
       await sdk.authenticateRequest(req);
     } catch {
@@ -105,7 +105,9 @@ export function configureApp(app: express.Express): void {
     }
     try {
       const { resolveLocalStoragePath } = await import("../storage");
-      const relKey = (req.params as Record<string, string>)[0] ?? "";
+      const params = req.params as unknown as Record<string, string | string[] | undefined>;
+      const wildcard = params.splat ?? "";
+      const relKey = Array.isArray(wildcard) ? wildcard.join("/") : wildcard;
       const filePath = resolveLocalStoragePath(relKey);
       res.sendFile(filePath, (err) => {
         if (err && !res.headersSent) {
