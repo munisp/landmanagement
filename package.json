@@ -114,7 +114,7 @@
     "input-otp": "^1.4.2",
     "ioredis": "^5.9.3",
     "joi": "^18.2.3",
-    "jose": "6.1.0",
+    "jose": "6.2.7",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "kafkajs": "^2.2.4",
