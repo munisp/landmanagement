@@ -32,6 +32,7 @@ import { geospatialDeliveryRouter } from './api/routers/geospatial-delivery';
 import { geoaiRouter } from './api/routers/geoai';
 import { geoInnovationsRouter } from './api/routers/geo-innovations';
 import { sedonaJobsRouter } from './api/routers/sedona-jobs';
+import { contextGlobeRouter } from './api/routers/context-globe';
 import { mortgageApplicationsRouter } from './api/routers/mortgage-applications';
 import { cachedParcelRouter } from './api/routers/cached-parcel';
 import { cachedTransactionRouter } from './api/routers/cached-transaction';
@@ -178,6 +179,7 @@ export const appRouter = router({
   geolibre: geolibreRouter,
   geospatial: geospatialRouter,
   geospatialDelivery: geospatialDeliveryRouter,
+  contextGlobe: contextGlobeRouter,
   geoai: geoaiRouter,
   geoInnovations: geoInnovationsRouter,
   sedonaJobs: sedonaJobsRouter,

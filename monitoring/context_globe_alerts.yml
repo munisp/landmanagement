@@ -1,0 +1,50 @@
+groups:
+  - name: idlr_context_globe_alerts
+    rules:
+      - alert: ContextGlobeServiceUnavailable
+        expr: up{job=~"context-stream-gateway|context-tiles-service|context-globe-ingestion"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: context_globe
+        annotations:
+          summary: "Context Globe dependency {{ $labels.job }} is unavailable"
+          runbook: "Check the service /ready or /metrics endpoint, PostgreSQL connectivity, capability-secret parity, and Compose health gate before restoring Context Globe delivery."
+      - alert: ContextGlobeSeismicSourceStale
+        expr: time() - context_globe_last_success_unixtime{layer="seismic"} > 180
+        for: 2m
+        labels:
+          severity: critical
+          service: context_globe
+          layer: seismic
+        annotations:
+          summary: "USGS seismic Context Globe data is stale"
+          runbook: "Verify the approved USGS all_hour GeoJSON endpoint, connector egress, PostgreSQL lineage writes, Iceberg catalog readiness, and Dapr publication. Do not substitute an unapproved source."
+      - alert: ContextGlobeWeatherSourceStale
+        expr: time() - context_globe_last_success_unixtime{layer="weather-alerts"} > 360
+        for: 2m
+        labels:
+          severity: critical
+          service: context_globe
+          layer: weather-alerts
+        annotations:
+          summary: "NWS Context Globe data is stale"
+          runbook: "Verify CONTEXT_NWS_USER_AGENT, the approved NWS active-alerts endpoint, connector egress, PostgreSQL lineage writes, Iceberg catalog readiness, and Dapr publication."
+      - alert: ContextGlobeIngestionFailures
+        expr: sum by (layer) (increase(context_globe_ingestion_total{outcome="failed"}[15m])) >= 3
+        for: 2m
+        labels:
+          severity: warning
+          service: context_globe
+        annotations:
+          summary: "Context Globe ingestion is repeatedly failing for {{ $labels.layer }}"
+          runbook: "Review the connector’s structured logs and ingestion-run lineage. Validate source response shape and configuration; do not bypass validation or suppress a failed source."
+      - alert: ContextGlobeTilesErrorBudgetBurn
+        expr: rate(context_tiles_errors_total[10m]) > 0.02
+        for: 5m
+        labels:
+          severity: warning
+          service: context_globe
+        annotations:
+          summary: "Context Globe temporal GeoJSON service is returning errors"
+          runbook: "Check context_events geometry quality, time-window requests, PostgreSQL availability, and signed-capability verification failures."

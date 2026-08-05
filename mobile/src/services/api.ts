@@ -763,3 +763,126 @@ export const listSedonaJobsForRun = (analysisRunId: number, token?: string | nul
 
 export const cancelSedonaJob = (jobId: number, token?: string | null) =>
   trpcMutation<MobileSedonaJob>("sedonaJobs.cancel", { jobId }, token);
+
+
+export type MobileContextGlobeLayerSummary = {
+  layerKey: "seismic" | "weather-alerts";
+  activeEvents: number;
+};
+
+export type MobileContextGlobeSummary = {
+  windowStart: string;
+  windowEnd: string;
+  layers: MobileContextGlobeLayerSummary[];
+  offlinePolicy: string;
+};
+
+export type MobileContextGlobeFeature = {
+  type: "Feature";
+  id?: string;
+  geometry: GeoJSON.Geometry;
+  properties: {
+    layerKey: "seismic" | "weather-alerts";
+    sourceObservedAt?: string;
+    severity?: string | null;
+    urgency?: string | null;
+    mag?: number | null;
+    place?: string | null;
+    event?: string | null;
+    headline?: string | null;
+  };
+};
+
+export type MobileContextGlobeResult = {
+  summary: MobileContextGlobeSummary;
+  features: MobileContextGlobeFeature[];
+};
+
+const CONTEXT_GLOBE_LAYER_KEYS = new Set(["seismic", "weather-alerts"]);
+
+function validContextTime(value: string): boolean {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && Math.abs(parsed - Date.now()) <= 31 * 24 * 60 * 60 * 1000;
+}
+
+function safeMobileContextSummary(value: unknown): MobileContextGlobeSummary | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (!validContextTime(String(record.windowStart ?? "")) || !validContextTime(String(record.windowEnd ?? "")) || !Array.isArray(record.layers) || typeof record.offlinePolicy !== "string") return null;
+  const layers = record.layers.flatMap((layer) => {
+    if (!layer || typeof layer !== "object") return [];
+    const item = layer as Record<string, unknown>;
+    const layerKey = String(item.layerKey ?? "");
+    const activeEvents = Number(item.activeEvents);
+    return CONTEXT_GLOBE_LAYER_KEYS.has(layerKey) && Number.isInteger(activeEvents) && activeEvents >= 0
+      ? [{ layerKey: layerKey as MobileContextGlobeLayerSummary["layerKey"], activeEvents }]
+      : [];
+  });
+  return layers.length === record.layers.length ? { windowStart: String(record.windowStart), windowEnd: String(record.windowEnd), layers, offlinePolicy: record.offlinePolicy } : null;
+}
+
+function safeMobileContextFeatures(value: unknown): MobileContextGlobeFeature[] | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (record.type !== "FeatureCollection" || !Array.isArray(record.features) || record.features.length > 2_000) return null;
+  const accepted: MobileContextGlobeFeature[] = [];
+  for (const feature of record.features) {
+    if (!feature || typeof feature !== "object") return null;
+    const item = feature as Record<string, unknown>;
+    const geometry = item.geometry as GeoJSON.Geometry | undefined;
+    const properties = item.properties as Record<string, unknown> | undefined;
+    const layerKey = String(properties?.layerKey ?? "");
+    if (!geometry || !["Point", "LineString", "Polygon", "MultiPoint", "MultiLineString", "MultiPolygon"].includes(geometry.type) || !properties || !CONTEXT_GLOBE_LAYER_KEYS.has(layerKey)) return null;
+    accepted.push({
+      type: "Feature",
+      id: typeof item.id === "string" ? item.id : undefined,
+      geometry,
+      properties: {
+        layerKey: layerKey as MobileContextGlobeFeature["properties"]["layerKey"],
+        sourceObservedAt: typeof properties.sourceObservedAt === "string" ? properties.sourceObservedAt : undefined,
+        severity: typeof properties.severity === "string" ? properties.severity : null,
+        urgency: typeof properties.urgency === "string" ? properties.urgency : null,
+        mag: typeof properties.mag === "number" ? properties.mag : null,
+        place: typeof properties.place === "string" ? properties.place : null,
+        event: typeof properties.event === "string" ? properties.event : null,
+        headline: typeof properties.headline === "string" ? properties.headline : null,
+      },
+    });
+  }
+  return accepted;
+}
+
+export async function getMobileContextGlobe(
+  input: { layerKeys: Array<MobileContextGlobeLayerSummary["layerKey"]>; start: string; end: string },
+  token?: string | null,
+): Promise<MobileContextGlobeResult> {
+  const layerKeys = [...new Set(input.layerKeys)].sort();
+  if (!layerKeys.length || layerKeys.length > 2 || layerKeys.some((layerKey) => !CONTEXT_GLOBE_LAYER_KEYS.has(layerKey))) {
+    throw new MobileApiError("Select at least one approved public-context layer", "BAD_REQUEST", 400);
+  }
+  if (!validContextTime(input.start) || !validContextTime(input.end) || Date.parse(input.start) > Date.parse(input.end) || Date.parse(input.end) - Date.parse(input.start) > 30 * 24 * 60 * 60 * 1000) {
+    throw new MobileApiError("The Context Globe time window is invalid", "BAD_REQUEST", 400);
+  }
+  if (!(await isOnline())) {
+    throw new MobileApiError("Context Globe events are online-only and are not stored on this device", "OFFLINE", 503);
+  }
+  const accessToken = token ?? await getAuthToken();
+  if (!accessToken) throw new MobileApiError("Sign in is required before accessing Context Globe", "UNAUTHORIZED", 401);
+
+  const [mobileGrant, tilesGrant] = await Promise.all([
+    trpcMutation<{ capability: string; endpoint: string }>("contextGlobe.issueCapability", { audience: "context_mobile", layerKeys, purpose: "mobile.context-globe.summary", ttlSeconds: 300 }, accessToken),
+    trpcMutation<{ capability: string; endpoint: string }>("contextGlobe.issueCapability", { audience: "context_tiles", layerKeys, purpose: "mobile.context-globe.overlay", ttlSeconds: 300 }, accessToken),
+  ]);
+  const query = new URLSearchParams({ layers: layerKeys.join(","), start: input.start, end: input.end }).toString();
+  const commonHeaders = { Accept: "application/json", Authorization: `Bearer ${accessToken}` };
+  const [summaryResponse, featureResponse] = await Promise.all([
+    fetch(`${getApiBaseUrl()}${mobileGrant.endpoint}?${query}`, { headers: { ...commonHeaders, "X-Context-Capability": `Bearer ${mobileGrant.capability}` } }),
+    fetch(`${getApiBaseUrl()}${tilesGrant.endpoint}?${query}`, { headers: { ...commonHeaders, "X-Context-Capability": `Bearer ${tilesGrant.capability}` } }),
+  ]);
+  const [summaryPayload, featurePayload] = await Promise.all([summaryResponse.json().catch(() => null), featureResponse.json().catch(() => null)]);
+  if (!summaryResponse.ok || !featureResponse.ok) throw new MobileApiError("The governed Context Globe delivery service rejected this request", "DELIVERY_DENIED", !summaryResponse.ok ? summaryResponse.status : featureResponse.status, !summaryResponse.ok ? summaryPayload : featurePayload);
+  const summary = safeMobileContextSummary(summaryPayload);
+  const features = safeMobileContextFeatures(featurePayload);
+  if (!summary || !features) throw new MobileApiError("The Context Globe response was incomplete", "INVALID_RESPONSE", 502);
+  return { summary, features };
+}

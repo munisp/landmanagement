@@ -4574,3 +4574,98 @@ export type GeoStacItem = typeof geoStacItems.$inferSelect;
 export type GeoMonitorSubscription = typeof geoMonitorSubscriptions.$inferSelect;
 export type GeoChangeAlert = typeof geoChangeAlerts.$inferSelect;
 export type GeoPublicRelease = typeof geoPublicReleases.$inferSelect;
+
+
+export const contextLayerKindEnum = pgEnum("context_layer_kind", ["seismic", "weather_alert"]);
+export const contextEventStatusEnum = pgEnum("context_event_status", ["active", "expired", "superseded", "rejected"]);
+export const contextQualityStateEnum = pgEnum("context_quality_state", ["verified", "degraded", "rejected"]);
+
+export const contextLayers = pgTable("context_layers", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  layerKey: varchar("layer_key", { length: 64 }).notNull().unique(),
+  kind: contextLayerKindEnum("kind").notNull().unique(),
+  displayName: varchar("display_name", { length: 128 }).notNull(),
+  description: text("description").notNull(),
+  sourceName: varchar("source_name", { length: 128 }).notNull(),
+  sourceEndpoint: text("source_endpoint").notNull(),
+  attribution: text("attribution").notNull(),
+  refreshSeconds: integer("refresh_seconds").notNull(),
+  defaultEnabled: boolean("default_enabled").notNull().default(true),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const contextIngestionRuns = pgTable("context_ingestion_runs", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  layerId: integer("layer_id").notNull().references(() => contextLayers.id, { onDelete: "restrict" }),
+  runKey: varchar("run_key", { length: 96 }).notNull().unique(),
+  sourceEtag: varchar("source_etag", { length: 512 }),
+  sourceLastModified: varchar("source_last_modified", { length: 512 }),
+  sourceChecksumSha256: varchar("source_checksum_sha256", { length: 64 }),
+  httpStatus: integer("http_status").notNull(),
+  receivedCount: integer("received_count").notNull().default(0),
+  acceptedCount: integer("accepted_count").notNull().default(0),
+  rejectedCount: integer("rejected_count").notNull().default(0),
+  qualityState: contextQualityStateEnum("quality_state").notNull(),
+  failureReason: text("failure_reason"),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => ({
+  layerStartedIdx: index("context_ingestion_runs_layer_started_idx").on(table.layerId, table.startedAt),
+}));
+
+export const contextEvents = pgTable("context_events", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  layerId: integer("layer_id").notNull().references(() => contextLayers.id, { onDelete: "restrict" }),
+  sourceEventKey: varchar("source_event_key", { length: 512 }).notNull(),
+  sourceUrl: text("source_url"),
+  sourceObservedAt: timestamp("source_observed_at", { withTimezone: true }).notNull(),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  eventStatus: contextEventStatusEnum("event_status").notNull().default("active"),
+  qualityState: contextQualityStateEnum("quality_state").notNull(),
+  severity: varchar("severity", { length: 32 }),
+  urgency: varchar("urgency", { length: 32 }),
+  geometry: jsonb("geometry").notNull(),
+  bbox: jsonb("bbox"),
+  properties: jsonb("properties").notNull().default({}),
+  sourceChecksumSha256: varchar("source_checksum_sha256", { length: 64 }).notNull(),
+  ingestionRunId: bigint("ingestion_run_id", { mode: "number" }).notNull().references(() => contextIngestionRuns.id, { onDelete: "restrict" }),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  layerObservedIdx: index("context_events_layer_observed_idx").on(table.layerId, table.sourceObservedAt),
+  activeExpiryIdx: index("context_events_active_expiry_idx").on(table.eventStatus, table.expiresAt),
+  sourceUnique: uniqueIndex("context_events_layer_source_key_unique").on(table.layerId, table.sourceEventKey),
+}));
+
+export const contextLayerSubscriptions = pgTable("context_layer_subscriptions", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  layerId: integer("layer_id").notNull().references(() => contextLayers.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userLayerUnique: uniqueIndex("context_layer_subscriptions_user_layer_unique").on(table.userId, table.layerId),
+}));
+
+export const contextDeliveryAudits = pgTable("context_delivery_audits", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  audience: varchar("audience", { length: 64 }).notNull(),
+  layerKeys: jsonb("layer_keys").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }),
+  windowEnd: timestamp("window_end", { withTimezone: true }),
+  capabilityFingerprintSha256: varchar("capability_fingerprint_sha256", { length: 64 }).notNull(),
+  requestId: varchar("request_id", { length: 128 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userCreatedIdx: index("context_delivery_audits_user_created_idx").on(table.userId, table.createdAt),
+}));
+
+export type ContextLayer = typeof contextLayers.$inferSelect;
+export type ContextEvent = typeof contextEvents.$inferSelect;
+export type ContextIngestionRun = typeof contextIngestionRuns.$inferSelect;

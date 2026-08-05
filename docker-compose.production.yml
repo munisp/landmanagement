@@ -95,6 +95,12 @@ services:
       GEO_TILE_SERVICE_TIMEOUT_MS: ${GEO_TILE_SERVICE_TIMEOUT_MS:-10000}
       GEO_CESIUM_ASSET_SERVICE_TIMEOUT_MS: ${GEO_CESIUM_ASSET_SERVICE_TIMEOUT_MS:-20000}
       GEO_SPATIAL_AUTHORITY_TIMEOUT_MS: ${GEO_SPATIAL_AUTHORITY_TIMEOUT_MS:-120000}
+      # Governed Context Globe delivery
+      CONTEXT_CAPABILITY_SECRET: ${CONTEXT_CAPABILITY_SECRET:?CONTEXT_CAPABILITY_SECRET must contain at least 32 characters}
+      CONTEXT_STREAM_SERVICE_URL: http://context-stream-gateway:8091
+      CONTEXT_TILES_SERVICE_URL: http://context-tiles-service:8092
+      CONTEXT_DELIVERY_TIMEOUT_MS: ${CONTEXT_DELIVERY_TIMEOUT_MS:-8000}
+      CONTEXT_STREAM_CONNECT_TIMEOUT_MS: ${CONTEXT_STREAM_CONNECT_TIMEOUT_MS:-8000}
       # Mojaloop
       MOJALOOP_API_URL: http://mojaloop-simulator:3000
       # TigerBeetle
@@ -119,6 +125,10 @@ services:
       vector-tile-service:
         condition: service_healthy
       cesium-asset-service:
+        condition: service_healthy
+      context-stream-gateway:
+        condition: service_healthy
+      context-tiles-service:
         condition: service_healthy
     volumes:
       - ./server/data:/app/server/data
@@ -536,6 +546,8 @@ services:
       S3_REGION: ${LAKEHOUSE_S3_REGION:-us-east-1}
       S3_PATH_STYLE_ACCESS: "true"
       SEDONA_WORKER_HEALTH_URL: http://sedona-job-worker:8081/ready
+      CONTEXT_NWS_USER_AGENT: ${CONTEXT_NWS_USER_AGENT:?CONTEXT_NWS_USER_AGENT must identify the platform and an operator contact}
+      CONTEXT_DAPR_PUBSUB: ${CONTEXT_DAPR_PUBSUB:-idlr-pubsub}
     volumes:
       - ./lakehouse/ml/weights:/app/ml/weights
       - lakehouse_data:/app/data
@@ -769,6 +781,83 @@ services:
       retries: 5
       start_period: 15s
 
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Context Globe — signed cross-language delivery and governed public ingestion
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  context-stream-gateway:
+    build:
+      context: ./go-services/context-stream-gateway
+      dockerfile: Dockerfile
+    container_name: idlr-context-stream-gateway
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      PORT: 8091
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      CONTEXT_CAPABILITY_SECRET: ${CONTEXT_CAPABILITY_SECRET:?CONTEXT_CAPABILITY_SECRET must contain at least 32 characters}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - idlr_net
+
+  context-tiles-service:
+    build:
+      context: ./rust-services/context-tiles-service
+      dockerfile: Dockerfile
+    container_name: idlr-context-tiles-service
+    <<: *default-restart
+    logging: *default-logging
+    environment:
+      PORT: 8092
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      CONTEXT_CAPABILITY_SECRET: ${CONTEXT_CAPABILITY_SECRET:?CONTEXT_CAPABILITY_SECRET must contain at least 32 characters}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - idlr_net
+
+  context-globe-ingestion:
+    build:
+      context: ./lakehouse
+      dockerfile: Dockerfile
+      network: host
+    container_name: idlr-context-globe-ingestion
+    <<: *default-restart
+    logging: *default-logging
+    command: ["python", "-m", "context_globe.service"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      CONTEXT_NWS_USER_AGENT: ${CONTEXT_NWS_USER_AGENT:?CONTEXT_NWS_USER_AGENT must identify the platform and an operator contact}
+      CONTEXT_DAPR_PUBSUB: ${CONTEXT_DAPR_PUBSUB:-idlr-pubsub}
+      DAPR_HTTP_ENDPOINT: http://localhost:3500
+      CONTEXT_INGEST_METRICS_PORT: 8093
+      CONTEXT_INGEST_POLL_SECONDS: ${CONTEXT_INGEST_POLL_SECONDS:-15}
+      ICEBERG_CATALOG_URI: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      ICEBERG_WAREHOUSE_PATH: s3://${LAKEHOUSE_S3_BUCKET:-idlr-lakehouse}/warehouse
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY:?LAKEHOUSE_S3_ACCESS_KEY must be set}
+      S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY:?LAKEHOUSE_S3_SECRET_KEY must be set}
+      S3_REGION: ${LAKEHOUSE_S3_REGION:-us-east-1}
+      S3_PATH_STYLE_ACCESS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      iceberg-catalog-bootstrap:
+        condition: service_completed_successfully
+      dapr-placement:
+        condition: service_started
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8093/metrics', timeout=3)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.13.0
     container_name: idlr-mlflow
@@ -963,6 +1052,61 @@ services:
     networks:
       - idlr_net
 
+  context-globe-temporal-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idlr-context-globe-temporal-worker
+    <<: *default-restart
+    logging: *default-logging
+    command: ["pnpm", "worker:context-globe"]
+    environment:
+      NODE_ENV: production
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_CONTEXT_GLOBE_TASK_QUEUE: ${TEMPORAL_CONTEXT_GLOBE_TASK_QUEUE:?TEMPORAL_CONTEXT_GLOBE_TASK_QUEUE must be set}
+      TEMPORAL_TLS_ENABLED: ${TEMPORAL_TLS_ENABLED:-true}
+      TEMPORAL_TLS_CERT: ${TEMPORAL_TLS_CERT:-}
+      TEMPORAL_TLS_KEY: ${TEMPORAL_TLS_KEY:-}
+      LAKEHOUSE_API_URL: http://lakehouse-api:8000
+      LAKEHOUSE_API_KEY: ${LAKEHOUSE_API_KEY:?LAKEHOUSE_API_KEY must be set}
+      CONTEXT_TEMPORAL_STATUS_TIMEOUT_MS: ${CONTEXT_TEMPORAL_STATUS_TIMEOUT_MS:-10000}
+    depends_on:
+      temporal:
+        condition: service_healthy
+      lakehouse-api:
+        condition: service_healthy
+      context-globe-ingestion:
+        condition: service_healthy
+    networks:
+      - idlr_net
+
+  context-globe-temporal-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idlr-context-globe-temporal-scheduler
+    <<: *default-restart
+    logging: *default-logging
+    command: ["pnpm", "worker:context-globe-scheduler"]
+    environment:
+      NODE_ENV: production
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_CONTEXT_GLOBE_TASK_QUEUE: ${TEMPORAL_CONTEXT_GLOBE_TASK_QUEUE:?TEMPORAL_CONTEXT_GLOBE_TASK_QUEUE must be set}
+      TEMPORAL_TLS_ENABLED: ${TEMPORAL_TLS_ENABLED:-true}
+      TEMPORAL_TLS_CERT: ${TEMPORAL_TLS_CERT:-}
+      TEMPORAL_TLS_KEY: ${TEMPORAL_TLS_KEY:-}
+      CONTEXT_TEMPORAL_RECONCILE_SECONDS: ${CONTEXT_TEMPORAL_RECONCILE_SECONDS:-300}
+      CONTEXT_TEMPORAL_WORKFLOW_ID: ${CONTEXT_TEMPORAL_WORKFLOW_ID:-context-globe-reconciliation-v1}
+    depends_on:
+      temporal:
+        condition: service_healthy
+      context-globe-temporal-worker:
+        condition: service_started
+    networks:
+      - idlr_net
+
   geo-innovation-temporal-scheduler:
     build:
       context: .
@@ -1047,6 +1191,29 @@ services:
     network_mode: "service:event-outbox-worker"
     depends_on:
       - event-outbox-worker
+      - dapr-placement
+
+  dapr-context-globe-ingestion-sidecar:
+    image: daprio/daprd:1.14.4
+    container_name: idlr-dapr-context-globe-ingestion-sidecar
+    <<: *default-restart
+    command:
+      - "./daprd"
+      - "--app-id"
+      - "idlr-context-globe-ingestion"
+      - "--placement-host-address"
+      - "dapr-placement:50006"
+      - "--dapr-http-port"
+      - "3500"
+      - "--dapr-grpc-port"
+      - "50001"
+      - "--resources-path"
+      - "/components"
+    volumes:
+      - ./dapr/components:/components:ro
+    network_mode: "service:context-globe-ingestion"
+    depends_on:
+      - context-globe-ingestion
       - dapr-placement
 
   tigerbeetle-format:
@@ -1160,6 +1327,7 @@ services:
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/mapping_alerts.yml:/etc/prometheus/rules/mapping_alerts.yml:ro
+      - ./monitoring/context_globe_alerts.yml:/etc/prometheus/rules/context_globe_alerts.yml:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"

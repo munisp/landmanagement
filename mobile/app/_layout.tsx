@@ -24,6 +24,7 @@ function ApplicationGate() {
       <Stack.Screen name="geoai/create" options={{ title: "Create GeoAI Run" }} />
       <Stack.Screen name="geoai/capture" options={{ title: "Capture Field Evidence", presentation: "modal" }} />
       <Stack.Screen name="field/drafts" options={{ title: "Offline Field Drafts" }} />
+      <Stack.Screen name="context/index" options={{ title: "Context Globe" }} />
       <Stack.Screen name="arcgis/index" options={{ title: "ArcGIS Operations" }} />
       <Stack.Screen name="arcgis/request" options={{ title: "Request ArcGIS Operation" }} />
       <Stack.Screen name="arcgis/[operationId]" options={{ title: "ArcGIS Operation" }} />

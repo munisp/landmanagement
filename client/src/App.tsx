@@ -74,6 +74,7 @@ const ForestReserveCenter = lazy(() => import('./pages/ForestReserveCenter'));
 const InfrastructureDevelopmentCenter = lazy(() => import('./pages/InfrastructureDevelopmentCenter'));
 const AdvancedGeospatialCenter = lazy(() => import('./pages/AdvancedGeospatialCenter'));
 const GeoLibreWorkspace = lazy(() => import('./pages/GeoLibreWorkspace'));
+const ContextGlobePage = lazy(() => import('./pages/ContextGlobePage'));
 const GeoAIOperationsCenter = lazy(() => import('./pages/GeoAIOperationsCenter'));
 const GeospatialInnovationHub = lazy(() => import('./pages/GeospatialInnovationHub'));
 const AccessibilityCenter = lazy(() => import('./pages/AccessibilityCenter'));
@@ -243,6 +244,7 @@ function Router() {
       <Route path="/infrastructure-development-center" component={InfrastructureDevelopmentCenter} />
       <Route path="/advanced-geospatial-center" component={AdvancedGeospatialCenter} />
       <Route path="/geolibre-workspace" component={GeoLibreWorkspace} />
+      <Route path="/context-globe" component={ContextGlobePage} />
       <Route path="/geoai-operations" component={GeoAIOperationsCenter} />
       <Route path="/geospatial-innovations" component={GeospatialInnovationHub} />
       <Route path="/accessibility-center" component={AccessibilityCenter} />

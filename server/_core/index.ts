@@ -21,6 +21,7 @@ import { realtimeWebSocketService } from "../realtimeWebSocketService";
 import { externalApiRouter } from "../externalApi";
 import { geoInteroperabilityHttpRouter } from "../geoInteroperabilityHttp";
 import { geospatialDeliveryHttpRouter } from "../geospatialDeliveryHttp";
+import { contextGlobeHttpRouter } from "../contextGlobeHttp";
 import { startEmailQueueProcessor } from "../emailQueueService";
 import { healthCheck, livenessProbe, readinessProbe, startupProbe } from "./healthCheck";
 import { advancedSecurityHeaders, idsMiddleware, wafMiddleware } from "./advancedSecurity";
@@ -140,6 +141,11 @@ export function configureApp(app: express.Express): void {
   // authoritative Python analyses, and mobile evidence manifests. The router
   // validates a short-lived capability and the session before forwarding.
   app.use("/api/geospatial-delivery", geospatialDeliveryHttpRouter);
+
+  // Same-origin Context Globe middleware gateway. Public-source context is
+  // delivered only after a session and a short-lived layer-scoped capability
+  // are validated; browsers never call upstream public providers directly.
+  app.use("/api/context-globe", contextGlobeHttpRouter);
 
   // tRPC API
   app.use(

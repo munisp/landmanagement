@@ -12,6 +12,7 @@ alerting:
 
 rule_files:
   - /etc/prometheus/rules/mapping_alerts.yml
+  - /etc/prometheus/rules/context_globe_alerts.yml
 
 scrape_configs:
   - job_name: 'idlr-pts-app'
@@ -62,6 +63,24 @@ scrape_configs:
     static_configs:
       - targets: ['cesium-asset-service:7022']
     metrics_path: '/metrics'
+
+  - job_name: 'context-stream-gateway'
+    static_configs:
+      - targets: ['context-stream-gateway:8091']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  - job_name: 'context-tiles-service'
+    static_configs:
+      - targets: ['context-tiles-service:8092']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  - job_name: 'context-globe-ingestion'
+    static_configs:
+      - targets: ['context-globe-ingestion:8093']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
 
   - job_name: 'temporal'
     static_configs:
