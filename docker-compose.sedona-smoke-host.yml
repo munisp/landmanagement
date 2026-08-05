@@ -1,0 +1,215 @@
+name: idlr-sedona-smoke-host
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    command: ["postgres", "-p", "55432"]
+    network_mode: host
+    environment:
+      POSTGRES_DB: idlr_smoke
+      POSTGRES_USER: idlr
+      POSTGRES_PASSWORD: idlr_smoke_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 55432 -U idlr -d idlr_smoke"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    command: server /data --address :9000
+    network_mode: host
+    environment:
+      MINIO_ROOT_USER: smokeaccess
+      MINIO_ROOT_PASSWORD: smoke-secret-key-at-least-32-characters
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  minio-bootstrap:
+    image: minio/mc:RELEASE.2024-10-08T09-37-26Z
+    network_mode: host
+    entrypoint: ["/bin/sh", "/bootstrap_minio.sh"]
+    environment:
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_ACCESS_KEY: smokeaccess
+      S3_SECRET_KEY: smoke-secret-key-at-least-32-characters
+      S3_BUCKET: idlr-lakehouse
+    volumes:
+      - ./lakehouse/warehouse/bootstrap_minio.sh:/bootstrap_minio.sh:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  iceberg-bootstrap:
+    build:
+      context: ./lakehouse
+      dockerfile: Dockerfile
+      network: host
+    network_mode: host
+    command: ["python", "-m", "warehouse.bootstrap_catalog"]
+    environment:
+      ICEBERG_CATALOG_URI: postgresql://idlr:idlr_smoke_password@127.0.0.1:55432/idlr_smoke
+      ICEBERG_WAREHOUSE_PATH: s3://idlr-lakehouse/warehouse
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_ACCESS_KEY: smokeaccess
+      S3_SECRET_KEY: smoke-secret-key-at-least-32-characters
+      S3_REGION: us-east-1
+      S3_PATH_STYLE_ACCESS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
+
+  spark-master:
+    build:
+      context: ./lakehouse/sedona
+      dockerfile: Dockerfile
+      network: host
+    network_mode: host
+    command: ["master"]
+    environment:
+      SPARK_MASTER_HOST: 127.0.0.1
+      SPARK_MASTER_PORT: 7077
+      SPARK_MASTER_WEBUI_PORT: 8080
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080 >/dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  spark-worker:
+    build:
+      context: ./lakehouse/sedona
+      dockerfile: Dockerfile
+      network: host
+    network_mode: host
+    command: ["worker"]
+    environment:
+      SPARK_MASTER_URL: spark://127.0.0.1:7077
+      SPARK_WORKER_CORES: 2
+      SPARK_WORKER_MEMORY: 2g
+      SPARK_WORKER_WEBUI_PORT: 8081
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081 >/dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  sedona-job-worker:
+    build:
+      context: ./lakehouse/sedona
+      dockerfile: Dockerfile
+      network: host
+    network_mode: host
+    command: ["job-worker"]
+    environment:
+      POSTGRES_URL: postgresql://idlr:idlr_smoke_password@127.0.0.1:55432/idlr_smoke
+      SEDONA_JOB_WORKER_ID: smoke-worker-01
+      SEDONA_WORKER_PROBE_ONLY: "true"
+      SEDONA_JOB_POLL_SECONDS: 1
+      SEDONA_STARTUP_PROBE_TIMEOUT_SECONDS: 180
+      SEDONA_WORKER_METRICS_PORT: 19108
+      SEDONA_WORKER_HEALTH_PORT: 18081
+      SPARK_MASTER_URL: spark://127.0.0.1:7077
+      ICEBERG_WAREHOUSE_PATH: s3://idlr-lakehouse/warehouse
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_ACCESS_KEY: smokeaccess
+      S3_SECRET_KEY: smoke-secret-key-at-least-32-characters
+      S3_REGION: us-east-1
+    depends_on:
+      iceberg-bootstrap:
+        condition: service_completed_successfully
+      spark-worker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:18081/ready >/dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+
+  lakehouse-api:
+    build:
+      context: ./lakehouse
+      dockerfile: Dockerfile
+      network: host
+    network_mode: host
+    environment:
+      DATABASE_URL: postgresql://idlr:idlr_smoke_password@127.0.0.1:55432/idlr_smoke
+      LAKEHOUSE_API_KEY: smoke-lakehouse-api-key-at-least-32chars
+      LAKEHOUSE_CORS_ORIGINS: https://platform.smoke.internal
+      GEOAI_ALLOWED_ASSET_URI_PREFIXES: s3://idlr-lakehouse/warehouse
+      GEO_DELIVERY_CAPABILITY_SECRET: smoke-geospatial-capability-secret-32chars
+      GEO_3D_PREPARATION_ROOT: /tmp/geo-3d-assets
+      ICEBERG_CATALOG_URI: postgresql://idlr:idlr_smoke_password@127.0.0.1:55432/idlr_smoke
+      ICEBERG_WAREHOUSE_PATH: s3://idlr-lakehouse/warehouse
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_ACCESS_KEY: smokeaccess
+      S3_SECRET_KEY: smoke-secret-key-at-least-32-characters
+      S3_REGION: us-east-1
+      S3_PATH_STYLE_ACCESS: "true"
+      SEDONA_WORKER_HEALTH_URL: http://127.0.0.1:18081/ready
+    depends_on:
+      iceberg-bootstrap:
+        condition: service_completed_successfully
+      sedona-job-worker:
+        condition: service_healthy
+
+  sedona-geoparquet-operation:
+    build:
+      context: ./lakehouse/sedona
+      dockerfile: Dockerfile
+      network: host
+    network_mode: host
+    entrypoint: ["/opt/spark/bin/spark-submit"]
+    command:
+      - "--master"
+      - "spark://127.0.0.1:7077"
+      - "--conf"
+      - "spark.ui.enabled=false"
+      - "/opt/idlr-sedona/jobs/governed_spatial_job.py"
+      - "--manifest"
+      - "/opt/idlr-sedona/jobs/smoke_geoparquet_manifest.json"
+      - "--result"
+      - "/tmp/smoke-geoparquet-result.json"
+    environment:
+      SPARK_MASTER_URL: spark://127.0.0.1:7077
+      ICEBERG_CATALOG_URI: postgresql://idlr:idlr_smoke_password@127.0.0.1:55432/idlr_smoke
+      ICEBERG_WAREHOUSE_PATH: s3://idlr-lakehouse/warehouse
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_ACCESS_KEY: smokeaccess
+      S3_SECRET_KEY: smoke-secret-key-at-least-32-characters
+      S3_REGION: us-east-1
+    depends_on:
+      iceberg-bootstrap:
+        condition: service_completed_successfully
+      spark-worker:
+        condition: service_healthy
+      sedona-job-worker:
+        condition: service_healthy
+      lakehouse-api:
+        condition: service_started
+
+  sedona-probe:
+    build:
+      context: ./lakehouse/sedona
+      dockerfile: Dockerfile
+      network: host
+    network_mode: host
+    command: ["probe"]
+    environment:
+      SPARK_MASTER_URL: spark://127.0.0.1:7077
+    depends_on:
+      iceberg-bootstrap:
+        condition: service_completed_successfully
+      spark-worker:
+        condition: service_healthy

@@ -34,6 +34,10 @@ export default function GeoAIOperationsCenter() {
     { enabled: selectedRunId !== null && showReport },
   );
   const arcgisQuery = trpc.geoai.listArcgisOperations.useQuery({ limit: 50 });
+  const sedonaJobsQuery = trpc.sedonaJobs.listForRun.useQuery(
+    { analysisRunId: selectedRunId ?? 0, limit: 50 },
+    { enabled: selectedRunId !== null, refetchInterval: 5000 },
+  );
 
   const invalidate = async () => {
     await Promise.all([
@@ -41,6 +45,7 @@ export default function GeoAIOperationsCenter() {
       selectedRunId ? utils.geoai.getPresentation.invalidate({ runId: selectedRunId }) : Promise.resolve(),
       selectedRunId ? utils.geoai.getEvidenceReport.invalidate({ runId: selectedRunId }) : Promise.resolve(),
       utils.geoai.listArcgisOperations.invalidate(),
+      selectedRunId ? utils.sedonaJobs.listForRun.invalidate({ analysisRunId: selectedRunId, limit: 50 }) : Promise.resolve(),
     ]);
   };
 
@@ -67,6 +72,10 @@ export default function GeoAIOperationsCenter() {
   });
   const refreshArcgis = trpc.geoai.refreshArcgisOperation.useMutation({
     onSuccess: async () => { toast.success("ArcGIS operation status refreshed."); await invalidate(); },
+    onError: (error) => toast.error(error.message),
+  });
+  const cancelSedonaJob = trpc.sedonaJobs.cancel.useMutation({
+    onSuccess: async () => { toast.success("Lakehouse job cancellation recorded."); await invalidate(); },
     onError: (error) => toast.error(error.message),
   });
 
@@ -120,7 +129,7 @@ export default function GeoAIOperationsCenter() {
                 {runsQuery.isLoading ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin" /></div> : runsQuery.error ? <p className="text-destructive">{runsQuery.error.message}</p> : (runsQuery.data ?? []).length === 0 ? <p className="text-muted-foreground">No GeoAI analysis runs have been recorded. Create a provenance-bearing manifest to begin.</p> : <div className="space-y-3">{(runsQuery.data as any[]).map((run) => <button key={run.id} onClick={() => { setSelectedRunId(run.id); setShowReport(false); }} className={`w-full rounded-lg border p-4 text-left transition ${selectedRunId === run.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold">{run.title}</p><p className="text-sm text-muted-foreground">{run.analysisType.replace(/_/g, " ")} · {run.runKey}</p></div><div className="flex gap-2"><EvidenceBadge value={run.evidenceStatus} /><Badge variant="outline">{run.status.replace(/_/g, " ")}</Badge></div></div></button>)}</div>}
               </CardContent>
             </Card>
-            {selectedRun && <div className="flex flex-wrap gap-3"><Button disabled={queueRun.isPending || !["draft", "failed", "cancelled"].includes(selectedRun.status)} onClick={() => queueRun.mutate({ runId: selectedRun.id })}><Play className="mr-2 h-4 w-4" /> Queue analysis</Button><Button variant="outline" disabled={approveRun.isPending || selectedRun.status !== "awaiting_review"} onClick={() => approveRun.mutate({ runId: selectedRun.id, decision: "verified", reviewNotes: "Evidence reviewed in GeoAI Operations Center" })}><CheckCircle2 className="mr-2 h-4 w-4" /> Verify evidence</Button><Button variant="outline" onClick={() => { setShowReport(true); presentationQuery.refetch(); }}><FileText className="mr-2 h-4 w-4" /> Open evidence report</Button></div>}
+            {selectedRun && <><div className="flex flex-wrap gap-3"><Button disabled={queueRun.isPending || !["draft", "failed", "cancelled"].includes(selectedRun.status)} onClick={() => queueRun.mutate({ runId: selectedRun.id })}><Play className="mr-2 h-4 w-4" /> Queue analysis</Button><Button variant="outline" disabled={approveRun.isPending || selectedRun.status !== "awaiting_review"} onClick={() => approveRun.mutate({ runId: selectedRun.id, decision: "verified", reviewNotes: "Evidence reviewed in GeoAI Operations Center" })}><CheckCircle2 className="mr-2 h-4 w-4" /> Verify evidence</Button><Button variant="outline" onClick={() => { setShowReport(true); presentationQuery.refetch(); }}><FileText className="mr-2 h-4 w-4" /> Open evidence report</Button><Link href={`/advanced-geospatial-center?analysisRunId=${selectedRun.id}`}><Button variant="outline"><Map className="mr-2 h-4 w-4" /> Open governed map workbench</Button></Link></div><Card className="mt-4"><CardHeader><CardTitle className="flex items-center gap-2"><Workflow className="h-5 w-5" /> Lakehouse Sedona jobs</CardTitle><CardDescription>Jobs remain queued, running, cancellable, or terminal with durable provenance. A successful compute result remains provisional until applicable evidence review gates pass.</CardDescription></CardHeader><CardContent>{sedonaJobsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : sedonaJobsQuery.error ? <p className="text-destructive">{sedonaJobsQuery.error.message}</p> : (sedonaJobsQuery.data ?? []).length ? <div className="space-y-2">{(sedonaJobsQuery.data as any[]).map((job) => <div key={job.id} className="rounded border p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-medium">{job.operation.replace(/_/g, " ")}</p><p className="text-xs text-muted-foreground">{job.jobKey} · attempt {job.attempt}/{job.maxAttempts}</p>{job.outputUri && <p className="mt-1 break-all text-xs text-muted-foreground">Artifact: {job.outputUri}</p>}{job.failureReason && <p className="mt-1 text-xs text-destructive">{job.failureReason}</p>}</div><div className="flex items-center gap-2"><Badge variant="outline">{job.status.replace(/_/g, " ")}</Badge>{["queued", "claimed", "running", "cancel_requested"].includes(job.status) && <Button size="sm" variant="outline" disabled={cancelSedonaJob.isPending} onClick={() => cancelSedonaJob.mutate({ jobId: job.id })}>Cancel</Button>}</div></div></div>)}</div> : <p className="text-sm text-muted-foreground">No governed Lakehouse jobs are attached to this analysis run yet.</p>}</CardContent></Card></>}
           </TabsContent>
 
           <TabsContent value="evidence" className="space-y-4">

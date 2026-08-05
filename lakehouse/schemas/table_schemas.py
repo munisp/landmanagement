@@ -45,7 +45,7 @@ PAYMENT_EVENTS_SCHEMA = Schema(
     NestedField(11, "payment_method", StringType(), required=False),
     NestedField(12, "status", StringType(), required=False),
     NestedField(13, "error_message", StringType(), required=False),
-    NestedField(14, "metadata", MapType(1, StringType(), StringType(), value_required=False), required=False),
+    NestedField(14, "metadata", MapType(141, StringType(), 142, StringType(), value_required=False), required=False),
 )
 
 BLOCKCHAIN_EVENTS_SCHEMA = Schema(
@@ -62,7 +62,7 @@ BLOCKCHAIN_EVENTS_SCHEMA = Schema(
     NestedField(11, "block_number", LongType(), required=False),
     NestedField(12, "confirmed", BooleanType(), required=False),
     NestedField(13, "gas_used", LongType(), required=False),
-    NestedField(14, "metadata", MapType(1, StringType(), StringType(), value_required=False), required=False),
+    NestedField(14, "metadata", MapType(141, StringType(), 142, StringType(), value_required=False), required=False),
 )
 
 LEDGER_EVENTS_SCHEMA = Schema(
@@ -78,7 +78,7 @@ LEDGER_EVENTS_SCHEMA = Schema(
     NestedField(10, "amount", DoubleType(), required=False),
     NestedField(11, "currency", StringType(), required=False),
     NestedField(12, "status", StringType(), required=False),
-    NestedField(13, "metadata", MapType(1, StringType(), StringType(), value_required=False), required=False),
+    NestedField(13, "metadata", MapType(131, StringType(), 132, StringType(), value_required=False), required=False),
 )
 
 WORKFLOW_EVENTS_SCHEMA = Schema(

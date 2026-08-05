@@ -4225,6 +4225,12 @@ export const geoArcgisOperationStatusEnum = pgEnum("geo_arcgis_operation_status"
 export const geoDeliveryAudienceEnum = pgEnum("geo_delivery_audience", [
   "vector_tiles", "cesium_assets", "geo_analysis", "mobile_evidence",
 ]);
+export const sedonaSpatialOperationEnum = pgEnum("sedona_spatial_operation", [
+  "geoparquet_export", "topology_validation", "spatial_workbench", "zonal_statistics", "viewshed",
+]);
+export const sedonaSpatialJobStatusEnum = pgEnum("sedona_spatial_job_status", [
+  "queued", "claimed", "running", "cancel_requested", "succeeded", "failed", "cancelled",
+]);
 
 export const geoAssetCatalog = pgTable("geo_asset_catalog", {
   id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
@@ -4292,6 +4298,54 @@ export const geoDeliveryAccessAudit = pgTable("geo_delivery_access_audit", {
   userCreatedIdx: index("geo_delivery_access_audit_user_created_idx").on(table.userId, table.createdAt),
   capabilityIdx: index("geo_delivery_access_audit_capability_idx").on(table.capabilityId, table.createdAt),
   assetIdx: index("geo_delivery_access_audit_asset_idx").on(table.assetKey, table.createdAt),
+}));
+
+export const sedonaSpatialJobs = pgTable("sedona_spatial_jobs", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  jobKey: varchar("job_key", { length: 128 }).notNull().unique(),
+  requestFingerprintSha256: varchar("request_fingerprint_sha256", { length: 64 }).notNull(),
+  operation: sedonaSpatialOperationEnum("operation").notNull(),
+  status: sedonaSpatialJobStatusEnum("status").notNull().default("queued"),
+  requestedBy: integer("requested_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  analysisRunId: bigint("analysis_run_id", { mode: "number" }).references(() => geoAnalysisRuns.id, { onDelete: "set null" }),
+  parcelId: integer("parcel_id").references(() => parcels.id, { onDelete: "set null" }),
+  inputManifest: jsonb("input_manifest").notNull(),
+  inputChecksumSha256: varchar("input_checksum_sha256", { length: 64 }).notNull(),
+  resultSummary: jsonb("result_summary"),
+  outputUri: text("output_uri"),
+  outputChecksumSha256: varchar("output_checksum_sha256", { length: 64 }),
+  sparkApplicationId: varchar("spark_application_id", { length: 255 }),
+  workerId: varchar("worker_id", { length: 128 }),
+  attempt: integer("attempt").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull().default(3),
+  cancelRequestedAt: timestamp("cancel_requested_at", { withTimezone: true }),
+  cancelRequestedBy: integer("cancel_requested_by").references(() => users.id, { onDelete: "set null" }),
+  heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  failureCode: varchar("failure_code", { length: 96 }),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  statusCreatedIdx: index("sedona_spatial_jobs_status_created_idx").on(table.status, table.createdAt),
+  parcelCreatedIdx: index("sedona_spatial_jobs_parcel_created_idx").on(table.parcelId, table.createdAt),
+  runCreatedIdx: index("sedona_spatial_jobs_run_idx").on(table.analysisRunId, table.createdAt),
+  heartbeatIdx: index("sedona_spatial_jobs_heartbeat_idx").on(table.status, table.heartbeatAt),
+}));
+
+export const sedonaSpatialJobEvents = pgTable("sedona_spatial_job_events", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  jobId: bigint("job_id", { mode: "number" }).notNull().references(() => sedonaSpatialJobs.id, { onDelete: "cascade" }),
+  eventType: varchar("event_type", { length: 96 }).notNull(),
+  status: sedonaSpatialJobStatusEnum("status").notNull(),
+  attempt: integer("attempt").notNull(),
+  actorType: varchar("actor_type", { length: 32 }).notNull(),
+  actorId: varchar("actor_id", { length: 128 }),
+  payload: jsonb("payload").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  jobCreatedIdx: index("sedona_spatial_job_events_job_created_idx").on(table.jobId, table.createdAt),
 }));
 
 export const geoAnalysisRuns = pgTable("geo_analysis_runs", {

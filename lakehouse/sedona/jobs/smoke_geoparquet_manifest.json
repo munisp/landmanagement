@@ -1,0 +1,31 @@
+{
+  "jobId": 9001,
+  "jobKey": "sedona-00000000-0000-0000-0000-000000009001",
+  "operation": "geoparquet_export",
+  "analysisRunId": null,
+  "parcelId": null,
+  "inputChecksumSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "warehousePath": "s3://idlr-lakehouse/warehouse",
+  "outputPrefix": "warehouse/spatial/jobs/sedona-00000000-0000-0000-0000-000000009001",
+  "input": {
+    "operation": "geoparquet_export",
+    "features": [
+      {
+        "featureId": "smoke-parcel-1",
+        "geometryWkt": "POLYGON ((3 4, 3 5, 4 5, 3 4))",
+        "sourceCrs": "EPSG:4326",
+        "sourceAssetId": "smoke-asset-1",
+        "sourceChecksumSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "properties": {
+          "fixture": true,
+          "purpose": "controlled_smoke_validation"
+        }
+      }
+    ],
+    "analysisCrs": "EPSG:3857",
+    "outputCrs": "EPSG:4326",
+    "sourceAssetIds": ["smoke-asset-1"],
+    "sourceChecksums": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+    "includeProperties": ["fixture", "purpose"]
+  }
+}

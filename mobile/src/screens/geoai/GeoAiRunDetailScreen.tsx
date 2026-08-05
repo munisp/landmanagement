@@ -93,6 +93,9 @@ export function GeoAiRunDetailScreen() {
       <Pressable onPress={() => router.push(`/geoai/map/${run.id}` as any)} style={({ pressed }) => [styles.mapButton, pressed && styles.pressed]}>
         <Text style={styles.mapButtonText}>Open evidence map</Text>
       </Pressable>
+      <Pressable onPress={() => router.push(`/geoai/sedona/${run.id}` as any)} style={({ pressed }) => [styles.mapButton, pressed && styles.pressed]}>
+        <Text style={styles.mapButtonText}>Open governed Lakehouse jobs</Text>
+      </Pressable>
       {run.parcelId ? <Pressable onPress={() => router.push(`/geoai/parcel/${run.parcelId}` as any)} style={({ pressed }) => [styles.mapButton, pressed && styles.pressed]}>
         <Text style={styles.mapButtonText}>Open governed parcel evidence</Text>
       </Pressable> : null}

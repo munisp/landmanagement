@@ -7,7 +7,7 @@ export default defineConfig({
   root: projectRoot,
   test: {
     environment: 'node',
-    include: ['server/geolibreEmbedBridge.test.ts', 'server/geospatialDeliveryCapability.test.ts'],
+    include: ['server/geolibreEmbedBridge.test.ts', 'server/geospatialDeliveryCapability.test.ts', 'server/sedonaJobPolicy.test.ts'],
     setupFiles: ['server/geospatialDeliveryCapability.test.setup.ts'],
     testTimeout: 10_000,
     hookTimeout: 10_000,

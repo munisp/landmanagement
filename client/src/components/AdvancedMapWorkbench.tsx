@@ -54,6 +54,7 @@ import {
 
 interface AdvancedMapWorkbenchProps {
   parcelId?: number;
+  analysisRunId?: number;
   state?: string;
   lga?: string;
   className?: string;
@@ -126,6 +127,7 @@ const FLOOD_RISK_COLORS: Record<string, string> = {
 
 export function AdvancedMapWorkbench({
   parcelId,
+  analysisRunId,
   state,
   lga,
   className,
@@ -146,7 +148,9 @@ export function AdvancedMapWorkbench({
   const [selectedParcelInfo, setSelectedParcelInfo] = useState<Record<string, unknown> | null>(null);
   const [isochroneMinutes, setIsochroneMinutes] = useState(15);
   const [isochroneMode, setIsochroneMode] = useState<'driving' | 'walking' | 'cycling'>('driving');
-  const [exportFormat, setExportFormat] = useState<'geojson' | 'geojsonl' | 'csv'>('geojson');
+  const [sedonaRunId, setSedonaRunId] = useState(analysisRunId ? String(analysisRunId) : '');
+  const [sedonaManifestJson, setSedonaManifestJson] = useState('');
+  const selectedSedonaRunId = Number.parseInt(sedonaRunId, 10);
 
   const [layers, setLayers] = useState<LayerToggleState>({
     parcels: true,
@@ -206,6 +210,10 @@ export function AdvancedMapWorkbench({
   const requestBoundaryDetection = trpc.geospatial.requestBoundaryDetection.useMutation();
   const getAVM = trpc.geospatial.getAutomatedValuation.useMutation();
   const exportData = trpc.geospatial.exportToGeoParquet.useMutation();
+  const selectedSedonaRun = trpc.geoai.getRun.useQuery(
+    { runId: selectedSedonaRunId },
+    { enabled: Number.isSafeInteger(selectedSedonaRunId) && selectedSedonaRunId > 0 },
+  );
   const getDuckDBQuery = trpc.geospatial.getDuckDBSpatialQuery.useQuery(
     { queryType: 'landUseDistribution', params: { state: state ?? 'Lagos' } },
     { enabled: false }
@@ -714,30 +722,28 @@ export function AdvancedMapWorkbench({
   // ============================================================
 
   const handleExport = useCallback(async () => {
-    try {
-      const result = await exportData.mutateAsync({ state, lga, format: exportFormat });
-      if (result.geojson) {
-        const blob = new Blob([JSON.stringify(result.geojson, null, 2)], { type: 'application/geo+json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = result.fileName ?? 'parcels.geojson';
-        a.click();
-        URL.revokeObjectURL(url);
-      } else if (result.csv) {
-        const blob = new Blob([result.csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `parcels-${Date.now()}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-      toast.success(`Exported ${result.rowCount} parcels as ${exportFormat.toUpperCase()}`);
-    } catch {
-      toast.error('Export failed');
+    if (!Number.isSafeInteger(selectedSedonaRunId) || selectedSedonaRunId <= 0) {
+      toast.error('Enter an authorized GeoAI analysis run ID first');
+      return;
     }
-  }, [state, lga, exportFormat, exportData]);
+    if (!sedonaManifestJson.trim()) {
+      toast.error('Paste the governed GeoParquet manifest for the selected evidence run');
+      return;
+    }
+    let manifest: unknown;
+    try {
+      manifest = JSON.parse(sedonaManifestJson);
+    } catch {
+      toast.error('The governed GeoParquet manifest must be valid JSON');
+      return;
+    }
+    try {
+      const result = await exportData.mutateAsync({ analysisRunId: selectedSedonaRunId, input: manifest });
+      toast.success(`Queued governed GeoParquet job ${result.job.jobKey}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Governed GeoParquet job submission failed');
+    }
+  }, [selectedSedonaRunId, sedonaManifestJson, exportData]);
 
   // ============================================================
   // Boundary Detection Handler
@@ -1108,30 +1114,34 @@ export function AdvancedMapWorkbench({
                   <Download className="w-3.5 h-3.5" />
                   Export Parcels
                 </p>
-                <Select value={exportFormat} onValueChange={(v: string) => setExportFormat(v as any)}>
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="geojson">GeoJSON</SelectItem>
-                    <SelectItem value="geojsonl">GeoJSONL (streaming)</SelectItem>
-                    <SelectItem value="csv">CSV</SelectItem>
-                    <SelectItem value="geoparquet_query">GeoParquet (Sedona SQL)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input
+                  className="h-7 text-xs"
+                  inputMode="numeric"
+                  placeholder="Authorized GeoAI analysis run ID"
+                  value={sedonaRunId}
+                  onChange={(event) => setSedonaRunId(event.target.value)}
+                />
+                <Textarea
+                  className="min-h-28 font-mono text-[10px]"
+                  placeholder={'Governed GeoParquet manifest JSON. It must include operation: "geoparquet_export", registered sourceAssetIds/sourceChecksums, real WKT features, analysisCrs, and outputCrs.'}
+                  value={sedonaManifestJson}
+                  onChange={(event) => setSedonaManifestJson(event.target.value)}
+                />
                 <Button
                   size="sm"
                   className="w-full h-8 text-xs"
                   onClick={handleExport}
-                  disabled={exportData.isPending}
+                  disabled={exportData.isPending || selectedSedonaRun.isFetching}
                 >
-                  {exportData.isPending ? 'Exporting...' : `Export as ${exportFormat.toUpperCase()}`}
+                  {exportData.isPending ? 'Queuing governed export...' : 'Queue GeoParquet Lakehouse job'}
                 </Button>
-                {state && (
-                  <p className="text-xs text-muted-foreground">
-                    Scope: {lga ? `${lga}, ` : ''}{state}
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  {selectedSedonaRun.isFetching
+                    ? 'Checking the selected GeoAI evidence run…'
+                    : selectedSedonaRun.data
+                      ? `Bound to evidence run ${sedonaRunId}. Output remains private until its durable job completes and review policy permits release.`
+                      : 'Use an evidence-bearing GeoAI run. Inline exports and Sedona SQL templates are intentionally disabled.'}
+                </p>
                 <Separator />
                 <p className="text-xs font-medium">GeoLibre Integration</p>
                 <p className="text-xs text-muted-foreground">

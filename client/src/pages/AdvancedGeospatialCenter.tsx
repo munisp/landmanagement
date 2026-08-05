@@ -6,7 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MapLibreParcelWorkbench } from '@/components/MapLibreParcelWorkbench';
+const MapLibreParcelWorkbench = lazy(async () => {
+  const module = await import('@/components/MapLibreParcelWorkbench');
+  return { default: module.MapLibreParcelWorkbench };
+});
+const AdvancedMapWorkbench = lazy(async () => {
+  const module = await import('@/components/AdvancedMapWorkbench');
+  return { default: module.AdvancedMapWorkbench };
+});
 const CesiumParcelViewer = lazy(async () => {
   const module = await import('@/components/CesiumParcelViewer');
   return { default: module.CesiumParcelViewer };
@@ -16,6 +23,7 @@ import { AlertTriangle, BrainCircuit, Compass, Layers3, Map, MapPinned, Radar, R
 export default function AdvancedGeospatialCenter() {
   const [parcelIdInput, setParcelIdInput] = useState('1');
   const [activeParcelId, setActiveParcelId] = useState(1);
+  const requestedAnalysisRunId = Number.parseInt(new URLSearchParams(window.location.search).get('analysisRunId') ?? '', 10);
 
   const workbenchQuery = trpc.geospatialIntelligence.parcelWorkbench.useQuery(
     { parcelId: activeParcelId },
@@ -35,7 +43,7 @@ export default function AdvancedGeospatialCenter() {
       <div>
         <h1 className="text-3xl font-bold">Advanced Geospatial Center</h1>
         <p className="mt-2 text-muted-foreground">
-          A unified geospatial workbench for parcel intelligence, MapLibre-based review, Sedona-aligned spatial analytics, field route planning, and AI-assisted surveying insight.
+          A unified geospatial workbench for parcel intelligence, MapLibre-based review, governed Apache Sedona/Iceberg spatial jobs, field route planning, and AI-assisted surveying insight.
         </p>
       </div>
 
@@ -46,6 +54,27 @@ export default function AdvancedGeospatialCenter() {
         <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Workbench parcel</p><p className="mt-2 text-2xl font-semibold">{workbench?.parcel?.parcelNumber ?? '—'}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Spatial runtime</p><p className="mt-2 text-2xl font-semibold">{runtimeStatus?.execution_mode ?? '—'}</p></CardContent></Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle><Layers3 className="mr-2 inline h-4 w-4" />Governed Lakehouse map workbench</CardTitle>
+          <CardDescription>MapLibre review, authorized GeoParquet submission, durable Sedona job status, and direct GeoLibre handoff. Inline exports and SQL recipes are intentionally unavailable.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<div className="flex min-h-[720px] items-center justify-center rounded-xl border text-sm text-muted-foreground">Loading governed MapLibre workbench…</div>}>
+            <AdvancedMapWorkbench
+              parcelId={workbench?.parcel?.id ?? activeParcelId}
+              analysisRunId={Number.isSafeInteger(requestedAnalysisRunId) && requestedAnalysisRunId > 0 ? requestedAnalysisRunId : undefined}
+              state={workbench?.parcel?.state ?? undefined}
+              lga={workbench?.parcel?.lga ?? undefined}
+              initialLng={Number(workbench?.parcel?.longitude ?? 3.3792)}
+              initialLat={Number(workbench?.parcel?.latitude ?? 6.5244)}
+              initialZoom={15}
+              className="min-h-[720px] w-full"
+            />
+          </Suspense>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <Card>
@@ -74,13 +103,13 @@ export default function AdvancedGeospatialCenter() {
               <Button variant="outline" asChild><Link href="/geoai-operations">Open GeoAI Operations Center</Link></Button>
             </div>
             <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-              This workbench now integrates a dedicated MapLibre surface, Sedona-aligned lakehouse analytics, AI/CV/NLP-ready photo-analysis hooks, and a direct launch path into the exact upstream GeoLibre companion workspace.
+              This workbench integrates a dedicated MapLibre surface, governed Apache Sedona/Iceberg Lakehouse jobs, AI/CV/NLP-ready photo-analysis hooks, and a direct launch path into the exact upstream GeoLibre companion workspace.
             </div>
             <div className="flex flex-wrap gap-2 text-sm">
               <Badge variant="outline">MapLibre vector tiles governed</Badge>
               <Badge variant="outline">CesiumJS 3D Tiles governed</Badge>
               <Badge variant="outline">GeoLibre connected</Badge>
-              <Badge variant="outline">Sedona-aligned analytics</Badge>
+              <Badge variant="outline">Sedona/Iceberg jobs governed</Badge>
               <Badge variant="outline">AI / CV / NLP enabled</Badge>
             </div>
           </CardContent>
@@ -92,11 +121,13 @@ export default function AdvancedGeospatialCenter() {
             <CardDescription>A live MapLibre-compatible parcel review surface with the anchor parcel and nearby context.</CardDescription>
           </CardHeader>
           <CardContent>
-            <MapLibreParcelWorkbench
-              parcel={workbench?.parcel ? { ...workbench.parcel, geometryGeoJSON: workbench?.parcel?.geometryGeoJSON } : undefined}
-              nearbyParcels={workbench?.nearbyParcels ?? []}
-              className="h-[460px] w-full rounded-xl border"
-            />
+            <Suspense fallback={<div className="flex h-[460px] items-center justify-center rounded-xl border text-sm text-muted-foreground">Loading MapLibre parcel review…</div>}>
+              <MapLibreParcelWorkbench
+                parcel={workbench?.parcel ? { ...workbench.parcel, geometryGeoJSON: workbench?.parcel?.geometryGeoJSON } : undefined}
+                nearbyParcels={workbench?.nearbyParcels ?? []}
+                className="h-[460px] w-full rounded-xl border"
+              />
+            </Suspense>
           </CardContent>
         </Card>
       </div>
@@ -150,8 +181,8 @@ export default function AdvancedGeospatialCenter() {
 
         <Card>
           <CardHeader>
-            <CardTitle><BrainCircuit className="mr-2 inline h-4 w-4" />Sedona-aligned and AI runtime</CardTitle>
-            <CardDescription>Operational status of the new spatial analytics and AI-enrichment layer.</CardDescription>
+            <CardTitle><BrainCircuit className="mr-2 inline h-4 w-4" />Distributed Sedona and Lakehouse runtime</CardTitle>
+            <CardDescription>Real worker SQL, shared Iceberg catalog, and private warehouse readiness for governed spatial jobs.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <div className="rounded-lg border p-4">
@@ -160,12 +191,12 @@ export default function AdvancedGeospatialCenter() {
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-lg border p-4">
-                <p className="font-medium text-foreground">Sedona Python</p>
-                <p className="mt-2">{runtimeStatus?.sedona_python_available ? 'Available' : 'Not available in current runtime'}</p>
+                <p className="font-medium text-foreground">Sedona SQL worker</p>
+                <p className="mt-2">{runtimeStatus?.sedona_worker_ready ? 'Real SQL probe passed' : 'Worker SQL probe not ready'}</p>
               </div>
               <div className="rounded-lg border p-4">
-                <p className="font-medium text-foreground">PySpark</p>
-                <p className="mt-2">{runtimeStatus?.pyspark_available ? 'Available' : 'Not available in current runtime'}</p>
+                <p className="font-medium text-foreground">Iceberg and private warehouse</p>
+                <p className="mt-2">{runtimeStatus?.lakehouse_ready ? 'Catalog and warehouse ready' : 'Catalog or warehouse not ready'}</p>
               </div>
             </div>
             <div className="rounded-lg border p-4">

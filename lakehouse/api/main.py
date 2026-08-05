@@ -9,7 +9,7 @@ of degrading to static mock payloads.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import hmac
 import os
@@ -22,15 +22,20 @@ from psycopg2.extras import RealDictCursor, Json, execute_values
 from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
+from urllib.error import URLError
+from urllib.parse import urlparse
+from urllib.request import urlopen
 from pydantic import BaseModel, Field
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from catalog.iceberg_catalog import get_catalog
+    from catalog.iceberg_catalog import get_catalog_manager
+    from warehouse.warehouse import probe_warehouse
 except ImportError:
-    get_catalog = None
+    get_catalog_manager = None
+    probe_warehouse = None
 
 from api.geoai_service import router as geoai_router
 from api.geo_innovations_service import router as geo_innovations_router
@@ -206,25 +211,65 @@ def normalise_group_by(value: str) -> str:
     return value if value in {"day", "week", "month"} else "day"
 
 
+def _error_summary(exc: Exception) -> str:
+    # Health output is operator-visible; do not leak PostgreSQL, S3, or token-bearing URLs.
+    return f"{type(exc).__name__}: {str(exc).split('://', 1)[0][:240]}"
+
+
+def _probe_sedona_worker() -> dict[str, Any]:
+    url = os.getenv("SEDONA_WORKER_HEALTH_URL", "").strip()
+    if not url:
+        return {"ready": False, "detail": "SEDONA_WORKER_HEALTH_URL is not configured"}
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+        return {"ready": False, "detail": "SEDONA_WORKER_HEALTH_URL is invalid"}
+    try:
+        with urlopen(url, timeout=3) as response:  # nosec B310: endpoint is deployment-controlled and validated above
+            payload = json.loads(response.read().decode("utf-8"))
+        return {"ready": response.status == 200 and payload.get("status") == "ready"}
+    except (URLError, TimeoutError, ValueError, OSError) as exc:
+        return {"ready": False, "detail": _error_summary(exc)}
+
+
 @app.get("/health")
 async def health_check():
-    catalog_available = get_catalog is not None
     postgres_available = False
     postgres_message = None
+    catalog_status: dict[str, Any] = {"catalog_ready": False, "detail": "catalog runtime is unavailable"}
+    warehouse_status: dict[str, Any] = {"warehouse_ready": False, "detail": "warehouse runtime is unavailable"}
 
     try:
         with get_connection() as conn, conn.cursor() as cur:
             cur.execute("SELECT 1 AS ok")
             postgres_available = bool(cur.fetchone()["ok"] == 1)
     except Exception as exc:  # pragma: no cover - operational branch
-        postgres_message = str(exc)
+        postgres_message = _error_summary(exc)
 
+    if get_catalog_manager is not None and probe_warehouse is not None:
+        try:
+            manager = get_catalog_manager()
+            catalog_status = dict(manager.readiness())
+            warehouse_status = probe_warehouse(manager.settings).as_dict()
+        except Exception as exc:  # pragma: no cover - operational branch
+            detail = _error_summary(exc)
+            catalog_status = {"catalog_ready": False, "detail": detail}
+            warehouse_status = {"warehouse_ready": False, "detail": detail}
+
+    sedona_status = _probe_sedona_worker()
+    ready = bool(
+        postgres_available
+        and catalog_status.get("catalog_ready")
+        and warehouse_status.get("warehouse_ready")
+        and sedona_status.get("ready")
+    )
     return {
-        "status": "healthy" if postgres_available else "degraded",
-        "timestamp": datetime.utcnow().isoformat(),
-        "catalog_available": catalog_available,
+        "status": "healthy" if ready else "degraded",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "postgres_available": postgres_available,
         "postgres_message": postgres_message,
+        "iceberg": catalog_status,
+        "warehouse": warehouse_status,
+        "sedona_worker": sedona_status,
     }
 
 
@@ -733,14 +778,32 @@ class SedonaSpatialWorkbenchRequest(BaseModel):
 
 
 def _sedona_runtime_status() -> Dict[str, Any]:
-    import importlib.util
+    catalog_status: Dict[str, Any] = {"catalog_ready": False, "detail": "catalog runtime is unavailable"}
+    warehouse_status: Dict[str, Any] = {"warehouse_ready": False, "detail": "warehouse runtime is unavailable"}
+    if get_catalog_manager is not None and probe_warehouse is not None:
+        try:
+            manager = get_catalog_manager()
+            catalog_status = dict(manager.readiness())
+            warehouse_status = probe_warehouse(manager.settings).as_dict()
+        except Exception as exc:  # pragma: no cover - operational branch
+            detail = _error_summary(exc)
+            catalog_status = {"catalog_ready": False, "detail": detail}
+            warehouse_status = {"warehouse_ready": False, "detail": detail}
 
-    sedona_spec = importlib.util.find_spec("sedona")
-    pyspark_spec = importlib.util.find_spec("pyspark")
+    sedona_worker = _probe_sedona_worker()
+    ready = bool(
+        sedona_worker.get("ready")
+        and catalog_status.get("catalog_ready")
+        and warehouse_status.get("warehouse_ready")
+    )
     return {
-        "sedona_python_available": sedona_spec is not None,
-        "pyspark_available": pyspark_spec is not None,
-        "execution_mode": "apache_sedona_ready" if sedona_spec is not None and pyspark_spec is not None else "geopandas_fallback",
+        "ready": ready,
+        "execution_mode": "apache_sedona_distributed" if ready else "distributed_sedona_not_ready",
+        "sedona_worker_ready": bool(sedona_worker.get("ready")),
+        "lakehouse_ready": bool(catalog_status.get("catalog_ready") and warehouse_status.get("warehouse_ready")),
+        "sedona_worker": sedona_worker,
+        "iceberg": catalog_status,
+        "warehouse": warehouse_status,
     }
 
 
@@ -793,13 +856,14 @@ async def geospatial_runtime_status():
     return {
         **status,
         "supports": {
-            "range_query": True,
-            "knn": True,
-            "clustering": True,
-            "outlier_detection": True,
+            "governed_sedona_jobs": bool(status["ready"]),
+            "geoparquet_export": bool(status["ready"]),
+            "topology_validation": bool(status["ready"]),
+            "viewshed": bool(status["ready"]),
+            "zonal_statistics": bool(status["ready"]),
             "geojson": True,
         },
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 

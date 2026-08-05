@@ -14,7 +14,7 @@ jest.mock("../lib/runtimeConfig", () => ({
   getApiBaseUrl: () => "https://platform.example.test",
 }));
 
-import { MobileApiError, getMobileParcelEvidence, trpcMutation, trpcQuery } from "./api";
+import { MobileApiError, cancelSedonaJob, getMobileParcelEvidence, listSedonaJobsForRun, trpcMutation, trpcQuery } from "./api";
 
 describe("native tRPC client", () => {
   const originalFetch = global.fetch;
@@ -102,6 +102,36 @@ describe("native tRPC client", () => {
       }),
     );
     expect([...mockSecureValues.values()].join(" ")).not.toContain("delivery-capability-token");
+  });
+
+  it("retrieves and cancels a governed Sedona job through the session-authenticated tRPC boundary", async () => {
+    const fetchSpy = jest.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        result: { data: { json: [{ id: 91, jobKey: "sedona-00000000-0000-0000-0000-000000000091", operation: "geoparquet_export", status: "running", attempt: 1, maxAttempts: 3, createdAt: new Date().toISOString(), completedAt: null, failureCode: null, failureReason: null, resultSummary: null }] } },
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        result: { data: { json: { id: 91, status: "cancel_requested" } } },
+      }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    global.fetch = fetchSpy as unknown as typeof fetch;
+
+    const jobs = await listSedonaJobsForRun(42, "native-access-token");
+    const cancelled = await cancelSedonaJob(91, "native-access-token");
+
+    expect(jobs[0]?.jobKey).toMatch(/^sedona-/);
+    expect(cancelled.status).toBe("cancel_requested");
+    expect(fetchSpy).toHaveBeenNthCalledWith(1,
+      expect.stringContaining("/trpc/sedonaJobs.listForRun?input="),
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer native-access-token" }) }),
+    );
+    expect(fetchSpy).toHaveBeenNthCalledWith(2,
+      "https://platform.example.test/trpc/sedonaJobs.cancel",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ Authorization: "Bearer native-access-token" }),
+        body: expect.stringContaining("91"),
+      }),
+    );
+    expect([...mockSecureValues.values()].join(" ")).not.toContain("sedona-00000000-0000-0000-0000-000000000091");
   });
 
   it("fails closed before a protected request when no mobile identity token is available", async () => {

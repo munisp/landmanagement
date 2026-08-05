@@ -35,7 +35,6 @@ import {
   getParcelMVTile,
   parsePersistedWktGeometry,
   DUCKDB_SPATIAL_QUERIES,
-  SEDONA_SQL_QUERIES,
 } from '../../geolibreEmbedBridge';
 import { requireDb } from '../../db';
 import {
@@ -50,6 +49,11 @@ import {
   elevationTiles,
 } from '../../../drizzle/schema';
 import { eq, and, sql, desc, asc, gte, lte, inArray } from 'drizzle-orm';
+import { createSedonaJob, getSedonaJob, type SedonaOperation } from '../../sedonaJobService';
+import { validateSedonaJobInput } from '../../sedonaJobPolicy';
+import { getGeoAnalysisRun } from '../../geoaiEvidenceService';
+import { checkPermifyPermission } from '../../permifyService';
+import { TRPCError } from '@trpc/server';
 
 export const geospatialRouter = router({
 
@@ -122,51 +126,62 @@ export const geospatialRouter = router({
     }),
 
   // ============================================================
-  // 3. Apache Sedona SQL Templates
+  // 3. Governed Apache Sedona Jobs
   // ============================================================
 
-  getSedonaQuery: protectedProcedure
+  submitSedonaOperation: protectedProcedure
     .input(z.object({
-      queryType: z.enum([
-        'distributedFloodRiskAnalysis',
-        'detectTopologyViolations',
-        'exportToGeoParquet',
-        'elevationStatisticsPerParcel',
-        'ndviTimeSeries',
-      ]),
-      params: z.record(z.string(), z.unknown()).optional(),
+      analysisRunId: z.number().int().positive(),
+      operation: z.enum(['geoparquet_export', 'topology_validation', 'spatial_workbench', 'zonal_statistics', 'viewshed']),
+      input: z.unknown(),
+      maxAttempts: z.number().int().min(1).max(10).optional(),
     }))
-    .query(({ input }) => {
-      const p = input.params ?? {};
-      let query = '';
-
-      switch (input.queryType) {
-        case 'distributedFloodRiskAnalysis':
-          query = SEDONA_SQL_QUERIES.distributedFloodRiskAnalysis(p.state ? String(p.state) : undefined);
-          break;
-        case 'detectTopologyViolations':
-          query = SEDONA_SQL_QUERIES.detectTopologyViolations();
-          break;
-        case 'exportToGeoParquet':
-          query = SEDONA_SQL_QUERIES.exportToGeoParquet(
-            String(p.outputPath ?? 's3://lakehouse/parcels/'),
-            p.state ? String(p.state) : undefined
-          );
-          break;
-        case 'elevationStatisticsPerParcel':
-          query = SEDONA_SQL_QUERIES.elevationStatisticsPerParcel(
-            String(p.demTablePath ?? 's3://lakehouse/dem/srtm/')
-          );
-          break;
-        case 'ndviTimeSeries':
-          query = SEDONA_SQL_QUERIES.ndviTimeSeries(
-            String(p.ndviTablePath ?? 's3://lakehouse/ndvi/'),
-            Number(p.parcelId ?? 1)
-          );
-          break;
+    .mutation(async ({ ctx, input }) => {
+      const stored = await getGeoAnalysisRun(input.analysisRunId);
+      if (!stored) throw new TRPCError({ code: 'NOT_FOUND', message: 'GeoAI analysis run was not found' });
+      const permitted = await checkPermifyPermission({
+        user: ctx.user,
+        resource: 'geo_analysis',
+        resourceId: String(input.analysisRunId),
+        action: 'update',
+      });
+      if (!permitted) throw new TRPCError({ code: 'FORBIDDEN', message: 'You are not authorized to execute this GeoAI analysis run' });
+      try {
+        const jobInput = validateSedonaJobInput(input.operation as SedonaOperation, input.input);
+        const runManifest = stored.run.inputManifest as { sourceAssets?: Array<{ assetId?: unknown; checksumSha256?: unknown }> };
+        const assets = Array.isArray(runManifest.sourceAssets) ? runManifest.sourceAssets : [];
+        const registeredChecksums = new Map(assets
+          .filter((asset): asset is { assetId: string; checksumSha256?: string } => typeof asset.assetId === 'string')
+          .map((asset) => [asset.assetId, asset.checksumSha256?.toLowerCase() ?? null]));
+        if (!jobInput.sourceAssetIds.every((assetId) => registeredChecksums.has(assetId))) {
+          throw new Error('Every Sedona input asset must be registered on the bound GeoAI analysis run');
+        }
+        if (!jobInput.sourceChecksums.every((checksum) => [...registeredChecksums.values()].includes(checksum.toLowerCase()))) {
+          throw new Error('Every Sedona input checksum must match a registered GeoAI analysis asset');
+        }
+        return await createSedonaJob({
+          requestedBy: ctx.user.id,
+          operation: input.operation,
+          analysisRunId: stored.run.id,
+          parcelId: stored.run.parcelId ?? undefined,
+          inputManifest: jobInput,
+          maxAttempts: input.maxAttempts,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Sedona job input is invalid';
+        throw new TRPCError({ code: 'BAD_REQUEST', message });
       }
+    }),
 
-      return { query, engine: 'sedona' as const };
+  getSedonaJobStatus: protectedProcedure
+    .input(z.object({ jobId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const job = await getSedonaJob(input.jobId);
+      if (!job) throw new TRPCError({ code: 'NOT_FOUND', message: 'Sedona job was not found' });
+      if (!job.analysisRunId) throw new TRPCError({ code: 'FORBIDDEN', message: 'Unbound Sedona jobs are not accessible from the user API' });
+      const permitted = await checkPermifyPermission({ user: ctx.user, resource: 'geo_analysis', resourceId: String(job.analysisRunId), action: 'view' });
+      if (!permitted) throw new TRPCError({ code: 'FORBIDDEN', message: 'You are not authorized to view this Sedona job' });
+      return job;
     }),
 
   // ============================================================
@@ -706,53 +721,35 @@ export const geospatialRouter = router({
     }),
 
   // ============================================================
-  // 15. Viewshed Analysis (simplified)
+  // 15. Governed DEM Viewshed Analysis
   // ============================================================
 
   computeViewshed: protectedProcedure
     .input(z.object({
-      parcelId: z.number().int().positive(),
-      observerHeightM: z.number().positive().default(1.8),
-      radiusM: z.number().positive().max(10000).default(2000),
+      analysisRunId: z.number().int().positive(),
+      input: z.unknown(),
+      maxAttempts: z.number().int().min(1).max(10).optional(),
     }))
-    .query(async ({ input }) => {
-      const db = await requireDb();
-      const [parcel] = await db.select({
-        latitude: parcels.latitude,
-        longitude: parcels.longitude,
-        parcelNumber: parcels.parcelNumber,
-      }).from(parcels).where(eq(parcels.id, input.parcelId)).limit(1);
-
-      if (!parcel?.latitude || !parcel?.longitude) {
-        return { parcelId: input.parcelId, viewshedAvailable: false };
+    .mutation(async ({ ctx, input }) => {
+      const stored = await getGeoAnalysisRun(input.analysisRunId);
+      if (!stored) throw new TRPCError({ code: 'NOT_FOUND', message: 'GeoAI analysis run was not found' });
+      const permitted = await checkPermifyPermission({ user: ctx.user, resource: 'geo_analysis', resourceId: String(input.analysisRunId), action: 'update' });
+      if (!permitted) throw new TRPCError({ code: 'FORBIDDEN', message: 'You are not authorized to execute this GeoAI analysis run' });
+      try {
+        const jobInput = validateSedonaJobInput('viewshed', input.input);
+        const result = await createSedonaJob({
+          requestedBy: ctx.user.id,
+          operation: 'viewshed',
+          analysisRunId: stored.run.id,
+          parcelId: stored.run.parcelId ?? undefined,
+          inputManifest: jobInput,
+          maxAttempts: input.maxAttempts,
+        });
+        return { viewshedAvailable: true, execution: 'sedona_lakehouse', job: result };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Viewshed job input is invalid';
+        throw new TRPCError({ code: 'BAD_REQUEST', message });
       }
-
-      // In production: use GRASS GIS r.viewshed or WhiteboxTools viewshed
-      // Here we return metadata and the Sedona SQL to run on the cluster
-      return {
-        parcelId: input.parcelId,
-        parcelNumber: parcel.parcelNumber,
-        observerLng: Number(parcel.longitude),
-        observerLat: Number(parcel.latitude),
-        observerHeightM: input.observerHeightM,
-        radiusM: input.radiusM,
-        viewshedAvailable: false,
-        message: 'Viewshed analysis requires DEM raster data. Use the Sedona lakehouse pipeline with SRTM DEM data.',
-        sedonaQuery: `
--- Run this in the Sedona cluster with DEM data loaded
-SELECT ST_Viewshed(
-  dem.rast,
-  ST_SetSRID(ST_MakePoint(${parcel.longitude}, ${parcel.latitude}), 4326),
-  ${input.observerHeightM},
-  ${input.radiusM}
-) AS viewshed_raster
-FROM dem_tiles dem
-WHERE ST_Intersects(dem.rast, ST_Buffer(
-  ST_SetSRID(ST_MakePoint(${parcel.longitude}, ${parcel.latitude}), 4326)::geography,
-  ${input.radiusM}
-)::geometry)
-        `.trim(),
-      };
     }),
 
   // ============================================================
@@ -1028,106 +1025,42 @@ WHERE ST_Intersects(dem.rast, ST_Buffer(
     }),
 
   // ============================================================
-  // 20. GeoParquet Lakehouse Export
+  // 20. Governed GeoParquet Lakehouse Export
   // ============================================================
 
   exportToGeoParquet: protectedProcedure
     .input(z.object({
-      state: z.string().optional(),
-      lga: z.string().optional(),
-      format: z.enum(['geojson', 'geojsonl', 'csv', 'geoparquet_query']).default('geojson'),
+      analysisRunId: z.number().int().positive(),
+      input: z.unknown(),
+      maxAttempts: z.number().int().min(1).max(10).optional(),
     }))
-    .mutation(async ({ input }) => {
-      const db = await requireDb();
-      const conditions = [];
-      if (input.state) conditions.push(eq(parcels.state, input.state));
-      if (input.lga) conditions.push(eq(parcels.lga, input.lga));
-
-      const rows = await db.select({
-        id: parcels.id,
-        parcelId: parcels.parcelId,
-        parcelNumber: parcels.parcelNumber,
-        address: parcels.address,
-        state: parcels.state,
-        lga: parcels.lga,
-        latitude: parcels.latitude,
-        longitude: parcels.longitude,
-        area: parcels.area,
-        landUse: parcels.landUse,
-        status: parcels.status,
-        estimatedValue: parcels.estimatedValue,
-        geometryGeoJSON: parcels.geometryGeoJSON,
-        titleNumber: parcels.titleNumber,
-        surveyPlanNumber: parcels.surveyPlanNumber,
-        createdAt: parcels.createdAt,
-      }).from(parcels)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .limit(10000);
-
-      if (input.format === 'geoparquet_query') {
-        return {
-          format: 'geoparquet_query',
-          sedonaQuery: SEDONA_SQL_QUERIES.exportToGeoParquet(
-            `s3://lakehouse/parcels/${input.state ?? 'all'}/`,
-            input.state
-          ),
-          rowCount: rows.length,
-          message: 'Run this Sedona SQL on the lakehouse cluster to export to GeoParquet format.',
-        };
-      }
-
-      const features: GeoJSON.Feature[] = rows.map((p) => {
-        let geometry: GeoJSON.Geometry;
-        try {
-          geometry = p.geometryGeoJSON ? JSON.parse(p.geometryGeoJSON) :
-            { type: 'Point', coordinates: [Number(p.longitude ?? 3.3792), Number(p.latitude ?? 6.5244)] };
-        } catch {
-          geometry = { type: 'Point', coordinates: [Number(p.longitude ?? 3.3792), Number(p.latitude ?? 6.5244)] };
+    .mutation(async ({ ctx, input }) => {
+      const stored = await getGeoAnalysisRun(input.analysisRunId);
+      if (!stored) throw new TRPCError({ code: 'NOT_FOUND', message: 'GeoAI analysis run was not found' });
+      const permitted = await checkPermifyPermission({ user: ctx.user, resource: 'geo_analysis', resourceId: String(input.analysisRunId), action: 'update' });
+      if (!permitted) throw new TRPCError({ code: 'FORBIDDEN', message: 'You are not authorized to export this GeoAI analysis run' });
+      try {
+        const jobInput = validateSedonaJobInput('geoparquet_export', input.input);
+        const runManifest = stored.run.inputManifest as { sourceAssets?: Array<{ assetId?: unknown }> };
+        const registeredAssetIds = new Set((Array.isArray(runManifest.sourceAssets) ? runManifest.sourceAssets : [])
+          .map((asset) => typeof asset.assetId === 'string' ? asset.assetId : null)
+          .filter((asset): asset is string => Boolean(asset)));
+        if (!jobInput.sourceAssetIds.every((assetId) => registeredAssetIds.has(assetId))) {
+          throw new Error('A GeoParquet export may include only assets registered on the bound GeoAI analysis run');
         }
-
-        return {
-          type: 'Feature',
-          id: p.id,
-          properties: {
-            id: p.id,
-            parcelId: p.parcelId,
-            parcelNumber: p.parcelNumber,
-            address: p.address,
-            state: p.state,
-            lga: p.lga,
-            area_m2: p.area,
-            landUse: p.landUse,
-            status: p.status,
-            estimatedValue: p.estimatedValue,
-            titleNumber: p.titleNumber,
-            surveyPlanNumber: p.surveyPlanNumber,
-            createdAt: p.createdAt?.toISOString(),
-          },
-          geometry,
-        };
-      });
-
-      const geojson: GeoJSON.FeatureCollection = {
-        type: 'FeatureCollection',
-        features,
-      };
-
-      return {
-        format: input.format,
-        rowCount: rows.length,
-        fileName: `parcels-${input.state ?? 'all'}-${Date.now()}.geojson`,
-        mimeType: 'application/geo+json',
-        geojson: input.format === 'geojson' ? geojson : undefined,
-        geojsonl: input.format === 'geojsonl'
-          ? features.map((f) => JSON.stringify(f)).join('\n')
-          : undefined,
-        csv: input.format === 'csv'
-          ? [
-              'id,parcelNumber,state,lga,area_m2,landUse,status,estimatedValue,latitude,longitude',
-              ...(rows as any[]).map((p: any) => `${p.id},${p.parcelNumber},${p.state},${p.lga},${p.area},${p.landUse},${p.status},${p.estimatedValue},${p.latitude},${p.longitude}`),
-            ].join('\n')
-          : undefined,
-      };
+        const job = await createSedonaJob({
+          requestedBy: ctx.user.id,
+          operation: 'geoparquet_export',
+          analysisRunId: stored.run.id,
+          parcelId: stored.run.parcelId ?? undefined,
+          inputManifest: jobInput,
+          maxAttempts: input.maxAttempts,
+        });
+        return { format: 'geoparquet', execution: 'sedona_lakehouse', job };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'GeoParquet export job input is invalid';
+        throw new TRPCError({ code: 'BAD_REQUEST', message });
+      }
     }),
 });
 

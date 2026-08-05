@@ -731,3 +731,35 @@ export async function getMobileParcelEvidence(parcelId: number, token?: string |
     throw error;
   }
 }
+
+export type SedonaJobStatus = "queued" | "claimed" | "running" | "cancel_requested" | "succeeded" | "failed" | "cancelled";
+export type SedonaOperation = "geoparquet_export" | "topology_validation" | "spatial_workbench" | "zonal_statistics" | "viewshed";
+
+export type MobileSedonaJob = {
+  id: number;
+  jobKey: string;
+  operation: SedonaOperation;
+  status: SedonaJobStatus;
+  analysisRunId: number | null;
+  parcelId: number | null;
+  attempt: number;
+  maxAttempts: number;
+  resultSummary?: Record<string, unknown> | null;
+  outputUri?: string | null;
+  failureCode?: string | null;
+  failureReason?: string | null;
+  createdAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+};
+
+/**
+ * Job state is always fetched live through the authenticated tRPC boundary.
+ * No scoped capability, raw artifact URI, or job manifest is written to the
+ * device cache because output access remains subject to server policy.
+ */
+export const listSedonaJobsForRun = (analysisRunId: number, token?: string | null) =>
+  trpcQuery<MobileSedonaJob[]>("sedonaJobs.listForRun", { analysisRunId, limit: 50 }, token);
+
+export const cancelSedonaJob = (jobId: number, token?: string | null) =>
+  trpcMutation<MobileSedonaJob>("sedonaJobs.cancel", { jobId }, token);

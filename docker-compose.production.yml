@@ -512,6 +512,7 @@ services:
     build:
       context: ./lakehouse
       dockerfile: Dockerfile
+      network: host
     container_name: idlr-lakehouse-api
     <<: *default-restart
     logging: *default-logging
@@ -526,6 +527,15 @@ services:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MODEL_WEIGHTS_DIR: /app/ml/weights
       RAY_ADDRESS: auto
+      # Governed Iceberg / S3-compatible Lakehouse catalog
+      ICEBERG_CATALOG_URI: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      ICEBERG_WAREHOUSE_PATH: s3://${LAKEHOUSE_S3_BUCKET:-idlr-lakehouse}/warehouse
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY:?LAKEHOUSE_S3_ACCESS_KEY must be set}
+      S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY:?LAKEHOUSE_S3_SECRET_KEY must be set}
+      S3_REGION: ${LAKEHOUSE_S3_REGION:-us-east-1}
+      S3_PATH_STYLE_ACCESS: "true"
+      SEDONA_WORKER_HEALTH_URL: http://sedona-job-worker:8081/ready
     volumes:
       - ./lakehouse/ml/weights:/app/ml/weights
       - lakehouse_data:/app/data
@@ -535,6 +545,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      iceberg-catalog-bootstrap:
+        condition: service_completed_successfully
     networks:
       - idlr_net
     healthcheck:
@@ -542,6 +554,163 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Apache Sedona + Iceberg governed Lakehouse data plane
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    container_name: idlr-lakehouse-minio
+    <<: *default-restart
+    logging: *default-logging
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${LAKEHOUSE_S3_ACCESS_KEY:?LAKEHOUSE_S3_ACCESS_KEY must be set}
+      MINIO_ROOT_PASSWORD: ${LAKEHOUSE_S3_SECRET_KEY:?LAKEHOUSE_S3_SECRET_KEY must be set}
+    volumes:
+      - lakehouse_warehouse:/data
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  minio-bootstrap:
+    image: minio/mc:RELEASE.2024-10-08T09-37-26Z
+    container_name: idlr-lakehouse-minio-bootstrap
+    restart: "no"
+    entrypoint: ["/bin/sh", "/bootstrap_minio.sh"]
+    environment:
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY:?LAKEHOUSE_S3_ACCESS_KEY must be set}
+      S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY:?LAKEHOUSE_S3_SECRET_KEY must be set}
+      S3_BUCKET: ${LAKEHOUSE_S3_BUCKET:-idlr-lakehouse}
+    volumes:
+      - ./lakehouse/warehouse/bootstrap_minio.sh:/bootstrap_minio.sh:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - idlr_net
+
+  iceberg-catalog-bootstrap:
+    build:
+      context: ./lakehouse
+      dockerfile: Dockerfile
+      network: host
+    container_name: idlr-iceberg-catalog-bootstrap
+    restart: "no"
+    command: ["python", "-m", "warehouse.bootstrap_catalog"]
+    environment:
+      ICEBERG_CATALOG_URI: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      ICEBERG_WAREHOUSE_PATH: s3://${LAKEHOUSE_S3_BUCKET:-idlr-lakehouse}/warehouse
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY:?LAKEHOUSE_S3_ACCESS_KEY must be set}
+      S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY:?LAKEHOUSE_S3_SECRET_KEY must be set}
+      S3_REGION: ${LAKEHOUSE_S3_REGION:-us-east-1}
+      S3_PATH_STYLE_ACCESS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
+    networks:
+      - idlr_net
+
+  sedona-spark-master:
+    build:
+      context: ./lakehouse/sedona
+      dockerfile: Dockerfile
+      network: host
+    container_name: idlr-sedona-spark-master
+    <<: *default-restart
+    logging: *default-logging
+    command: ["master"]
+    environment:
+      SPARK_MASTER_HOST: sedona-spark-master
+      SPARK_MASTER_PORT: 7077
+      SPARK_MASTER_WEBUI_PORT: 8080
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080 >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  sedona-spark-worker:
+    build:
+      context: ./lakehouse/sedona
+      dockerfile: Dockerfile
+      network: host
+    container_name: idlr-sedona-spark-worker
+    <<: *default-restart
+    logging: *default-logging
+    command: ["worker"]
+    environment:
+      SPARK_MASTER_URL: spark://sedona-spark-master:7077
+      SPARK_WORKER_CORES: ${SEDONA_SPARK_WORKER_CORES:-2}
+      SPARK_WORKER_MEMORY: ${SEDONA_SPARK_WORKER_MEMORY:-2g}
+      SPARK_WORKER_WEBUI_PORT: 8081
+    depends_on:
+      sedona-spark-master:
+        condition: service_healthy
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081 >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  sedona-job-worker:
+    build:
+      context: ./lakehouse/sedona
+      dockerfile: Dockerfile
+      network: host
+    container_name: idlr-sedona-job-worker
+    <<: *default-restart
+    logging: *default-logging
+    command: ["job-worker"]
+    environment:
+      POSTGRES_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      SEDONA_JOB_WORKER_ID: ${SEDONA_JOB_WORKER_ID:-sedona-worker-01}
+      SEDONA_JOB_POLL_SECONDS: ${SEDONA_JOB_POLL_SECONDS:-3}
+      SEDONA_JOB_STALE_AFTER_SECONDS: ${SEDONA_JOB_STALE_AFTER_SECONDS:-300}
+      SEDONA_JOB_MAX_RUNTIME_SECONDS: ${SEDONA_JOB_MAX_RUNTIME_SECONDS:-3600}
+      SEDONA_STARTUP_PROBE_TIMEOUT_SECONDS: ${SEDONA_STARTUP_PROBE_TIMEOUT_SECONDS:-180}
+      SEDONA_WORKER_METRICS_PORT: 9108
+      SEDONA_WORKER_HEALTH_PORT: 8081
+      SPARK_MASTER_URL: spark://sedona-spark-master:7077
+      ICEBERG_CATALOG_URI: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:-idlr}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      ICEBERG_WAREHOUSE_PATH: s3://${LAKEHOUSE_S3_BUCKET:-idlr-lakehouse}/warehouse
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY:?LAKEHOUSE_S3_ACCESS_KEY must be set}
+      S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY:?LAKEHOUSE_S3_SECRET_KEY must be set}
+      S3_REGION: ${LAKEHOUSE_S3_REGION:-us-east-1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      iceberg-catalog-bootstrap:
+        condition: service_completed_successfully
+      sedona-spark-master:
+        condition: service_healthy
+      sedona-spark-worker:
+        condition: service_healthy
+    networks:
+      - idlr_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/ready >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Governed cross-language geospatial delivery
@@ -1043,6 +1212,7 @@ volumes:
   etcd_data:
   opensearch_data:
   lakehouse_data:
+  lakehouse_warehouse:
   geo_3d_assets:
   mlflow_artifacts:
   prometheus_data:
