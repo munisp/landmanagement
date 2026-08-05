@@ -1,0 +1,31 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: mapping-operations-webhook
+  group_by: [alertname, service, job]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: mapping-operations-webhook
+      repeat_interval: 1h
+    - matchers: [severity="warning"]
+      receiver: mapping-operations-webhook
+      repeat_interval: 4h
+
+receivers:
+  - name: mapping-operations-webhook
+    webhook_configs:
+      - url: '__ALERTMANAGER_WEBHOOK_URL__'
+        send_resolved: true
+        http_config:
+          authorization:
+            type: Bearer
+            credentials: '__ALERTMANAGER_WEBHOOK_TOKEN__'
+
+inhibit_rules:
+  - source_matchers: [alertname="MappingServiceUnavailable", severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: [job]

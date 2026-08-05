@@ -1,0 +1,66 @@
+groups:
+  - name: idlr_mapping_slos
+    rules:
+      - record: idlr:geospatial_basemap_failure_ratio:5m
+        expr: sum(rate(geospatial_basemap_tile_requests_total{outcome="error"}[5m])) / clamp_min(sum(rate(geospatial_basemap_tile_requests_total[5m])), 0.001)
+      - record: idlr:vector_tile_error_ratio:5m
+        expr: sum(rate(geospatial_vector_tile_errors_total[5m])) / clamp_min(sum(rate(geospatial_vector_tile_requests_total[5m])), 0.001)
+      - record: idlr:cesium_asset_error_ratio:5m
+        expr: sum(rate(geospatial_cesium_asset_errors_total[5m])) / clamp_min(sum(rate(geospatial_cesium_asset_requests_total[5m])), 0.001)
+
+  - name: idlr_mapping_alerts
+    rules:
+      - alert: MappingServiceUnavailable
+        expr: up{job=~"idlr-pts-app|vector-tile-service|cesium-asset-service|lakehouse-api|sedona-job-worker"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: mapping
+        annotations:
+          summary: "Mapping dependency {{ $labels.job }} is unavailable"
+          runbook: "Check the service readiness endpoint, correlated request IDs, and deployment health gates before restoring traffic."
+      - alert: ApprovedBasemapFallbackActive
+        expr: increase(geospatial_basemap_fallbacks_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: mapping
+        annotations:
+          summary: "Approved basemap fallback is active"
+          runbook: "Check the primary approved provider, its contract, and upstream availability. Do not replace the configured provider with an unapproved URL."
+      - alert: ApprovedBasemapErrorBudgetBurn
+        expr: idlr:geospatial_basemap_failure_ratio:5m > 0.05
+        for: 10m
+        labels:
+          severity: critical
+          service: mapping
+        annotations:
+          summary: "Approved basemap delivery error rate exceeds 5 percent"
+          runbook: "Review primary and fallback provider outcomes, proxy timeouts, and platform egress before declaring a map outage."
+      - alert: VectorTileErrorBudgetBurn
+        expr: idlr:vector_tile_error_ratio:5m > 0.02
+        for: 10m
+        labels:
+          severity: critical
+          service: mapping
+        annotations:
+          summary: "Vector tile delivery error rate exceeds 2 percent"
+          runbook: "Check PostGIS readiness, capability verification failures, tile query latency, and parcel-scope authorization events."
+      - alert: CesiumAssetErrorBudgetBurn
+        expr: idlr:cesium_asset_error_ratio:5m > 0.02
+        for: 10m
+        labels:
+          severity: critical
+          service: mapping
+        annotations:
+          summary: "Cesium asset delivery error rate exceeds 2 percent"
+          runbook: "Check catalog availability, asset-root mounts, manifest validation, and capability authorization denials."
+      - alert: SedonaMappingWorkerNotReady
+        expr: up{job="sedona-job-worker"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: lakehouse_mapping
+        annotations:
+          summary: "Sedona mapping worker readiness is unavailable"
+          runbook: "Check Spark/Sedona SQL startup probe, private warehouse health, and Iceberg catalog readiness."

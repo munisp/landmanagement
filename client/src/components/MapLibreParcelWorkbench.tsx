@@ -6,23 +6,25 @@ import { trpc } from '@/lib/trpc';
 const MAP_STYLE: StyleSpecification = {
   version: 8,
   sources: {
-    osm: {
+    platformBasemap: {
       type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tiles: ['/api/geospatial-delivery/basemap/{z}/{x}/{y}.png'],
       tileSize: 256,
-      attribution: '© OpenStreetMap contributors',
+      attribution: '© OpenStreetMap contributors · delivered by the platform',
     },
   },
-  layers: [{ id: 'osm-base', type: 'raster', source: 'osm' }],
+  layers: [{ id: 'platform-basemap', type: 'raster', source: 'platformBasemap' }],
 };
 
 const NEUTRAL_MAP_CENTER: [number, number] = [0, 20];
 const NEUTRAL_MAP_ZOOM = 1.5;
 const VECTOR_LAYER_IDS = ['authorized-parcel-fill', 'authorized-parcel-line'];
+const EARTH_RADIUS_METERS = 6_371_008.8;
 
 type ParcelGeometry = GeoJSON.Polygon | GeoJSON.MultiPolygon;
+type MeasurementMode = 'distance' | 'area' | null;
 
-interface ParcelShape {
+export interface ParcelShape {
   id: number;
   parcelNumber: string;
   estimatedValue?: number;
@@ -37,6 +39,7 @@ interface MapLibreParcelWorkbenchProps {
   parcel?: ParcelShape | null;
   nearbyParcels?: ParcelShape[];
   className?: string;
+  enableMeasurementTools?: boolean;
 }
 
 type TileGrant = { endpoint: string; capability: string; expiresAt: string };
@@ -152,7 +155,70 @@ function removeVectorTileSource(map: maplibregl.Map) {
   if (map.getSource('authorized-parcels')) map.removeSource('authorized-parcels');
 }
 
-export function MapLibreParcelWorkbench({ parcel, nearbyParcels = [], className }: MapLibreParcelWorkbenchProps) {
+function haversineMeters(points: [number, number][]): number {
+  return points.slice(1).reduce((total, [lng, lat], index) => {
+    const [previousLng, previousLat] = points[index]!;
+    const lat1 = previousLat * Math.PI / 180;
+    const lat2 = lat * Math.PI / 180;
+    const deltaLat = lat2 - lat1;
+    const deltaLng = (lng - previousLng) * Math.PI / 180;
+    const a = Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
+    return total + 2 * EARTH_RADIUS_METERS * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }, 0);
+}
+
+function localAreaSquareMeters(points: [number, number][]): number {
+  if (points.length < 3) return 0;
+  const referenceLatitude = points.reduce((sum, [, latitude]) => sum + latitude, 0) / points.length * Math.PI / 180;
+  const projected = points.map(([longitude, latitude]) => [
+    EARTH_RADIUS_METERS * longitude * Math.PI / 180 * Math.cos(referenceLatitude),
+    EARTH_RADIUS_METERS * latitude * Math.PI / 180,
+  ] as [number, number]);
+  let twiceArea = 0;
+  projected.forEach(([x, y], index) => {
+    const [nextX, nextY] = projected[(index + 1) % projected.length]!;
+    twiceArea += x * nextY - nextX * y;
+  });
+  return Math.abs(twiceArea) / 2;
+}
+
+function formatDistance(meters: number): string {
+  return meters >= 1_000 ? `${(meters / 1_000).toFixed(3)} km` : `${meters.toFixed(1)} m`;
+}
+
+function formatArea(squareMeters: number): string {
+  return squareMeters >= 10_000 ? `${(squareMeters / 10_000).toFixed(4)} ha` : `${squareMeters.toFixed(1)} m²`;
+}
+
+function measurementSourceData(mode: MeasurementMode, points: [number, number][]): GeoJSON.FeatureCollection {
+  const features: GeoJSON.Feature[] = points.map((coordinates, index) => ({
+    type: 'Feature',
+    properties: { index: index + 1 },
+    geometry: { type: 'Point', coordinates },
+  }));
+  if (points.length >= 2) {
+    const coordinates = mode === 'area' && points.length >= 3 ? [...points, points[0]!] : points;
+    features.push({ type: 'Feature', properties: { role: 'line' }, geometry: { type: 'LineString', coordinates } });
+  }
+  if (mode === 'area' && points.length >= 3) {
+    features.push({ type: 'Feature', properties: { role: 'area' }, geometry: { type: 'Polygon', coordinates: [[...points, points[0]!]] } });
+  }
+  return featureCollection(features);
+}
+
+function applyMeasurementLayers(map: maplibregl.Map, mode: MeasurementMode, points: [number, number][]) {
+  const data = measurementSourceData(mode, points);
+  if (!map.getSource('measurement')) {
+    map.addSource('measurement', { type: 'geojson', data });
+    map.addLayer({ id: 'measurement-fill', type: 'fill', source: 'measurement', filter: ['==', ['get', 'role'], 'area'], paint: { 'fill-color': '#f97316', 'fill-opacity': 0.18 } });
+    map.addLayer({ id: 'measurement-line', type: 'line', source: 'measurement', filter: ['==', ['get', 'role'], 'line'], paint: { 'line-color': '#ea580c', 'line-width': 3 } });
+    map.addLayer({ id: 'measurement-points', type: 'circle', source: 'measurement', filter: ['!', ['has', 'role']], paint: { 'circle-color': '#ffffff', 'circle-radius': 5, 'circle-stroke-color': '#ea580c', 'circle-stroke-width': 2 } });
+    return;
+  }
+  (map.getSource('measurement') as maplibregl.GeoJSONSource).setData(data);
+}
+
+export function MapLibreParcelWorkbench({ parcel, nearbyParcels = [], className, enableMeasurementTools = false }: MapLibreParcelWorkbenchProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const tileCapabilityRef = useRef<string | null>(null);
@@ -160,6 +226,8 @@ export function MapLibreParcelWorkbench({ parcel, nearbyParcels = [], className 
   const [tileGrant, setTileGrant] = useState<TileGrant | null>(null);
   const [tileError, setTileError] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [measurementMode, setMeasurementMode] = useState<MeasurementMode>(null);
+  const [measurementPoints, setMeasurementPoints] = useState<[number, number][]>([]);
   const issueTileCapability = trpc.geospatialDelivery.issueVectorTileCapability.useMutation();
   const parcelId = parcel?.id;
   const nearbySignature = useMemo(() => nearbyParcels.map((candidate) => candidate.id).join(','), [nearbyParcels]);
@@ -269,18 +337,49 @@ export function MapLibreParcelWorkbench({ parcel, nearbyParcels = [], className 
         map.setLayoutProperty('anchor-polygon-fill', 'visibility', 'visible');
         map.setLayoutProperty('anchor-polygon-line', 'visibility', 'visible');
       }
+      applyMeasurementLayers(map, measurementMode, measurementPoints);
       const bounds = buildBounds(parcel, nearbyParcels);
       if (bounds) map.fitBounds(bounds, { padding: 40, maxZoom: 15, duration: 0 });
     };
     if (map.isStyleLoaded()) applyData();
     else map.once('style.load', applyData);
     return () => { map.off('style.load', applyData); };
-  }, [nearbyParcels, nearbySignature, parcel, tileGrant]);
+  }, [measurementMode, measurementPoints, nearbyParcels, nearbySignature, parcel, tileGrant]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !enableMeasurementTools) return;
+    const onClick = (event: maplibregl.MapMouseEvent) => {
+      if (!measurementMode) return;
+      setMeasurementPoints((points) => [...points, [event.lngLat.lng, event.lngLat.lat]]);
+    };
+    map.on('click', onClick);
+    map.getCanvas().style.cursor = measurementMode ? 'crosshair' : '';
+    return () => {
+      map.off('click', onClick);
+      map.getCanvas().style.cursor = '';
+    };
+  }, [enableMeasurementTools, measurementMode]);
 
   const hasPersistedBoundary = Boolean(buildPersistedParcelGeometry(parcel));
+  const measurementValue = measurementMode === 'distance'
+    ? measurementPoints.length >= 2 ? `Approximate distance: ${formatDistance(haversineMeters(measurementPoints))}` : 'Click at least two locations to measure distance.'
+    : measurementMode === 'area'
+      ? measurementPoints.length >= 3 ? `Approximate area: ${formatArea(localAreaSquareMeters(measurementPoints))}` : 'Click at least three locations to measure area.'
+      : null;
+
   return (
     <div className="relative">
       <div ref={mapContainerRef} className={className ?? 'h-[420px] w-full rounded-xl'} />
+      {enableMeasurementTools ? <div className="absolute right-3 top-3 max-w-xs rounded-md bg-background/95 p-2 text-xs shadow">
+        <p className="mb-2 font-medium text-foreground">Review measurement</p>
+        <div className="flex flex-wrap gap-1">
+          <button type="button" className={`rounded border px-2 py-1 ${measurementMode === 'distance' ? 'bg-primary text-primary-foreground' : 'bg-background'}`} onClick={() => { setMeasurementMode('distance'); setMeasurementPoints([]); }}>Distance</button>
+          <button type="button" className={`rounded border px-2 py-1 ${measurementMode === 'area' ? 'bg-primary text-primary-foreground' : 'bg-background'}`} onClick={() => { setMeasurementMode('area'); setMeasurementPoints([]); }}>Area</button>
+          <button type="button" className="rounded border bg-background px-2 py-1" onClick={() => { setMeasurementMode(null); setMeasurementPoints([]); }}>Clear</button>
+        </div>
+        {measurementValue ? <p className="mt-2 text-muted-foreground">{measurementValue} Measurements are visual review aids and are not survey or title evidence.</p> : null}
+      </div> : null}
       {mapError ? <p className="absolute bottom-3 left-3 right-3 rounded-md bg-destructive/95 p-2 text-xs text-destructive-foreground">{mapError}</p> : null}
       {tileError ? <p className="absolute bottom-12 left-3 right-3 rounded-md bg-background/95 p-2 text-xs text-muted-foreground shadow">{tileError}</p> : null}
       {tileGrant ? <p className="absolute left-3 top-3 rounded-md bg-background/95 p-2 text-xs text-muted-foreground shadow">Authorized PostGIS vector tiles are active for this parcel.</p> : null}

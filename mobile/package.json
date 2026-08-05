@@ -15,6 +15,7 @@
   "dependencies": {
     "@babel/runtime": "^7.28.4",
     "@expo/vector-icons": "^14.0.0",
+    "@maplibre/maplibre-react-native": "10.4.0",
     "@react-native-async-storage/async-storage": "^1.23.1",
     "@react-native-community/netinfo": "^11.3.1",
     "@react-navigation/bottom-tabs": "^6.5.20",
@@ -22,6 +23,7 @@
     "@react-navigation/native-stack": "^6.9.26",
     "@tanstack/query-core": "^5.90.2",
     "@tanstack/react-query": "^5.40.0",
+    "@types/geojson": "7946.0.16",
     "expo": "~51.0.0",
     "expo-auth-session": "~5.5.2",
     "expo-camera": "~15.0.14",

@@ -137,6 +137,20 @@ export const cacheEvictions = new Counter({
   registers: [register],
 });
 
+// Mapping delivery metrics
+export const basemapTileRequests = new Counter({
+  name: 'geospatial_basemap_tile_requests_total',
+  help: 'Approved basemap tile delivery attempts by provider and outcome',
+  labelNames: ['provider', 'outcome'],
+  registers: [register],
+});
+
+export const basemapFallbacks = new Counter({
+  name: 'geospatial_basemap_fallbacks_total',
+  help: 'Approved basemap requests served by the configured fallback provider',
+  registers: [register],
+});
+
 // Security Metrics
 export const securityEvents = new Counter({
   name: 'security_events_total',

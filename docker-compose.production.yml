@@ -1159,9 +1159,24 @@ services:
     <<: *default-restart
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/mapping_alerts.yml:/etc/prometheus/rules/mapping_alerts.yml:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
+    networks:
+      - idlr_net
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: idlr-alertmanager
+    <<: *default-restart
+    entrypoint: ["/bin/sh", "/etc/alertmanager-template/alertmanager-entrypoint.sh"]
+    environment:
+      ALERTMANAGER_WEBHOOK_URL: ${ALERTMANAGER_WEBHOOK_URL}
+      ALERTMANAGER_WEBHOOK_TOKEN: ${ALERTMANAGER_WEBHOOK_TOKEN}
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager-template/alertmanager.yml:ro
+      - ./monitoring/alertmanager-entrypoint.sh:/etc/alertmanager-template/alertmanager-entrypoint.sh:ro
     networks:
       - idlr_net
 
@@ -1180,6 +1195,7 @@ services:
       - "3001:3000"
     depends_on:
       - prometheus
+      - alertmanager
     networks:
       - idlr_net
 

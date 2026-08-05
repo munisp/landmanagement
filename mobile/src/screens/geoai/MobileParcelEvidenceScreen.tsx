@@ -1,6 +1,6 @@
 import React from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppScreen } from "../../components/AppScreen";
 import { GeoAiStatusBadge } from "../../components/GeoAiStatusBadge";
@@ -62,6 +62,8 @@ export function MobileParcelEvidenceScreen() {
           </View>
         )) : <Text style={styles.muted}>No active, non-rejected evidence asset was returned for this parcel scope.</Text>}
       </View>
+
+      <Pressable onPress={() => router.push(`/geoai/map/${parcelId}`)} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}><Text style={styles.primaryText}>Open governed MapLibre field map</Text></Pressable>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Operational limitations</Text>

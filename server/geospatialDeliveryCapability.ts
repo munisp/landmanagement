@@ -160,7 +160,9 @@ export function verifyGeospatialCapability(token: string, expectedAudience: Geos
   }
   const expected = createHmac("sha256", getCapabilitySecret()).update(encodedPayload).digest();
   const provided = base64UrlDecode(encodedSignature);
-  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+  // Node's base64url decoder can accept noncanonical trailing characters. Require
+  // the decoded bytes to re-encode to the identical token segment before HMAC comparison.
+  if (base64UrlEncode(provided) !== encodedSignature || provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
     throw new Error("Capability signature is invalid");
   }
   let raw: unknown;

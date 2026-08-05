@@ -11,12 +11,15 @@ import {
   type GeospatialDeliveryAudience,
 } from "./geospatialDeliveryCapability";
 import { sdk } from "./_core/sdk";
+import { basemapFallbacks, basemapTileRequests } from "./_core/metrics";
 
 export const geospatialDeliveryHttpRouter = express.Router();
 
 const TILE_PATH = /^\d{1,2}$/;
 const TILE_COORDINATE_MAX = 2 ** 22 - 1;
 const CONTENT_PATH_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,255}$/;
+const BASEMAP_TEMPLATE_TOKENS = ['{z}', '{x}', '{y}'] as const;
+const BASEMAP_DEFAULT_TEMPLATE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 function configuredHttpService(name: string): URL {
   const raw = process.env[name]?.trim();
@@ -32,6 +35,55 @@ function configuredHttpService(name: string): URL {
   }
   url.pathname = url.pathname.replace(/\/$/, "");
   return url;
+}
+
+type BasemapProvider = { name: 'primary' | 'fallback'; template: string };
+
+function validatedBasemapTemplate(value: string, name: string): string {
+  const template = value.trim();
+  if (!template || BASEMAP_TEMPLATE_TOKENS.some((token) => !template.includes(token))) {
+    throw new Error(`${name} must include {z}, {x}, and {y} tile placeholders`);
+  }
+  const probe = template.replace('{z}', '0').replace('{x}', '0').replace('{y}', '0');
+  let parsed: URL;
+  try {
+    parsed = new URL(probe);
+  } catch {
+    throw new Error(`${name} must be an absolute HTTP(S) URL template`);
+  }
+  if ((process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') || !/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password || parsed.hash) {
+    throw new Error(`${name} must be a credential-free ${process.env.NODE_ENV === 'production' ? 'HTTPS' : 'HTTP(S)'} URL template`);
+  }
+  return template;
+}
+
+function configuredBasemapProviders(): BasemapProvider[] {
+  const configuredPrimary = process.env.GEO_BASEMAP_PRIMARY_URL?.trim();
+  if (!configuredPrimary && process.env.NODE_ENV === 'production') {
+    throw new Error('GEO_BASEMAP_PRIMARY_URL must be configured in production');
+  }
+  const primary = validatedBasemapTemplate(configuredPrimary || BASEMAP_DEFAULT_TEMPLATE, 'GEO_BASEMAP_PRIMARY_URL');
+  const fallback = process.env.GEO_BASEMAP_FALLBACK_URL?.trim();
+  return [{ name: 'primary', template: primary }, ...(fallback ? [{ name: 'fallback' as const, template: validatedBasemapTemplate(fallback, 'GEO_BASEMAP_FALLBACK_URL') }] : [])];
+}
+
+function expandBasemapTemplate(template: string, z: number, x: number, y: number): string {
+  return template.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y));
+}
+
+function configuredBasemapPublicOrigin(req: express.Request): string {
+  const configured = process.env.GEO_BASEMAP_PUBLIC_ORIGIN?.trim();
+  if (configured) {
+    const parsed = new URL(configured);
+    if ((process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') || !/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) {
+      throw new Error('GEO_BASEMAP_PUBLIC_ORIGIN must be a credential-free origin without a path');
+    }
+    return parsed.origin;
+  }
+  if (process.env.NODE_ENV === 'production') throw new Error('GEO_BASEMAP_PUBLIC_ORIGIN must be configured in production');
+  const host = req.get('host');
+  if (!host || !/^[A-Za-z0-9.:-]+$/.test(host)) throw new Error('A valid Host header is required for development basemap style delivery');
+  return `${req.protocol}://${host}`;
 }
 
 function requestId(req: express.Request): string {
@@ -111,6 +163,72 @@ function sendDeliveryError(res: express.Response, error: unknown, correlationId:
     requestId: correlationId,
   });
 }
+
+geospatialDeliveryHttpRouter.get('/basemap/style.json', (req, res) => {
+  const correlationId = requestId(req);
+  try {
+    configuredBasemapProviders();
+    const origin = configuredBasemapPublicOrigin(req);
+    res.setHeader('Cache-Control', 'public, max-age=300, must-revalidate');
+    res.setHeader('X-Request-Id', correlationId);
+    res.json({
+      version: 8,
+      name: 'IDLR approved basemap',
+      sources: {
+        platformBasemap: {
+          type: 'raster',
+          tiles: [`${origin}/api/geospatial-delivery/basemap/{z}/{x}/{y}.png`],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors · delivered by the IDLR platform',
+        },
+      },
+      layers: [{ id: 'platform-basemap', type: 'raster', source: 'platformBasemap' }],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Approved basemap configuration is unavailable';
+    res.status(503).setHeader('X-Request-Id', correlationId).json({ error: 'Approved basemap configuration is unavailable', requestId: correlationId, detail: process.env.NODE_ENV === 'production' ? undefined : message });
+  }
+});
+
+geospatialDeliveryHttpRouter.get('/basemap/:z/:x/:y.png', async (req, res) => {
+  const correlationId = requestId(req);
+  try {
+    const z = parseTileCoordinate(req.params.z, 'z');
+    const x = parseTileCoordinate(req.params.x, 'x');
+    const y = parseTileCoordinate(req.params.y, 'y');
+    if (x >= 2 ** z || y >= 2 ** z) throw new Error('Tile coordinate is outside its zoom matrix');
+    const providers = configuredBasemapProviders();
+    let lastFailure: unknown;
+    for (const [index, provider] of providers.entries()) {
+      try {
+        const upstream = await fetch(expandBasemapTemplate(provider.template, z, x, y), {
+          headers: { Accept: 'image/avif,image/webp,image/png,image/*;q=0.8', 'User-Agent': 'IDLR-PTS approved basemap proxy' },
+          signal: AbortSignal.timeout(Number(process.env.GEO_BASEMAP_TIMEOUT_MS || 8_000)),
+        });
+        const contentType = upstream.headers.get('content-type') || '';
+        if (!upstream.ok || !contentType.startsWith('image/')) {
+          basemapTileRequests.labels(provider.name, 'error').inc();
+          lastFailure = new Error(`Approved basemap ${provider.name} returned ${upstream.status}`);
+          continue;
+        }
+        basemapTileRequests.labels(provider.name, 'success').inc();
+        if (index > 0) basemapFallbacks.inc();
+        forwardHeaders(upstream.headers, res, correlationId, 'public, max-age=86400, stale-while-revalidate=604800');
+        res.setHeader('Vary', 'Accept-Encoding');
+        await streamUpstream(upstream, res);
+        return;
+      } catch (error) {
+        basemapTileRequests.labels(provider.name, 'error').inc();
+        lastFailure = error;
+      }
+    }
+    throw lastFailure instanceof Error ? lastFailure : new Error('No approved basemap provider responded');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Approved basemap delivery failed';
+    const invalid = /coordinate|invalid/i.test(message);
+    res.status(invalid ? 400 : 503).setHeader('X-Request-Id', correlationId).json({ error: invalid ? 'Invalid basemap tile request' : 'Approved basemap is temporarily unavailable', requestId: correlationId });
+  }
+});
 
 geospatialDeliveryHttpRouter.get("/tiles/:z/:x/:y.pbf", async (req, res) => {
   const correlationId = requestId(req);
