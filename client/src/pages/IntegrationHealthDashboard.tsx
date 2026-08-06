@@ -428,8 +428,8 @@ export default function IntegrationHealthDashboard() {
                 <CardDescription>{operations.backupPosture.summary}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <div className="flex items-center justify-between"><span className="text-muted-foreground">Last backup</span><span>{new Date(operations.backupPosture.lastBackup).toLocaleString()}</span></div>
-                <div className="flex items-center justify-between"><span className="text-muted-foreground">Next backup</span><span>{new Date(operations.backupPosture.nextBackup).toLocaleString()}</span></div>
+                <div className="flex items-center justify-between"><span className="text-muted-foreground">Last evidenced backup</span><span>{operations.backupPosture.lastBackup ? new Date(operations.backupPosture.lastBackup).toLocaleString() : 'Not recorded'}</span></div>
+                <div className="flex items-center justify-between"><span className="text-muted-foreground">Next backup</span><span>{operations.backupPosture.nextBackup ? new Date(operations.backupPosture.nextBackup).toLocaleString() : 'Not scheduled in platform'}</span></div>
                 <div className="flex items-center justify-between"><span className="text-muted-foreground">Recovery points</span><span>{operations.backupPosture.recoveryPointCount}</span></div>
                 <div className="flex items-center justify-between"><span className="text-muted-foreground">Recent failures</span><span>{operations.backupPosture.recentFailureCount}</span></div>
               </CardContent>

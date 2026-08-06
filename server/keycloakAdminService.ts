@@ -24,7 +24,10 @@ type AdminConfig = {
   adminRealm: string;
   clientId: string;
   clientSecret: string;
+  timeoutMs: number;
 };
+
+const REQUIRED_REALM_ROLES = ['user', 'surveyor', 'registrar', 'admin', 'land_citizen', 'land_surveyor', 'land_registrar', 'land_admin'] as const;
 
 function getConfig(): AdminConfig {
   const baseUrl = process.env.KEYCLOAK_URL?.replace(/\/$/, "");
@@ -38,7 +41,18 @@ function getConfig(): AdminConfig {
       "KEYCLOAK_URL, KEYCLOAK_REALM, KEYCLOAK_ADMIN_REALM, KEYCLOAK_ADMIN_CLIENT_ID, and KEYCLOAK_ADMIN_CLIENT_SECRET are required for Keycloak administration",
     );
   }
-  return { baseUrl, realm, adminRealm, clientId, clientSecret };
+  const parsed = new URL(baseUrl);
+  if (parsed.protocol !== 'https:' && process.env.NODE_ENV !== 'test' && process.env.KEYCLOAK_ALLOW_HTTP !== 'true') {
+    throw new Error('KEYCLOAK_URL must use HTTPS outside a controlled test environment');
+  }
+  if (adminRealm !== realm) {
+    throw new Error('KEYCLOAK_ADMIN_REALM must equal KEYCLOAK_REALM; cross-realm administration is not permitted');
+  }
+  const timeoutMs = Number(process.env.KEYCLOAK_TIMEOUT_MS ?? '10000');
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) {
+    throw new Error('KEYCLOAK_TIMEOUT_MS must be an integer between 1000 and 30000');
+  }
+  return { baseUrl: parsed.toString().replace(/\/$/, ''), realm, adminRealm, clientId, clientSecret, timeoutMs };
 }
 
 async function getAdminToken(): Promise<string> {
@@ -49,7 +63,7 @@ async function getAdminToken(): Promise<string> {
     client_secret: config.clientSecret,
   });
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.KEYCLOAK_TIMEOUT_MS || 10_000));
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
   try {
     const response = await fetch(
       `${config.baseUrl}/realms/${encodeURIComponent(config.adminRealm)}/protocol/openid-connect/token`,
@@ -74,7 +88,7 @@ async function adminRequest<T>(method: string, pathname: string, body?: unknown)
   const config = getConfig();
   const token = await getAdminToken();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.KEYCLOAK_TIMEOUT_MS || 10_000));
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
   try {
     const response = await fetch(`${config.baseUrl}/admin/realms/${encodeURIComponent(config.realm)}${pathname}`, {
       method,
@@ -236,4 +250,30 @@ export async function requireKeycloakTotpEnrollment(user: Pick<User, "openId">):
   await adminRequest("PUT", `/users/${encodeURIComponent(keycloakUserId)}`, {
     requiredActions: [...requiredActions],
   });
+}
+
+
+export async function getKeycloakAdministrationReadiness(): Promise<{
+  ready: boolean;
+  realm: string;
+  requiredRoles: readonly string[];
+  missingRoles: string[];
+}> {
+  const config = getConfig();
+  await getAdminToken();
+  const roles = await Promise.all(REQUIRED_REALM_ROLES.map(async (role) => {
+    try {
+      await realmRole(role);
+      return { role, present: true };
+    } catch {
+      return { role, present: false };
+    }
+  }));
+  const missingRoles = roles.filter((item) => !item.present).map((item) => item.role);
+  return {
+    ready: missingRoles.length === 0,
+    realm: config.realm,
+    requiredRoles: REQUIRED_REALM_ROLES,
+    missingRoles,
+  };
 }

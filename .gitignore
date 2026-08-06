@@ -118,3 +118,6 @@ go-services/*/bin/
 lakehouse/ml/**/__pycache__/
 lakehouse/ml/**/*.pyc
 lakehouse/ml/mlruns/
+
+# Generated release provenance and component inventories
+artifacts/

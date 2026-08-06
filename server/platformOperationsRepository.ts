@@ -39,8 +39,8 @@ export interface PlatformOperationsOverview {
   };
   domains: ReadinessDomain[];
   backupPosture: {
-    lastBackup: string;
-    nextBackup: string;
+    lastBackup: string | null;
+    nextBackup: string | null;
     recoveryPointCount: number;
     recentFailureCount: number;
     geoRedundancyStatus: ReadinessStatus;
@@ -260,12 +260,10 @@ export async function getPlatformOperationsOverview(): Promise<PlatformOperation
     : 0;
 
   const recentFailureCount = backupState.recentBackups.filter((backup) => backup.status === 'failed').length;
-  const location = backupState.schedule.location.toLowerCase();
-  const geoRedundancyStatus: ReadinessStatus = location.includes('geo-redundant') || location.includes('frankfurt')
-    ? 'healthy'
-    : location.includes('regional')
-      ? 'degraded'
-      : 'unhealthy';
+  const passedDrillCount = backupState.recoveryDrills.filter((drill) => drill.outcome === 'passed').length;
+  const evidenceRecorded = Boolean(backupState.schedule.lastBackup) && passedDrillCount > 0;
+  const geoRedundancyStatus: ReadinessStatus = 'unhealthy';
+  const backupEvidenceScore = 35;
 
   const backupPosture = {
     lastBackup: backupState.schedule.lastBackup,
@@ -273,9 +271,9 @@ export async function getPlatformOperationsOverview(): Promise<PlatformOperation
     recoveryPointCount: backupState.recoveryPoints.length,
     recentFailureCount,
     geoRedundancyStatus,
-    summary: recentFailureCount === 0
-      ? 'Backup posture is stable and recovery points are available.'
-      : `Backup posture needs attention because ${recentFailureCount} recent backup run(s) failed.`,
+    summary: evidenceRecorded
+      ? 'Backup and recovery evidence is recorded, but geo-redundancy must be independently attested through Nationwide Rollout Control.'
+      : 'No independently reviewed backup and recovery evidence is available. Backup, restore, and geo-redundancy remain rollout blockers.',
   };
 
   const allowedOrigins = [
@@ -308,7 +306,7 @@ export async function getPlatformOperationsOverview(): Promise<PlatformOperation
 
   return {
     generatedAt: new Date().toISOString(),
-    overallStatus: normalizeStatus(Math.round((readinessScore + (backupPosture.geoRedundancyStatus === 'healthy' ? 90 : backupPosture.geoRedundancyStatus === 'degraded' ? 65 : 35)) / 2)),
+    overallStatus: normalizeStatus(Math.round((readinessScore + backupEvidenceScore) / 2)),
     readinessScore,
     counts,
     domains,

@@ -230,6 +230,29 @@ export const integrationHealthRouter = router({
         case 'elasticsearch':
           result = await checkElasticsearchConnection();
           break;
+        case 'keycloak':
+          result = await checkKeycloakConnection();
+          break;
+        case 'apisix':
+          result = await checkApisixConnection();
+          break;
+        case 'permify':
+          result = await checkPermifyConnection();
+          break;
+        case 'dapr':
+          result = await checkDaprConnection();
+          break;
+        case 'fluvio':
+          result = await checkFluvioConnection();
+          break;
+        case 'openappsec':
+          result = await checkOpenAppSecConnection();
+          break;
+        case 'lakehouse':
+          result = await checkLakehouseConnection();
+          break;
+        default:
+          throw new Error(`No health probe is implemented for ${input.service}`);
       }
 
       return {

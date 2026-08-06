@@ -301,3 +301,16 @@ export async function synchronizeParcelResourceRelations(params: {
   });
   return schemaVersion;
 }
+
+
+export async function getPermifyAuthorizationReadiness(): Promise<{
+  ready: boolean;
+  tenantId: string;
+  schemaVersion: string;
+  globalRelationsSynchronized: true;
+}> {
+  const { tenantId } = getConfig();
+  const schemaVersion = await publishAuthorizationSchema();
+  await ensureGlobalGeoResourceRelations(schemaVersion);
+  return { ready: true, tenantId, schemaVersion, globalRelationsSynchronized: true };
+}

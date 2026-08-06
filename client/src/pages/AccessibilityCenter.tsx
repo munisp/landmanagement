@@ -1,63 +1,40 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'wouter';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Ear, Keyboard, Contrast, Volume2, Sparkles, BookOpen } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { BookOpen, Contrast, Ear, Gauge, Keyboard, Sparkles, Volume2 } from 'lucide-react';
+import { applyAccessibilityPreferences, getAccessibilityPreferences, saveAccessibilityPreferences, type AccessibilityPreferences } from '@/lib/accessibilityPreferences';
 
 export default function AccessibilityCenter() {
-  const [screenReaderHints, setScreenReaderHints] = useState(true);
-  const [keyboardMode, setKeyboardMode] = useState(true);
-  const [highContrast, setHighContrast] = useState(false);
-  const [ttsPrompt, setTtsPrompt] = useState('Read section headings and required form guidance aloud before data entry.');
-  const [simplifiedMode, setSimplifiedMode] = useState(false);
-  const [wizardWorkflow, setWizardWorkflow] = useState(true);
-  const [dyslexiaFont, setDyslexiaFont] = useState(false);
+  const [preferences, setPreferences] = useState<AccessibilityPreferences>(() => getAccessibilityPreferences());
 
-  return (
-    <div className="container py-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Accessibility & Inclusivity Center</h1>
-        <p className="text-muted-foreground mt-2">Configure inclusive workflow aids for screen-reader guidance, keyboard navigation, contrast, text-to-speech instructions, simplified operation, guided wizards, and dyslexia-friendly reading preferences.</p>
-      </div>
+  useEffect(() => {
+    applyAccessibilityPreferences(preferences);
+  }, [preferences]);
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Keyboard shortcuts</p><p className="mt-2 text-2xl font-semibold">{keyboardMode ? 'Enabled' : 'Off'}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Reading mode</p><p className="mt-2 text-2xl font-semibold">{dyslexiaFont ? 'Dyslexia friendly' : 'Default'}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Workflow mode</p><p className="mt-2 text-2xl font-semibold">{simplifiedMode ? 'Simplified' : 'Standard'}</p></CardContent></Card>
-      </div>
+  const update = <K extends keyof AccessibilityPreferences>(key: K, value: AccessibilityPreferences[K]) => {
+    const next = { ...preferences, [key]: value };
+    setPreferences(next);
+    saveAccessibilityPreferences(next);
+  };
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
-        <Card>
-          <CardHeader><CardTitle>Inclusive controls</CardTitle><CardDescription>Adjust accessibility behaviors and guided-workflow preferences.</CardDescription></CardHeader>
-          <CardContent className="space-y-5">
-            <div className="flex items-center justify-between rounded-lg border p-4"><div><Label className="flex items-center gap-2"><Ear className="h-4 w-4" />Screen-reader support</Label><p className="text-sm text-muted-foreground">Enable assistive announcements and reading cues.</p></div><Switch checked={screenReaderHints} onCheckedChange={setScreenReaderHints} /></div>
-            <div className="flex items-center justify-between rounded-lg border p-4"><div><Label className="flex items-center gap-2"><Keyboard className="h-4 w-4" />Comprehensive keyboard shortcuts</Label><p className="text-sm text-muted-foreground">Keep power-user and accessibility shortcuts visible and active.</p></div><Switch checked={keyboardMode} onCheckedChange={setKeyboardMode} /></div>
-            <div className="flex items-center justify-between rounded-lg border p-4"><div><Label className="flex items-center gap-2"><Contrast className="h-4 w-4" />High-contrast mode</Label><p className="text-sm text-muted-foreground">Increase color contrast for low-vision accessibility.</p></div><Switch checked={highContrast} onCheckedChange={setHighContrast} /></div>
-            <div className="space-y-2 rounded-lg border p-4"><Label className="flex items-center gap-2"><Volume2 className="h-4 w-4" />Text-to-speech prompt</Label><Input value={ttsPrompt} onChange={(e) => setTtsPrompt(e.target.value)} /><p className="text-sm text-muted-foreground">Use this prompt in supported assistive readers during form completion.</p></div>
-            <div className="flex items-center justify-between rounded-lg border p-4"><div><Label className="flex items-center gap-2"><Sparkles className="h-4 w-4" />Simplified mode</Label><p className="text-sm text-muted-foreground">Reduce decision density for novice users.</p></div><Switch checked={simplifiedMode} onCheckedChange={setSimplifiedMode} /></div>
-            <div className="flex items-center justify-between rounded-lg border p-4"><div><Label className="flex items-center gap-2"><BookOpen className="h-4 w-4" />Wizard workflows</Label><p className="text-sm text-muted-foreground">Prefer guided, step-by-step task completion.</p></div><Switch checked={wizardWorkflow} onCheckedChange={setWizardWorkflow} /></div>
-            <div className="flex items-center justify-between rounded-lg border p-4"><div><Label>Dyslexia-friendly font mode</Label><p className="text-sm text-muted-foreground">Prefer letterforms that improve readability for dyslexic users.</p></div><Switch checked={dyslexiaFont} onCheckedChange={setDyslexiaFont} /></div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Accessibility workflow guidance</CardTitle><CardDescription>Operational summary and routes into existing support and settings surfaces.</CardDescription></CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <div className="rounded-lg border p-4"><p className="font-medium text-foreground mb-1">Current posture</p><div className="flex flex-wrap gap-2"><Badge variant="outline">{screenReaderHints ? 'Screen reader ready' : 'Screen reader off'}</Badge><Badge variant="outline">{keyboardMode ? 'Keyboard mode on' : 'Keyboard mode off'}</Badge><Badge variant="outline">{highContrast ? 'High contrast on' : 'High contrast off'}</Badge><Badge variant="outline">{simplifiedMode ? 'Simplified mode' : 'Standard mode'}</Badge></div></div>
-            <div className="rounded-lg border p-4"><p className="font-medium text-foreground mb-1">Wizard-based workflows</p><p>{wizardWorkflow ? 'Users are guided through step-by-step sequences for novice-friendly completion.' : 'Users may use direct expert workflows.'}</p></div>
-            <div className="rounded-lg border p-4"><p className="font-medium text-foreground mb-1">Assistive reading prompt</p><p>{ttsPrompt}</p></div>
-            <div className="flex flex-wrap gap-3">
-              <Button asChild><Link href="/settings">Open Settings</Link></Button>
-              <Button variant="outline" asChild><Link href="/support-center">Open Support Center</Link></Button>
-              <Button variant="outline" asChild><Link href="/collaboration">Open Collaboration</Link></Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+  const Toggle = ({ preference, icon: Icon, label, description }: { preference: keyof Pick<AccessibilityPreferences, 'screenReaderHints' | 'keyboardMode' | 'highContrast' | 'simplifiedMode' | 'wizardWorkflow' | 'dyslexiaFont' | 'lowBandwidth'>; icon: typeof Ear; label: string; description: string }) => (
+    <div className="flex items-center justify-between gap-4 rounded-xl border p-4">
+      <div><Label className="flex items-center gap-2"><Icon className="h-4 w-4" />{label}</Label><p className="mt-1 text-sm text-muted-foreground">{description}</p></div>
+      <Switch checked={preferences[preference]} onCheckedChange={(value) => update(preference, value)} aria-label={label} />
     </div>
   );
+
+  return <main className="container space-y-6 py-8">
+    <header className="max-w-3xl"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Inclusive service delivery</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Accessibility & connectivity preferences</h1><p className="mt-3 text-muted-foreground">These browser-local choices improve reading, navigation, and bandwidth use across the PWA. They never remove a required review, verification, consent, or statutory service step.</p></header>
+
+    <section className="grid gap-4 md:grid-cols-4"><Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Keyboard navigation</p><p className="mt-2 text-xl font-semibold">{preferences.keyboardMode ? 'Enabled' : 'Standard'}</p></CardContent></Card><Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Reading mode</p><p className="mt-2 text-xl font-semibold">{preferences.dyslexiaFont ? 'Reader friendly' : 'Default'}</p></CardContent></Card><Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Workflow density</p><p className="mt-2 text-xl font-semibold">{preferences.simplifiedMode ? 'Simplified' : 'Standard'}</p></CardContent></Card><Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Connectivity mode</p><p className="mt-2 text-xl font-semibold">{preferences.lowBandwidth ? 'Low bandwidth' : 'Full experience'}</p></CardContent></Card></section>
+
+    <section className="grid gap-6 lg:grid-cols-[1fr_1.1fr]"><Card><CardHeader><CardTitle>Personal interface controls</CardTitle><CardDescription>Preferences are saved on this device. Use the assisted-service path when a person needs human or non-digital support.</CardDescription></CardHeader><CardContent className="space-y-4"><Toggle preference="screenReaderHints" icon={Ear} label="Screen-reader guidance" description="Announce state changes and use clearer assistive cues." /><Toggle preference="keyboardMode" icon={Keyboard} label="Keyboard-first navigation" description="Keep shortcut affordances and focus treatment visible." /><Toggle preference="highContrast" icon={Contrast} label="High-contrast preference" description="Use stronger surface and text distinction in addition to system contrast settings." /><Toggle preference="simplifiedMode" icon={Sparkles} label="Simplified workflow density" description="Reduce decorative detail and emphasize the next safe action." /><Toggle preference="wizardWorkflow" icon={BookOpen} label="Guided task steps" description="Prefer staged instructions for complex tasks where supported." /><Toggle preference="dyslexiaFont" icon={BookOpen} label="Reader-friendly letter spacing" description="Increase spacing and avoid overly condensed text." /><Toggle preference="lowBandwidth" icon={Gauge} label="Low-bandwidth mode" description="Reduce animation and decorative imagery; map and document operations still require their governed online connection." /><div className="space-y-2 rounded-xl border p-4"><Label className="flex items-center gap-2"><Volume2 className="h-4 w-4" />Assistive reading prompt</Label><Input value={preferences.ttsPrompt} onChange={(event) => update('ttsPrompt', event.target.value)} aria-describedby="tts-prompt-help" /><p id="tts-prompt-help" className="text-sm text-muted-foreground">Used as contextual text for supported assistive-reader workflows. Do not enter personal or case information here.</p></div></CardContent></Card>
+    <Card><CardHeader><CardTitle>Service continuity and support</CardTitle><CardDescription>Accessibility settings improve the interface, while assisted service provides accountable human support when digital completion is not appropriate.</CardDescription></CardHeader><CardContent className="space-y-4 text-sm text-muted-foreground"><div className="rounded-xl border p-4"><p className="font-medium text-foreground">Current interface posture</p><div className="mt-3 flex flex-wrap gap-2"><Badge variant="outline">{preferences.screenReaderHints ? 'Screen-reader cues' : 'Reader cues off'}</Badge><Badge variant="outline">{preferences.highContrast ? 'High contrast' : 'System contrast'}</Badge><Badge variant="outline">{preferences.lowBandwidth ? 'Low bandwidth' : 'Full experience'}</Badge><Badge variant="outline">{preferences.wizardWorkflow ? 'Guided steps' : 'Expert workflow'}</Badge></div></div><div className="rounded-xl border p-4"><p className="font-medium text-foreground">When to use assisted service</p><p className="mt-2">Choose in-person, phone, kiosk, outreach, or accessibility assistance for connectivity barriers, accessibility needs, identity support, or any task that should not be completed independently.</p></div><div className="flex flex-wrap gap-3"><Button asChild><Link href="/support-center">Open Support Center</Link></Button><Button variant="outline" asChild><Link href="/admin/nationwide-rollout">Open assisted-service controls</Link></Button><Button variant="outline" asChild><Link href="/getting-started">Return to guided onboarding</Link></Button></div></CardContent></Card></section>
+  </main>;
 }

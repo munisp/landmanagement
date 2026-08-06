@@ -1,12 +1,14 @@
-import { readJsonStore, writeJsonStore } from './jsonStore';
+import { desc } from 'drizzle-orm';
+import { rolloutRecoveryDrills } from '../drizzle/schema';
+import { requireDb } from './db';
 
 export type BackupStatus = 'completed' | 'in_progress' | 'failed';
 export type RecoveryPointType = 'manual' | 'automated';
 
 export interface BackupScheduleRecord {
   frequency: string;
-  lastBackup: string;
-  nextBackup: string;
+  lastBackup: string | null;
+  nextBackup: string | null;
   retention: string;
   location: string;
 }
@@ -31,7 +33,7 @@ export interface RecoveryPointRecord {
 export interface StorageMetricsRecord {
   totalBackupSize: string;
   availableSpace: string;
-  usagePercentage: number;
+  usagePercentage: number | null;
   estimatedCostMonth: string;
 }
 
@@ -55,204 +57,97 @@ export interface BackupAutomationHealth {
   replicationStatus: 'healthy' | 'degraded' | 'unhealthy';
   monitoringStatus: 'healthy' | 'degraded' | 'unhealthy';
   alertingStatus: 'healthy' | 'degraded' | 'unhealthy';
-  lastDrillAt: string;
-  lastVerifiedRestoreAt: string;
+  lastDrillAt: string | null;
+  lastVerifiedRestoreAt: string | null;
 }
 
-interface BackupRecoveryStore {
-  nextBackupId: number;
-  nextRecoveryPointId: number;
-  nextAlertId: number;
-  nextDrillId: number;
-  schedule: BackupScheduleRecord;
-  recentBackups: BackupRecord[];
-  recoveryPoints: RecoveryPointRecord[];
-  storageMetrics: StorageMetricsRecord;
-  alertChannels: string[];
-  recentAlerts: BackupAlertRecord[];
-  recoveryDrills: RecoveryDrillRecord[];
-  automationHealth: BackupAutomationHealth;
+function healthFromEvidence(passed: number, failed: number): 'healthy' | 'degraded' | 'unhealthy' {
+  if (passed > 0 && failed === 0) return 'healthy';
+  if (passed > 0) return 'degraded';
+  return 'unhealthy';
 }
 
-
-function defaultStore(): BackupRecoveryStore {
-  return {
-    nextBackupId: 5,
-    nextRecoveryPointId: 4,
-    nextAlertId: 3,
-    nextDrillId: 3,
-    schedule: {
-      frequency: 'Daily',
-      lastBackup: '2026-05-14T02:00:00.000Z',
-      nextBackup: '2026-05-15T02:00:00.000Z',
-      retention: '30 days',
-      location: 'Geo-redundant object storage (Lagos + Frankfurt)',
-    },
-    recentBackups: [
-      { id: 1, type: 'Full Backup', size: '45.2 GB', status: 'completed', timestamp: '2026-05-14T02:00:00.000Z', duration: '1h 23m' },
-      { id: 2, type: 'Incremental Backup', size: '2.1 GB', status: 'completed', timestamp: '2026-05-13T14:00:00.000Z', duration: '8m 45s' },
-      { id: 3, type: 'Full Backup', size: '44.8 GB', status: 'completed', timestamp: '2026-05-13T02:00:00.000Z', duration: '1h 19m' },
-      { id: 4, type: 'Incremental Backup', size: '1.8 GB', status: 'completed', timestamp: '2026-05-12T14:00:00.000Z', duration: '7m 12s' },
-    ],
-    recoveryPoints: [
-      { id: 1, name: 'Pre-Migration Snapshot', timestamp: '2026-05-10T00:00:00.000Z', size: '42.5 GB', type: 'manual' },
-      { id: 2, name: 'Daily Backup - May 14', timestamp: '2026-05-14T02:00:00.000Z', size: '45.2 GB', type: 'automated' },
-      { id: 3, name: 'Daily Backup - May 13', timestamp: '2026-05-13T02:00:00.000Z', size: '44.8 GB', type: 'automated' },
-    ],
-    storageMetrics: {
-      totalBackupSize: '450 GB',
-      availableSpace: '2.5 TB',
-      usagePercentage: 15,
-      estimatedCostMonth: '$125',
-    },
-    alertChannels: ['email', 'slack', 'dashboard'],
-    recentAlerts: [
-      { id: 1, severity: 'info', message: 'Nightly backup replication completed successfully.', timestamp: '2026-05-14T02:20:00.000Z' },
-      { id: 2, severity: 'warning', message: 'Restore drill is due within the next 7 days.', timestamp: '2026-05-13T09:00:00.000Z' },
-    ],
-    recoveryDrills: [
-      { id: 1, scenario: 'Primary database region failover', outcome: 'passed', recoveryTime: '18m', timestamp: '2026-05-08T10:00:00.000Z', notes: 'Replica promotion and application reconnect succeeded.' },
-      { id: 2, scenario: 'Object storage restore validation', outcome: 'warning', recoveryTime: '27m', timestamp: '2026-05-01T15:30:00.000Z', notes: 'Restore succeeded but metadata verification required manual follow-up.' },
-    ],
-    automationHealth: {
-      replicationStatus: 'healthy',
-      monitoringStatus: 'healthy',
-      alertingStatus: 'degraded',
-      lastDrillAt: '2026-05-08T10:00:00.000Z',
-      lastVerifiedRestoreAt: '2026-05-08T10:18:00.000Z',
-    },
-  };
+function recoveryTime(rto: number | null): string {
+  return rto === null ? 'Not measured' : `${rto}s`;
 }
 
-async function loadStore(): Promise<BackupRecoveryStore> {
-  return readJsonStore<BackupRecoveryStore>('backup-recovery-store', defaultStore);
-}
-
-async function saveStore(store: BackupRecoveryStore) {
-  await writeJsonStore('backup-recovery-store', store);
-}
-
+/**
+ * Returns only independently recorded recovery evidence. Backup execution and
+ * restore actions remain with the configured backup provider; this platform
+ * deliberately does not simulate successful backups or restores.
+ */
 export async function getBackupRecoveryState() {
-  return await loadStore();
+  const db = await requireDb();
+  const drills = await db.select().from(rolloutRecoveryDrills).orderBy(desc(rolloutRecoveryDrills.createdAt)).limit(25);
+  const passed = drills.filter((drill) => drill.status === 'passed');
+  const failed = drills.filter((drill) => drill.status === 'failed');
+  const latest = drills[0] ?? null;
+  const latestPassed = passed[0] ?? null;
+  const recoveryDrills: RecoveryDrillRecord[] = drills.map((drill) => ({
+    id: drill.id,
+    scenario: drill.drillType,
+    outcome: drill.status === 'passed' ? 'passed' : drill.status === 'failed' ? 'failed' : 'warning',
+    recoveryTime: recoveryTime(drill.measuredRtoSeconds),
+    timestamp: (drill.completedAt ?? drill.createdAt).toISOString(),
+    notes: drill.reviewNotes ?? undefined,
+  }));
+  const health = healthFromEvidence(passed.length, failed.length);
+  const configured = Boolean(process.env.BACKUP_EVIDENCE_REPOSITORY?.startsWith('https://'));
+
+  return {
+    schedule: {
+      frequency: configured ? (process.env.BACKUP_SCHEDULE_DESCRIPTION ?? 'Configured externally') : 'Not configured',
+      lastBackup: null,
+      nextBackup: null,
+      retention: process.env.BACKUP_RETENTION_DESCRIPTION ?? 'Not evidenced',
+      location: configured ? 'Evidence repository configured' : 'Not configured',
+    },
+    recentBackups: [] as BackupRecord[],
+    recoveryPoints: [] as RecoveryPointRecord[],
+    storageMetrics: {
+      totalBackupSize: 'Not reported',
+      availableSpace: 'Not reported',
+      usagePercentage: null,
+      estimatedCostMonth: 'Not reported',
+    } as StorageMetricsRecord,
+    alertChannels: process.env.BACKUP_ALERT_CHANNELS?.split(',').map((item) => item.trim()).filter(Boolean) ?? [],
+    recentAlerts: latest && latest.status !== 'passed'
+      ? [{ id: latest.id, severity: latest.status === 'failed' ? 'critical' as const : 'warning' as const, message: `Latest recovery drill is ${latest.status}; resolve evidence gaps before rollout.`, timestamp: (latest.completedAt ?? latest.createdAt).toISOString() }]
+      : [],
+    recoveryDrills,
+    automationHealth: {
+      replicationStatus: health,
+      monitoringStatus: configured ? health : 'unhealthy',
+      alertingStatus: configured && (process.env.BACKUP_ALERT_CHANNELS?.trim() ?? '').length > 0 ? health : 'unhealthy',
+      lastDrillAt: latest ? (latest.completedAt ?? latest.createdAt).toISOString() : null,
+      lastVerifiedRestoreAt: latestPassed?.completedAt?.toISOString() ?? null,
+    } as BackupAutomationHealth,
+  };
 }
 
 export async function getBackupReadinessSummary() {
-  const store = await loadStore();
-  const failedBackups = store.recentBackups.filter((backup) => backup.status === 'failed').length;
-  const lastDrill = store.recoveryDrills[0] ?? null;
+  const state = await getBackupRecoveryState();
+  const lastDrill = state.recoveryDrills[0] ?? null;
   return {
-    failedBackups,
-    alertChannels: store.alertChannels,
-    recentAlertCount: store.recentAlerts.length,
-    replicationStatus: store.automationHealth.replicationStatus,
-    monitoringStatus: store.automationHealth.monitoringStatus,
-    alertingStatus: store.automationHealth.alertingStatus,
+    failedBackups: 0,
+    alertChannels: state.alertChannels,
+    recentAlertCount: state.recentAlerts.length,
+    replicationStatus: state.automationHealth.replicationStatus,
+    monitoringStatus: state.automationHealth.monitoringStatus,
+    alertingStatus: state.automationHealth.alertingStatus,
     lastDrill,
+    evidenceOnly: true,
   };
 }
 
-export async function initiateBackupRun() {
-  const store = await loadStore();
-  const now = new Date();
-  const id = store.nextBackupId++;
-  const backup: BackupRecord = {
-    id,
-    type: now.getUTCHours() < 6 ? 'Full Backup' : 'Incremental Backup',
-    size: now.getUTCHours() < 6 ? '45.5 GB' : '2.3 GB',
-    status: 'completed',
-    timestamp: now.toISOString(),
-    duration: now.getUTCHours() < 6 ? '1h 17m' : '9m 10s',
-  };
-
-  const recoveryPoint: RecoveryPointRecord = {
-    id: store.nextRecoveryPointId++,
-    name: `${backup.type} - ${now.toISOString().slice(0, 10)}`,
-    timestamp: backup.timestamp,
-    size: backup.size,
-    type: 'automated',
-  };
-
-  store.schedule.lastBackup = backup.timestamp;
-  store.automationHealth.monitoringStatus = 'healthy';
-  store.automationHealth.replicationStatus = 'healthy';
-  store.recentAlerts.unshift({
-    id: store.nextAlertId++,
-    severity: 'info',
-    message: `${backup.type} completed successfully and recovery point ${recoveryPoint.name} is available.`,
-    timestamp: backup.timestamp,
-  });
-  const next = new Date(now);
-  next.setUTCDate(next.getUTCDate() + 1);
-  next.setUTCHours(2, 0, 0, 0);
-  store.schedule.nextBackup = next.toISOString();
-  store.recentBackups.unshift(backup);
-  store.recentBackups = store.recentBackups.slice(0, 10);
-  store.recoveryPoints.unshift(recoveryPoint);
-  store.recoveryPoints = store.recoveryPoints.slice(0, 10);
-  store.recentAlerts = store.recentAlerts.slice(0, 10);
-  await saveStore(store);
-  return backup;
+export async function initiateBackupRun(): Promise<never> {
+  throw new Error('Backup execution is intentionally unavailable in the application. Run the approved external backup job and record independently reviewed recovery evidence through Nationwide Rollout Controls.');
 }
 
-export async function recordRecoveryDrill(input: {
-  scenario: string;
-  outcome: 'passed' | 'warning' | 'failed';
-  recoveryTime: string;
-  notes?: string;
-}) {
-  const store = await loadStore();
-  const drill: RecoveryDrillRecord = {
-    id: store.nextDrillId++,
-    scenario: input.scenario,
-    outcome: input.outcome,
-    recoveryTime: input.recoveryTime,
-    timestamp: new Date().toISOString(),
-    notes: input.notes,
-  };
-
-  store.recoveryDrills.unshift(drill);
-  store.recoveryDrills = store.recoveryDrills.slice(0, 12);
-  store.automationHealth.lastDrillAt = drill.timestamp;
-  if (input.outcome === 'passed') {
-    store.automationHealth.lastVerifiedRestoreAt = drill.timestamp;
-    store.automationHealth.alertingStatus = 'healthy';
-  } else if (input.outcome === 'warning') {
-    store.automationHealth.alertingStatus = 'degraded';
-  } else {
-    store.automationHealth.alertingStatus = 'unhealthy';
-  }
-  store.recentAlerts.unshift({
-    id: store.nextAlertId++,
-    severity: input.outcome === 'passed' ? 'info' : input.outcome === 'warning' ? 'warning' : 'critical',
-    message: `Recovery drill completed for ${input.scenario} with outcome ${input.outcome}.`,
-    timestamp: drill.timestamp,
-  });
-  store.recentAlerts = store.recentAlerts.slice(0, 10);
-  await saveStore(store);
-  return drill;
+export async function recordRecoveryDrill(): Promise<never> {
+  throw new Error('Recovery drill outcomes must be recorded through the two-person Nationwide Rollout Controls workflow.');
 }
 
-export async function restoreFromRecoveryPoint(recoveryPointId: number) {
-  const store = await loadStore();
-  const point = store.recoveryPoints.find((item) => item.id === recoveryPointId);
-  if (!point) {
-    throw new Error('Recovery point not found');
-  }
-  const restoredAt = new Date().toISOString();
-  store.automationHealth.lastVerifiedRestoreAt = restoredAt;
-  store.recentAlerts.unshift({
-    id: store.nextAlertId++,
-    severity: 'info',
-    message: `Recovery point ${point.name} was used for a restore workflow validation.`,
-    timestamp: restoredAt,
-  });
-  store.recentAlerts = store.recentAlerts.slice(0, 10);
-  await saveStore(store);
-  return {
-    success: true,
-    recoveryPointId,
-    name: point.name,
-    restoredAt,
-    message: 'Recovery workflow registered successfully',
-  };
+export async function restoreFromRecoveryPoint(): Promise<never> {
+  throw new Error('Restore execution is intentionally unavailable in the application. Execute the approved runbook in the isolated recovery environment and record evidence through Nationwide Rollout Controls.');
 }

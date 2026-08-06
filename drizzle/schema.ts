@@ -1,5 +1,5 @@
 import { numeric } from "drizzle-orm/pg-core";
-import { bigint, boolean, date, decimal, doublePrecision, integer, json, jsonb, index, uniqueIndex, pgEnum, pgTable, real, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { bigint, boolean, date, decimal, doublePrecision, integer, json, jsonb, index, uniqueIndex, pgEnum, pgTable, real, serial, text, timestamp, varchar, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
@@ -5117,3 +5117,175 @@ export const daprInboxDeliveries = pgTable("dapr_inbox_deliveries", {
 }, (table) => ({
   statusReceivedIdx: index("dapr_inbox_deliveries_status_received_idx").on(table.status, table.receivedAt),
 }));
+
+
+export const rolloutJurisdictionStatusEnum = pgEnum('rollout_jurisdiction_status', ['planned', 'rehearsal', 'shadow_register', 'limited_authoritative', 'expanded', 'paused', 'retired']);
+export const rolloutImportStatusEnum = pgEnum('rollout_import_status', ['draft', 'submitted', 'validating', 'reconciliation_required', 'accepted', 'rejected', 'withdrawn']);
+export const rolloutStagingStatusEnum = pgEnum('rollout_staging_status', ['pending', 'validated', 'reconciliation_required', 'accepted', 'rejected']);
+export const rolloutReconciliationStatusEnum = pgEnum('rollout_reconciliation_status', ['open', 'matched', 'rejected', 'escalated', 'withdrawn']);
+export const rolloutGateStatusEnum = pgEnum('rollout_gate_status', ['not_started', 'evidence_submitted', 'approved', 'expired', 'rejected']);
+export const rolloutDrillStatusEnum = pgEnum('rollout_drill_status', ['planned', 'running', 'passed', 'failed', 'cancelled']);
+export const assistedServiceStatusEnum = pgEnum('assisted_service_status', ['opened', 'in_progress', 'resolved', 'escalated', 'closed']);
+
+export const rolloutJurisdictions = pgTable('rollout_jurisdictions', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  code: varchar('code', { length: 32 }).notNull().unique(),
+  name: varchar('name', { length: 255 }).notNull(),
+  administrativeLevel: varchar('administrative_level', { length: 32 }).notNull(),
+  parentJurisdictionId: integer('parent_jurisdiction_id').references((): AnyPgColumn => rolloutJurisdictions.id),
+  country: varchar('country', { length: 128 }).default('Nigeria').notNull(),
+  authoritativeRecordStatement: text('authoritative_record_statement').notNull(),
+  legalMandateReference: varchar('legal_mandate_reference', { length: 512 }),
+  serviceFallbackDescription: text('service_fallback_description').notNull(),
+  status: rolloutJurisdictionStatusEnum('status').default('planned').notNull(),
+  pilotEnabled: boolean('pilot_enabled').default(false).notNull(),
+  pausedReason: text('paused_reason'),
+  createdBy: integer('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index('rollout_jurisdictions_status_idx').on(table.status),
+  parentIdx: index('rollout_jurisdictions_parent_idx').on(table.parentJurisdictionId),
+}));
+
+export const rolloutGateAttestations = pgTable('rollout_gate_attestations', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  jurisdictionId: integer('jurisdiction_id').notNull().references(() => rolloutJurisdictions.id, { onDelete: 'cascade' }),
+  gateCode: varchar('gate_code', { length: 64 }).notNull(),
+  status: rolloutGateStatusEnum('status').default('not_started').notNull(),
+  evidenceReference: varchar('evidence_reference', { length: 512 }),
+  evidenceSha256: varchar('evidence_sha256', { length: 64 }),
+  attestedBy: integer('attested_by').references(() => users.id),
+  attestedAt: timestamp('attested_at'),
+  expiresAt: timestamp('expires_at'),
+  reviewerNotes: text('reviewer_notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  jurisdictionStatusIdx: index('rollout_gate_attestations_jurisdiction_status_idx').on(table.jurisdictionId, table.status),
+  jurisdictionGateUnique: uniqueIndex('rollout_gate_attestations_jurisdiction_gate_unique').on(table.jurisdictionId, table.gateCode),
+}));
+
+export const rolloutImportBatches = pgTable('rollout_import_batches', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  jurisdictionId: integer('jurisdiction_id').notNull().references(() => rolloutJurisdictions.id),
+  sourceSystem: varchar('source_system', { length: 255 }).notNull(),
+  sourceExportReference: varchar('source_export_reference', { length: 512 }).notNull(),
+  sourceExtractSha256: varchar('source_extract_sha256', { length: 64 }).notNull(),
+  sourceRecordCount: integer('source_record_count').notNull(),
+  acceptedRecordCount: integer('accepted_record_count').default(0).notNull(),
+  rejectedRecordCount: integer('rejected_record_count').default(0).notNull(),
+  reconciliationRequiredCount: integer('reconciliation_required_count').default(0).notNull(),
+  status: rolloutImportStatusEnum('status').default('draft').notNull(),
+  submittedBy: integer('submitted_by').notNull().references(() => users.id),
+  approvedBy: integer('approved_by').references(() => users.id),
+  approvedAt: timestamp('approved_at'),
+  submittedAt: timestamp('submitted_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  jurisdictionStatusIdx: index('rollout_import_batches_jurisdiction_status_idx').on(table.jurisdictionId, table.status),
+  sourceUnique: uniqueIndex('rollout_import_batches_source_unique').on(table.jurisdictionId, table.sourceSystem, table.sourceExtractSha256),
+}));
+
+export const rolloutStagingRecords = pgTable('rollout_staging_records', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  importBatchId: integer('import_batch_id').notNull().references(() => rolloutImportBatches.id, { onDelete: 'cascade' }),
+  sourceRecordId: varchar('source_record_id', { length: 255 }).notNull(),
+  sourceRecordSha256: varchar('source_record_sha256', { length: 64 }).notNull(),
+  parcelIdentifier: varchar('parcel_identifier', { length: 128 }),
+  titleIdentifier: varchar('title_identifier', { length: 128 }),
+  geometryGeojson: jsonb('geometry_geojson'),
+  normalizedAttributes: jsonb('normalized_attributes').default({}).notNull(),
+  qualityFlags: jsonb('quality_flags').default([]).notNull(),
+  status: rolloutStagingStatusEnum('status').default('pending').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  batchStatusIdx: index('rollout_staging_records_batch_status_idx').on(table.importBatchId, table.status),
+  parcelIdentifierIdx: index('rollout_staging_records_parcel_identifier_idx').on(table.parcelIdentifier),
+  sourceUnique: uniqueIndex('rollout_staging_records_batch_source_unique').on(table.importBatchId, table.sourceRecordId),
+}));
+
+export const rolloutReconciliationCases = pgTable('rollout_reconciliation_cases', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  jurisdictionId: integer('jurisdiction_id').notNull().references(() => rolloutJurisdictions.id),
+  stagingRecordId: integer('staging_record_id').notNull().unique().references(() => rolloutStagingRecords.id, { onDelete: 'cascade' }),
+  canonicalParcelId: integer('canonical_parcel_id').references(() => parcels.id),
+  status: rolloutReconciliationStatusEnum('status').default('open').notNull(),
+  issueCode: varchar('issue_code', { length: 96 }).notNull(),
+  issueSummary: text('issue_summary').notNull(),
+  riskLevel: varchar('risk_level', { length: 16 }).notNull(),
+  assignedTo: integer('assigned_to').references(() => users.id),
+  resolvedBy: integer('resolved_by').references(() => users.id),
+  resolutionReference: varchar('resolution_reference', { length: 512 }),
+  resolvedAt: timestamp('resolved_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  jurisdictionStatusIdx: index('rollout_reconciliation_cases_jurisdiction_status_idx').on(table.jurisdictionId, table.status),
+  assigneeIdx: index('rollout_reconciliation_cases_assignee_idx').on(table.assignedTo, table.status),
+}));
+
+export const rolloutReconciliationEvents = pgTable('rollout_reconciliation_events', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  reconciliationCaseId: integer('reconciliation_case_id').notNull().references(() => rolloutReconciliationCases.id, { onDelete: 'cascade' }),
+  actorId: integer('actor_id').notNull().references(() => users.id),
+  action: varchar('action', { length: 64 }).notNull(),
+  priorStatus: rolloutReconciliationStatusEnum('prior_status'),
+  nextStatus: rolloutReconciliationStatusEnum('next_status'),
+  evidenceReference: varchar('evidence_reference', { length: 512 }),
+  note: text('note'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  caseCreatedIdx: index('rollout_reconciliation_events_case_created_idx').on(table.reconciliationCaseId, table.createdAt),
+}));
+
+export const rolloutRecoveryDrills = pgTable('rollout_recovery_drills', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  jurisdictionId: integer('jurisdiction_id').references(() => rolloutJurisdictions.id),
+  drillType: varchar('drill_type', { length: 64 }).notNull(),
+  status: rolloutDrillStatusEnum('status').default('planned').notNull(),
+  plannedAt: timestamp('planned_at').notNull(),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  measuredRpoSeconds: integer('measured_rpo_seconds'),
+  measuredRtoSeconds: integer('measured_rto_seconds'),
+  evidenceReference: varchar('evidence_reference', { length: 512 }),
+  evidenceSha256: varchar('evidence_sha256', { length: 64 }),
+  executedBy: integer('executed_by').references(() => users.id),
+  reviewedBy: integer('reviewed_by').references(() => users.id),
+  reviewNotes: text('review_notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  statusPlannedIdx: index('rollout_recovery_drills_status_planned_idx').on(table.status, table.plannedAt),
+}));
+
+export const assistedServiceCases = pgTable('assisted_service_cases', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  jurisdictionId: integer('jurisdiction_id').notNull().references(() => rolloutJurisdictions.id),
+  requesterReference: varchar('requester_reference', { length: 128 }).notNull(),
+  serviceChannel: varchar('service_channel', { length: 32 }).notNull(),
+  requestedService: varchar('requested_service', { length: 128 }).notNull(),
+  status: assistedServiceStatusEnum('status').default('opened').notNull(),
+  assignedTo: integer('assigned_to').references(() => users.id),
+  escalationReference: varchar('escalation_reference', { length: 512 }),
+  consentRecordedAt: timestamp('consent_recorded_at').notNull(),
+  openedBy: integer('opened_by').notNull().references(() => users.id),
+  resolvedBy: integer('resolved_by').references(() => users.id),
+  resolutionSummary: text('resolution_summary'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  jurisdictionStatusIdx: index('assisted_service_cases_jurisdiction_status_idx').on(table.jurisdictionId, table.status),
+  assigneeIdx: index('assisted_service_cases_assignee_idx').on(table.assignedTo, table.status),
+}));
+
+export type RolloutJurisdiction = typeof rolloutJurisdictions.$inferSelect;
+export type RolloutGateAttestation = typeof rolloutGateAttestations.$inferSelect;
+export type RolloutImportBatch = typeof rolloutImportBatches.$inferSelect;
+export type RolloutStagingRecord = typeof rolloutStagingRecords.$inferSelect;
+export type RolloutReconciliationCase = typeof rolloutReconciliationCases.$inferSelect;
+export type RolloutRecoveryDrill = typeof rolloutRecoveryDrills.$inferSelect;
+export type AssistedServiceCase = typeof assistedServiceCases.$inferSelect;

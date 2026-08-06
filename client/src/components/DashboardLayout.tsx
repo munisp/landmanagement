@@ -55,6 +55,7 @@ const menuGroups: NavigationGroup[] = [
       { icon: Sparkles, label: "Getting started", path: "/getting-started", description: "Your guided next step" },
       { icon: Map, label: "Land & mapping", path: "/advanced-geospatial-center", description: "Parcels and spatial context" },
       { icon: FileText, label: "Cases & documents", path: "/legal-document-center", description: "Governed evidence and records" },
+      { icon: ShieldCheck, label: "Rollout control", path: "/admin/nationwide-rollout", description: "Evidence-gated pilot safety" },
     ],
   },
   {

@@ -235,3 +235,26 @@ export async function shutdownTemporalClient(): Promise<void> {
     console.info('Temporal client shut down');
   }
 }
+
+
+export async function getTemporalOrchestrationReadiness(): Promise<{
+  ready: true;
+  namespace: string;
+  taskQueues: string[];
+  tlsEnabled: boolean;
+}> {
+  const namespace = requiredTemporalConfig('TEMPORAL_NAMESPACE');
+  const propertyQueue = temporalTaskQueue();
+  const geoAiQueue = geoAiTemporalTaskQueue();
+  const tlsEnabled = process.env.TEMPORAL_TLS_ENABLED === 'true';
+  if (process.env.NODE_ENV === 'production' && !tlsEnabled) {
+    throw new Error('TEMPORAL_TLS_ENABLED=true is required for production readiness');
+  }
+  const initializedHere = !client;
+  if (initializedHere) await initializeTemporalClient();
+  try {
+    return { ready: true, namespace, taskQueues: [propertyQueue, geoAiQueue], tlsEnabled };
+  } finally {
+    if (initializedHere) await shutdownTemporalClient();
+  }
+}

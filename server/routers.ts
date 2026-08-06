@@ -57,6 +57,7 @@ import { rightOfWayRouter } from './api/routers/right-of-way';
 import { taxOperationsRouter } from './api/routers/tax-operations';
 import { portfolioProductsRouter } from './api/routers/portfolio-products';
 import { publicSecurityRouter } from './api/routers/public-security';
+import { nationwideRolloutRouter } from './api/routers/nationwide-rollout';
 import { parcelSubscriptionsRouter, notificationPreferencesRouter, notificationInboxRouter } from './api/routers/parcel-subscriptions';
 import { identityRouter } from './api/routers/identity';
 import { legalRouter } from './api/routers/legal';
@@ -214,6 +215,7 @@ export const appRouter = router({
   rightOfWay: rightOfWayRouter,
   taxOperations: taxOperationsRouter,
   portfolioProducts: portfolioProductsRouter,
+  nationwideRollout: nationwideRolloutRouter,
   publicSecurity: publicSecurityRouter,
   parcelSubscriptions: parcelSubscriptionsRouter,
   notificationPreferences: notificationPreferencesRouter,
@@ -2899,8 +2901,8 @@ export const appRouter = router({
           ...state,
           schedule: {
             ...state.schedule,
-            lastBackup: new Date(state.schedule.lastBackup),
-            nextBackup: new Date(state.schedule.nextBackup),
+            lastBackup: state.schedule.lastBackup ? new Date(state.schedule.lastBackup) : null,
+            nextBackup: state.schedule.nextBackup ? new Date(state.schedule.nextBackup) : null,
           },
           recentBackups: state.recentBackups.map((backup) => ({
             ...backup,
@@ -2915,12 +2917,7 @@ export const appRouter = router({
 
     initiateBackup: protectedProcedure
       .mutation(async () => {
-        const { initiateBackupRun } = await import('./backupRecoveryRepository');
-        const backup = await initiateBackupRun();
-        return {
-          ...backup,
-          timestamp: new Date(backup.timestamp),
-        };
+        throw new Error('Backup execution is not available through the application. Run the approved external job and record reviewed evidence through Nationwide Rollout Control.');
       }),
 
     readiness: protectedProcedure
@@ -2945,24 +2942,14 @@ export const appRouter = router({
         recoveryTime: z.string(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const { recordRecoveryDrill } = await import('./backupRecoveryRepository');
-        const drill = await recordRecoveryDrill(input);
-        return {
-          ...drill,
-          timestamp: new Date(drill.timestamp),
-        };
+      .mutation(async () => {
+        throw new Error('Recovery drills must use the independent executor/reviewer workflow in Nationwide Rollout Control.');
       }),
 
     restore: protectedProcedure
       .input(z.object({ recoveryPointId: z.number() }))
-      .mutation(async ({ input }) => {
-        const { restoreFromRecoveryPoint } = await import('./backupRecoveryRepository');
-        const result = await restoreFromRecoveryPoint(input.recoveryPointId);
-        return {
-          ...result,
-          restoredAt: new Date(result.restoredAt),
-        };
+      .mutation(async () => {
+        throw new Error('Restore execution is not available through the application. Execute the approved isolated recovery runbook and record evidence through Nationwide Rollout Control.');
       }),
   }),
 

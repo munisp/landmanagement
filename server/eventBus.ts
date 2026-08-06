@@ -61,31 +61,60 @@ async function publishViaKafka(record: EventOutboxRecord) {
   });
 }
 
-async function publishViaDapr(record: EventOutboxRecord) {
-  const baseUrl = process.env.DAPR_HTTP_URL?.replace(/\/$/, "");
-  const pubsubName = process.env.DAPR_PUBSUB_NAME?.trim();
-  if (!baseUrl || !pubsubName) {
-    throw new Error("DAPR_HTTP_URL and DAPR_PUBSUB_NAME are required for Dapr event publication");
+function daprPublicationConfig() {
+  const endpointValue = process.env.DAPR_HTTP_ENDPOINT?.trim() || process.env.DAPR_HTTP_URL?.trim();
+  const pubsubName = process.env.DAPR_PUBSUB_COMPONENT?.trim() || process.env.DAPR_PUBSUB_NAME?.trim();
+  if (!endpointValue || !pubsubName) {
+    throw new Error('DAPR_HTTP_ENDPOINT and DAPR_PUBSUB_COMPONENT are required for Dapr event publication');
   }
+  const endpoint = new URL(endpointValue);
+  if (!['http:', 'https:'].includes(endpoint.protocol)) throw new Error('DAPR_HTTP_ENDPOINT must use HTTP or HTTPS');
+  const timeoutMs = Number(process.env.DAPR_TIMEOUT_MS ?? '5000');
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) throw new Error('DAPR_TIMEOUT_MS must be an integer between 1000 and 30000');
+  return { baseUrl: endpoint.toString().replace(/\/$/, ''), pubsubName, timeoutMs };
+}
 
-  const response = await fetch(`${baseUrl}/v1.0/publish/${encodeURIComponent(pubsubName)}/${encodeURIComponent(record.topic)}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(record.headers as Record<string, string> | undefined),
-    },
-    body: JSON.stringify({
-      id: String(record.id),
-      type: record.eventType,
-      source: "landmanagement/event-outbox",
-      subject: record.aggregateType && record.aggregateId ? `${record.aggregateType}/${record.aggregateId}` : undefined,
-      time: new Date().toISOString(),
-      data: record.payload,
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(`Dapr publish failed with status ${response.status}: ${await response.text()}`);
+async function publishDaprCloudEvent(topic: string, event: Record<string, unknown>) {
+  const { baseUrl, pubsubName, timeoutMs } = daprPublicationConfig();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${baseUrl}/v1.0/publish/${encodeURIComponent(pubsubName)}/${encodeURIComponent(topic)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/cloudevents+json', 'ce-id': String(event.id ?? ''), 'ce-type': String(event.type ?? '') },
+      body: JSON.stringify(event),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`Dapr publish failed with status ${response.status}: ${await response.text()}`);
+  } finally {
+    clearTimeout(timeout);
   }
+}
+
+async function publishViaDapr(record: EventOutboxRecord) {
+  await publishDaprCloudEvent(record.topic, {
+    id: String(record.id),
+    type: record.eventType,
+    source: 'landmanagement/event-outbox',
+    subject: record.aggregateType && record.aggregateId ? `${record.aggregateType}/${record.aggregateId}` : undefined,
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: record.payload,
+  });
+}
+
+async function publishDaprDeadLetter(record: EventOutboxRecord, errorMessage: string): Promise<void> {
+  const topic = process.env.DAPR_DEAD_LETTER_TOPIC?.trim();
+  if (!topic) return;
+  await publishDaprCloudEvent(topic, {
+    id: `dead-letter-${record.id}`,
+    type: 'landmanagement.outbox.dead_lettered.v1',
+    source: 'landmanagement/event-outbox',
+    subject: record.aggregateType && record.aggregateId ? `${record.aggregateType}/${record.aggregateId}` : undefined,
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: { eventId: record.id, eventType: record.eventType, topic: record.topic, attempts: (record.attemptCount ?? 0) + 1, error: errorMessage },
+  });
 }
 
 async function publishViaFluvio(record: EventOutboxRecord) {
@@ -144,6 +173,14 @@ export async function publishQueuedEvent(record: EventOutboxRecord): Promise<Eve
   } catch (error) {
     const message = error instanceof Error ? error.message : "Event publish failed";
     const exhausted = nextAttempt >= MAX_DELIVERY_ATTEMPTS;
+    if (exhausted && record.backend === 'dapr_pubsub') {
+      try {
+        await publishDaprDeadLetter(record, message);
+      } catch (deadLetterError) {
+        const deadLetterMessage = deadLetterError instanceof Error ? deadLetterError.message : 'Dapr dead-letter publication failed';
+        console.error('[EventOutbox] dead-letter publication failed', { eventId: record.id, error: deadLetterMessage });
+      }
+    }
     const updated = await db
       .update(eventOutbox)
       .set({

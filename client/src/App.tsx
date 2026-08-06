@@ -10,6 +10,7 @@ import { KeyboardShortcutsDialog } from "@/components/KeyboardShortcutsDialog";
 import { AddToHomeScreenPrompt } from "@/components/AddToHomeScreenPrompt";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { initializeKeyboardShortcuts, cleanupKeyboardShortcuts } from './lib/keyboardShortcuts';
+import { initializeAccessibilityPreferences } from './lib/accessibilityPreferences';
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from './pages/Home';
@@ -119,6 +120,7 @@ const PropertyTransactionWorkflowPage = lazy(() => import('./pages/PropertyTrans
 const CofOApplication = lazy(() => import('./pages/CofOApplication'));
 const StakeholderOnboarding = lazy(() => import('./pages/StakeholderOnboarding'));
 const GettingStarted = lazy(() => import('./pages/GettingStarted'));
+const NationwideRolloutControl = lazy(() => import('./pages/NationwideRolloutControl'));
 
 // Lazy load non-critical pages
 const AnalyticsDashboard = lazy(() => import('./pages/AnalyticsDashboard'));
@@ -181,6 +183,7 @@ function Router() {
       <Route path="/admin/users" component={AdminUserManagement} />
       <Route path="/admin/phase4" component={AdminPhase4Dashboard} />
       <Route path="/admin/stakeholder-onboarding" component={StakeholderOnboarding} />
+      <Route path="/admin/nationwide-rollout" component={NationwideRolloutControl} />
       <Route path="/getting-started" component={GettingStarted} />
       <Route path="/cofo-applications" component={CofOApplication} />
             <Route path="/verification" component={VerificationWorkflow} />
@@ -285,6 +288,10 @@ function Router() {
   );}
 
 function App() {
+  useEffect(() => {
+    initializeAccessibilityPreferences();
+  }, []);
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
