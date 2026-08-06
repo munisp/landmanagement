@@ -23,6 +23,7 @@ import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   Building2,
+  Compass,
   FileText,
   Landmark,
   LayoutDashboard,
@@ -64,6 +65,7 @@ const menuGroups: NavigationGroup[] = [
       { icon: Landmark, label: "Mortgage operations", path: "/mortgage-dashboard", description: "Loan and collateral workflows" },
       { icon: ShoppingCart, label: "Trusted services", path: "/marketplace", description: "Verified professional services" },
       { icon: Building2, label: "Commercial portfolio", path: "/commercial-portfolio", description: "Institutional workspaces" },
+      { icon: Compass, label: "Guided journeys", path: "/journeys", description: "Connected, evidence-led service paths" },
     ],
   },
 ];

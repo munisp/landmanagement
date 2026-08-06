@@ -999,3 +999,44 @@ export const transitionMobileFieldAssignment = (input: {
   nextStatus: MobileFieldAssignment["status"];
   reviewNotes?: string;
 }, accessToken?: string | null) => trpcMutation<MobileFieldAssignment>("commercialLender.transitionFieldAssignment", input, accessToken);
+
+
+export type MobileStakeholderJourneyTemplate = {
+  code: string;
+  title: string;
+  stakeholder: string;
+  description: string;
+  domain: string;
+  subjectKinds: string[];
+  launchRoute: string;
+  mobileRoute?: string;
+  decisionBoundary: string;
+};
+
+export type MobileStakeholderJourneyRun = {
+  runKey: string;
+  templateCode: string;
+  subjectKind: string;
+  subjectReference: string;
+  status: "pending" | "running" | "awaiting_intervention" | "blocked" | "completed" | "cancelled" | "failed";
+  blockedReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  template: MobileStakeholderJourneyTemplate;
+};
+
+export const getMobileStakeholderJourneyTemplates = (token?: string | null) =>
+  trpcQuery<MobileStakeholderJourneyTemplate[]>("stakeholderJourneys.templates", undefined, token);
+
+export const listMobileStakeholderJourneys = (token?: string | null) =>
+  trpcQuery<MobileStakeholderJourneyRun[]>("stakeholderJourneys.listMine", { includeAll: false }, token);
+
+export const startMobileStakeholderJourney = (input: {
+  templateCode: string;
+  subjectKind: string;
+  subjectReference: string;
+  idempotencyKey: string;
+}, token?: string | null) => trpcMutation<{ run: MobileStakeholderJourneyRun; created: boolean; dispatched: boolean; orchestrationBlocked: boolean; reason?: string }>("stakeholderJourneys.start", input, token);
+
+export const retryMobileStakeholderJourney = (runKey: string, token?: string | null) =>
+  trpcMutation<{ run: MobileStakeholderJourneyRun; dispatched: boolean; orchestrationBlocked: boolean; reason?: string }>("stakeholderJourneys.retry", { runKey }, token);

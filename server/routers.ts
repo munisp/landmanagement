@@ -58,6 +58,7 @@ import { taxOperationsRouter } from './api/routers/tax-operations';
 import { portfolioProductsRouter } from './api/routers/portfolio-products';
 import { publicSecurityRouter } from './api/routers/public-security';
 import { nationwideRolloutRouter } from './api/routers/nationwide-rollout';
+import { stakeholderJourneysRouter } from './api/routers/stakeholder-journeys';
 import { parcelSubscriptionsRouter, notificationPreferencesRouter, notificationInboxRouter } from './api/routers/parcel-subscriptions';
 import { identityRouter } from './api/routers/identity';
 import { legalRouter } from './api/routers/legal';
@@ -216,6 +217,7 @@ export const appRouter = router({
   taxOperations: taxOperationsRouter,
   portfolioProducts: portfolioProductsRouter,
   nationwideRollout: nationwideRolloutRouter,
+  stakeholderJourneys: stakeholderJourneysRouter,
   publicSecurity: publicSecurityRouter,
   parcelSubscriptions: parcelSubscriptionsRouter,
   notificationPreferences: notificationPreferencesRouter,

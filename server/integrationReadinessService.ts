@@ -1,10 +1,11 @@
 import { verifyKeycloakAdminReadiness } from "./keycloakAdminService";
 import { verifyPermifyReadiness } from "./permifyService";
+import { getTemporalOrchestrationReadiness } from "./temporalClient";
 
 export type IntegrationReadinessState = "ready" | "not_ready";
 
 export type IntegrationReadinessCheck = {
-  name: "keycloak" | "permify" | "identity_verification" | "document_verification" | "dapr" | "temporal";
+  name: "keycloak" | "permify" | "identity_verification" | "document_verification" | "dapr" | "temporal" | "stakeholder_journeys";
   state: IntegrationReadinessState;
   detail: string;
 };
@@ -101,6 +102,31 @@ async function probeDapr(): Promise<IntegrationReadinessCheck> {
   }
 }
 
+async function probeStakeholderJourneys(): Promise<IntegrationReadinessCheck> {
+  const missing = configured(
+    "TEMPORAL_STAKEHOLDER_JOURNEY_TASK_QUEUE",
+    "PORTFOLIO_INTEGRATION_GATEWAY_URL",
+    "PORTFOLIO_INTEGRATION_SECRET",
+    "PORTFOLIO_SPATIAL_ENGINE_URL",
+    "PORTFOLIO_SPATIAL_ENGINE_SECRET",
+    "LAKEHOUSE_PORTFOLIO_ANALYTICS_URL",
+    "LAKEHOUSE_INTERNAL_TOKEN",
+  );
+  if (missing.length) return { name: "stakeholder_journeys", state: "not_ready", detail: `Missing ${missing.join(", ")}` };
+  try {
+    const temporal = await getTemporalOrchestrationReadiness();
+    const [gateway, spatial, lakehouse] = await Promise.all([
+      getJson(`${process.env.PORTFOLIO_INTEGRATION_GATEWAY_URL!.replace(/\/$/, "")}/ready`, 5_000),
+      getJson(`${process.env.PORTFOLIO_SPATIAL_ENGINE_URL!.replace(/\/$/, "")}/ready`, 5_000),
+      getJson(`${process.env.LAKEHOUSE_PORTFOLIO_ANALYTICS_URL!.replace(/\/$/, "")}/health`, 5_000),
+    ]);
+    if (!gateway.ok || !spatial.ok || !lakehouse.ok) return { name: "stakeholder_journeys", state: "not_ready", detail: "One or more journey middleware readiness probes failed" };
+    return { name: "stakeholder_journeys", state: "ready", detail: `Temporal namespace ${temporal.namespace}, journey queue, Go gateway, Rust spatial engine, and Python Lakehouse are reachable` };
+  } catch (error) {
+    return { name: "stakeholder_journeys", state: "not_ready", detail: error instanceof Error ? error.message : "Stakeholder journey readiness probe failed" };
+  }
+}
+
 function probeTemporal(): IntegrationReadinessCheck {
   const missing = configured("TEMPORAL_ADDRESS", "TEMPORAL_NAMESPACE", "TEMPORAL_PROPERTY_TRANSACTION_TASK_QUEUE");
   return missing.length
@@ -116,6 +142,7 @@ export async function runIntegrationReadinessPreflight() {
     probePrivateVerifier("document_verification", "DOCUMENT_VERIFICATION_SERVICE_URL"),
     probeDapr(),
     Promise.resolve(probeTemporal()),
+    probeStakeholderJourneys(),
   ]);
   return { generatedAt: new Date().toISOString(), ready: checks.every((check) => check.state === "ready"), checks };
 }

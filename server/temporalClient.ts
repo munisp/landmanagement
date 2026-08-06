@@ -16,6 +16,7 @@ import {
 } from '../temporal/workflows/propertyTransactionWorkflow';
 import { geoAiAnalysisWorkflow, type GeoAiAnalysisWorkflowInput } from '../temporal/workflows/geoaiAnalysisWorkflow';
 import { onboardingActivationWorkflow } from '../temporal/workflows/onboardingActivationWorkflow';
+import { stakeholderJourneyWorkflow, journeyCancellationSignal, journeyInterventionSignal, type StakeholderJourneyWorkflowInput, type StakeholderJourneyWorkflowState, getStakeholderJourneyStateQuery } from '../temporal/workflows/stakeholderJourneyWorkflow';
 
 let client: Client | null = null;
 
@@ -35,6 +36,10 @@ function geoAiTemporalTaskQueue(): string {
 
 function onboardingActivationTaskQueue(): string {
   return requiredTemporalConfig('TEMPORAL_ONBOARDING_ACTIVATION_TASK_QUEUE');
+}
+
+function stakeholderJourneyTaskQueue(): string {
+  return requiredTemporalConfig('TEMPORAL_STAKEHOLDER_JOURNEY_TASK_QUEUE');
 }
 
 /** Initialize Temporal client connection. */
@@ -237,6 +242,46 @@ export async function shutdownTemporalClient(): Promise<void> {
 }
 
 
+/** Start a durable, idempotent reusable stakeholder journey workflow. */
+export async function startStakeholderJourneyWorkflow(input: StakeholderJourneyWorkflowInput): Promise<{ workflowId: string; runId: string }> {
+  if (!client) await initializeTemporalClient();
+  const temporalClient = getTemporalClient();
+  const workflowId = `stakeholder-journey-${input.runKey}`;
+  try {
+    const handle = await temporalClient.workflow.start(stakeholderJourneyWorkflow, {
+      taskQueue: stakeholderJourneyTaskQueue(),
+      workflowId,
+      args: [input],
+      workflowExecutionTimeout: '31 days',
+      workflowRunTimeout: '31 days',
+      workflowTaskTimeout: '1 minute',
+    });
+    return { workflowId: handle.workflowId, runId: handle.firstExecutionRunId };
+  } catch (error) {
+    if (error instanceof Error && /already started|already exists/i.test(error.message)) {
+      return { workflowId, runId: 'existing' };
+    }
+    throw error;
+  }
+}
+
+/** Signal a resolved, already-authorized intervention to a journey workflow. */
+export async function signalStakeholderJourneyIntervention(input: { workflowId: string; interventionKey: string }): Promise<void> {
+  if (!client) await initializeTemporalClient();
+  const handle = getTemporalClient().workflow.getHandle(input.workflowId);
+  await handle.signal(journeyInterventionSignal, { interventionKey: input.interventionKey });
+}
+
+export async function signalStakeholderJourneyCancellation(workflowId: string): Promise<void> {
+  if (!client) await initializeTemporalClient();
+  await getTemporalClient().workflow.getHandle(workflowId).signal(journeyCancellationSignal);
+}
+
+export async function getStakeholderJourneyWorkflowState(workflowId: string): Promise<StakeholderJourneyWorkflowState> {
+  if (!client) await initializeTemporalClient();
+  return getTemporalClient().workflow.getHandle(workflowId).query(getStakeholderJourneyStateQuery);
+}
+
 export async function getTemporalOrchestrationReadiness(): Promise<{
   ready: true;
   namespace: string;
@@ -253,7 +298,7 @@ export async function getTemporalOrchestrationReadiness(): Promise<{
   const initializedHere = !client;
   if (initializedHere) await initializeTemporalClient();
   try {
-    return { ready: true, namespace, taskQueues: [propertyQueue, geoAiQueue], tlsEnabled };
+    return { ready: true, namespace, taskQueues: [propertyQueue, geoAiQueue, stakeholderJourneyTaskQueue()], tlsEnabled };
   } finally {
     if (initializedHere) await shutdownTemporalClient();
   }

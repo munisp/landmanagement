@@ -5289,3 +5289,103 @@ export type RolloutStagingRecord = typeof rolloutStagingRecords.$inferSelect;
 export type RolloutReconciliationCase = typeof rolloutReconciliationCases.$inferSelect;
 export type RolloutRecoveryDrill = typeof rolloutRecoveryDrills.$inferSelect;
 export type AssistedServiceCase = typeof assistedServiceCases.$inferSelect;
+
+
+// Reusable stakeholder journey engine. These tables persist orchestration state
+// and evidence only; domain services remain authoritative for rights and decisions.
+export const stakeholderJourneyRunStatusEnum = pgEnum("stakeholder_journey_run_status", [
+  "pending", "running", "awaiting_intervention", "blocked", "completed", "cancelled", "failed",
+]);
+
+export const stakeholderJourneyStepStatusEnum = pgEnum("stakeholder_journey_step_status", [
+  "pending", "running", "awaiting_intervention", "completed", "blocked", "failed", "skipped",
+]);
+
+export const stakeholderJourneyInterventionStatusEnum = pgEnum("stakeholder_journey_intervention_status", [
+  "requested", "continued", "blocked", "cancelled", "expired",
+]);
+
+export const stakeholderJourneyRuns = pgTable("stakeholder_journey_runs", {
+  id: serial("id").primaryKey(),
+  runKey: varchar("run_key", { length: 96 }).notNull().unique(),
+  templateCode: varchar("template_code", { length: 8 }).notNull(),
+  actorId: integer("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  subjectKind: varchar("subject_kind", { length: 48 }).notNull(),
+  subjectReference: varchar("subject_reference", { length: 160 }).notNull(),
+  idempotencyKey: varchar("idempotency_key", { length: 128 }).notNull(),
+  status: stakeholderJourneyRunStatusEnum("status").notNull().default("pending"),
+  currentStepKey: varchar("current_step_key", { length: 80 }),
+  workflowId: varchar("workflow_id", { length: 160 }).unique(),
+  temporalRunId: varchar("temporal_run_id", { length: 128 }),
+  inputHash: varchar("input_hash", { length: 64 }).notNull(),
+  context: jsonb("context").notNull().default({}),
+  blockedReason: text("blocked_reason"),
+  completedAt: timestamp("completed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("stakeholder_journey_runs_actor_template_idempotency_unique").on(table.actorId, table.templateCode, table.idempotencyKey),
+  index("stakeholder_journey_runs_actor_status_idx").on(table.actorId, table.status, table.updatedAt),
+  index("stakeholder_journey_runs_template_status_idx").on(table.templateCode, table.status, table.updatedAt),
+  index("stakeholder_journey_runs_subject_idx").on(table.subjectKind, table.subjectReference),
+]);
+
+export const stakeholderJourneySteps = pgTable("stakeholder_journey_steps", {
+  id: serial("id").primaryKey(),
+  journeyRunId: integer("journey_run_id").notNull().references(() => stakeholderJourneyRuns.id, { onDelete: "cascade" }),
+  stepKey: varchar("step_key", { length: 80 }).notNull(),
+  adapterKey: varchar("adapter_key", { length: 80 }).notNull(),
+  sequenceNo: integer("sequence_no").notNull(),
+  status: stakeholderJourneyStepStatusEnum("status").notNull().default("pending"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  outputHash: varchar("output_hash", { length: 64 }),
+  output: jsonb("output"),
+  failureCode: varchar("failure_code", { length: 80 }),
+  failureDetail: text("failure_detail"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("stakeholder_journey_steps_run_step_unique").on(table.journeyRunId, table.stepKey),
+  uniqueIndex("stakeholder_journey_steps_run_sequence_unique").on(table.journeyRunId, table.sequenceNo),
+  index("stakeholder_journey_steps_run_status_idx").on(table.journeyRunId, table.status, table.sequenceNo),
+]);
+
+export const stakeholderJourneyEvents = pgTable("stakeholder_journey_events", {
+  id: serial("id").primaryKey(),
+  eventKey: varchar("event_key", { length: 96 }).notNull().unique(),
+  journeyRunId: integer("journey_run_id").notNull().references(() => stakeholderJourneyRuns.id, { onDelete: "cascade" }),
+  journeyStepId: integer("journey_step_id").references(() => stakeholderJourneySteps.id, { onDelete: "set null" }),
+  eventType: varchar("event_type", { length: 96 }).notNull(),
+  actorId: integer("actor_id").references(() => users.id, { onDelete: "set null" }),
+  evidenceHash: varchar("evidence_hash", { length: 64 }).notNull(),
+  payload: jsonb("payload").notNull().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("stakeholder_journey_events_run_created_idx").on(table.journeyRunId, table.createdAt),
+]);
+
+export const stakeholderJourneyInterventions = pgTable("stakeholder_journey_interventions", {
+  id: serial("id").primaryKey(),
+  interventionKey: varchar("intervention_key", { length: 96 }).notNull().unique(),
+  journeyRunId: integer("journey_run_id").notNull().references(() => stakeholderJourneyRuns.id, { onDelete: "cascade" }),
+  journeyStepId: integer("journey_step_id").notNull().references(() => stakeholderJourneySteps.id, { onDelete: "cascade" }),
+  requestedRole: varchar("requested_role", { length: 96 }).notNull(),
+  reason: text("reason").notNull(),
+  status: stakeholderJourneyInterventionStatusEnum("status").notNull().default("requested"),
+  requestedAt: timestamp("requested_at").notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: integer("resolved_by").references(() => users.id, { onDelete: "set null" }),
+  resolutionNote: text("resolution_note"),
+  expiresAt: timestamp("expires_at"),
+}, (table) => [
+  index("stakeholder_journey_interventions_pending_idx").on(table.status, table.requestedRole, table.requestedAt),
+  index("stakeholder_journey_interventions_run_idx").on(table.journeyRunId, table.status),
+]);
+
+export type StakeholderJourneyRun = typeof stakeholderJourneyRuns.$inferSelect;
+export type StakeholderJourneyStep = typeof stakeholderJourneySteps.$inferSelect;
+export type StakeholderJourneyEvent = typeof stakeholderJourneyEvents.$inferSelect;
+export type StakeholderJourneyIntervention = typeof stakeholderJourneyInterventions.$inferSelect;

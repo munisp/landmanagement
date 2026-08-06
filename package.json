@@ -14,6 +14,7 @@
     "worker:commercial-billing": "tsx temporal/commercialBillingWorker.ts",
     "worker:commercial-billing-scheduler": "tsx temporal/commercialBillingScheduler.ts",
     "worker:onboarding-activation": "tsx temporal/onboardingActivationWorker.ts",
+    "worker:stakeholder-journeys": "tsx temporal/stakeholderJourneyWorker.ts",
     "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
@@ -22,6 +23,7 @@
     "test:geospatial-geometry": "vitest --config vitest.geospatial-geometry.config.ts run",
     "test:regression": "vitest run server/api/routers/phase4.test.ts server/notifications.presence.test.ts",
     "test:context-globe": "vitest run --config vitest.context-globe.config.ts",
+    "test:stakeholder-journeys": "tsx scripts/release/validate-stakeholder-journeys.ts",
     "test:load": "node tests/load/comprehensive-load-test.js",
     "test:capacity:mapping": "node tools/mapping-capacity-test.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"

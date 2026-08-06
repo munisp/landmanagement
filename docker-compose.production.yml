@@ -82,8 +82,20 @@ services:
       # Temporal
       TEMPORAL_ADDRESS: temporal:7233
       TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_TLS_ENABLED: ${TEMPORAL_TLS_ENABLED:-true}
+      TEMPORAL_TLS_CERT: ${TEMPORAL_TLS_CERT:-}
+      TEMPORAL_TLS_KEY: ${TEMPORAL_TLS_KEY:-}
       TEMPORAL_PROPERTY_TRANSACTION_TASK_QUEUE: ${TEMPORAL_PROPERTY_TRANSACTION_TASK_QUEUE:-property-transaction}
       TEMPORAL_GEOAI_TASK_QUEUE: ${TEMPORAL_GEOAI_TASK_QUEUE:?TEMPORAL_GEOAI_TASK_QUEUE must be set}
+      # Reusable stakeholder-journey orchestration and cross-language middleware
+      TEMPORAL_STAKEHOLDER_JOURNEY_TASK_QUEUE: ${TEMPORAL_STAKEHOLDER_JOURNEY_TASK_QUEUE:?TEMPORAL_STAKEHOLDER_JOURNEY_TASK_QUEUE must be set}
+      JOURNEY_MIDDLEWARE_REQUIRED: "true"
+      PORTFOLIO_INTEGRATION_GATEWAY_URL: ${PORTFOLIO_INTEGRATION_GATEWAY_URL:?PORTFOLIO_INTEGRATION_GATEWAY_URL must be set}
+      PORTFOLIO_INTEGRATION_SECRET: ${PORTFOLIO_INTEGRATION_SECRET:?PORTFOLIO_INTEGRATION_SECRET must be set}
+      PORTFOLIO_SPATIAL_ENGINE_URL: ${PORTFOLIO_SPATIAL_ENGINE_URL:?PORTFOLIO_SPATIAL_ENGINE_URL must be set}
+      PORTFOLIO_SPATIAL_ENGINE_SECRET: ${PORTFOLIO_SPATIAL_ENGINE_SECRET:?PORTFOLIO_SPATIAL_ENGINE_SECRET must be set}
+      LAKEHOUSE_PORTFOLIO_ANALYTICS_URL: ${LAKEHOUSE_PORTFOLIO_ANALYTICS_URL:-http://lakehouse-api:8000}
+      LAKEHOUSE_INTERNAL_TOKEN: ${LAKEHOUSE_INTERNAL_TOKEN:?LAKEHOUSE_INTERNAL_TOKEN must be set}
       # OpenSearch
       OPENSEARCH_URL: http://opensearch:9200
       ELASTICSEARCH_URL: http://opensearch:9200
@@ -585,6 +597,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-idlr_pts}
       LAKEHOUSE_API_KEY: ${LAKEHOUSE_API_KEY:?LAKEHOUSE_API_KEY must be set}
+      LAKEHOUSE_INTERNAL_TOKEN: ${LAKEHOUSE_INTERNAL_TOKEN:?LAKEHOUSE_INTERNAL_TOKEN must be set}
       LAKEHOUSE_CORS_ORIGINS: ${LAKEHOUSE_CORS_ORIGINS:-}
       GEOAI_ALLOWED_ASSET_URI_PREFIXES: ${GEOAI_ALLOWED_ASSET_URI_PREFIXES:?GEOAI_ALLOWED_ASSET_URI_PREFIXES must be set}
       GEOAI_PDAL_BINARY: ${GEOAI_PDAL_BINARY:-}
@@ -1294,6 +1307,45 @@ services:
     networks:
       - idlr_net
 
+  stakeholder-journey-temporal-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idlr-stakeholder-journey-temporal-worker
+    <<: *default-restart
+    logging: *default-logging
+    command: ["pnpm", "worker:stakeholder-journeys"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-idlr}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-idlr_pts}
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_STAKEHOLDER_JOURNEY_TASK_QUEUE: ${TEMPORAL_STAKEHOLDER_JOURNEY_TASK_QUEUE:?TEMPORAL_STAKEHOLDER_JOURNEY_TASK_QUEUE must be set}
+      STAKEHOLDER_JOURNEY_WORKER_METRICS_PORT: ${STAKEHOLDER_JOURNEY_WORKER_METRICS_PORT:-9465}
+      TEMPORAL_TLS_ENABLED: ${TEMPORAL_TLS_ENABLED:-true}
+      TEMPORAL_TLS_CERT: ${TEMPORAL_TLS_CERT:-}
+      TEMPORAL_TLS_KEY: ${TEMPORAL_TLS_KEY:-}
+      JOURNEY_MIDDLEWARE_REQUIRED: "true"
+      PORTFOLIO_INTEGRATION_GATEWAY_URL: ${PORTFOLIO_INTEGRATION_GATEWAY_URL:?PORTFOLIO_INTEGRATION_GATEWAY_URL must be set}
+      PORTFOLIO_INTEGRATION_SECRET: ${PORTFOLIO_INTEGRATION_SECRET:?PORTFOLIO_INTEGRATION_SECRET must be set}
+      PORTFOLIO_SPATIAL_ENGINE_URL: ${PORTFOLIO_SPATIAL_ENGINE_URL:?PORTFOLIO_SPATIAL_ENGINE_URL must be set}
+      PORTFOLIO_SPATIAL_ENGINE_SECRET: ${PORTFOLIO_SPATIAL_ENGINE_SECRET:?PORTFOLIO_SPATIAL_ENGINE_SECRET must be set}
+      LAKEHOUSE_PORTFOLIO_ANALYTICS_URL: ${LAKEHOUSE_PORTFOLIO_ANALYTICS_URL:-http://lakehouse-api:8000}
+      LAKEHOUSE_INTERNAL_TOKEN: ${LAKEHOUSE_INTERNAL_TOKEN:?LAKEHOUSE_INTERNAL_TOKEN must be set}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      portfolio-integration-gateway:
+        condition: service_healthy
+      portfolio-spatial-engine:
+        condition: service_healthy
+      lakehouse-api:
+        condition: service_healthy
+    networks:
+      - idlr_net
+
   geo-innovation-temporal-scheduler:
     build:
       context: .
@@ -1515,6 +1567,7 @@ services:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/mapping_alerts.yml:/etc/prometheus/rules/mapping_alerts.yml:ro
       - ./monitoring/context_globe_alerts.yml:/etc/prometheus/rules/context_globe_alerts.yml:ro
+      - ./monitoring/stakeholder_journey_alerts.yml:/etc/prometheus/rules/stakeholder_journey_alerts.yml:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"

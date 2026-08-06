@@ -13,6 +13,7 @@ alerting:
 rule_files:
   - /etc/prometheus/rules/mapping_alerts.yml
   - /etc/prometheus/rules/context_globe_alerts.yml
+  - /etc/prometheus/rules/stakeholder_journey_alerts.yml
 
 scrape_configs:
   - job_name: 'idlr-pts-app'
@@ -47,6 +48,24 @@ scrape_configs:
     static_configs:
       - targets: ['lakehouse-api:8000']
     metrics_path: '/metrics'
+
+  - job_name: 'portfolio-integration-gateway'
+    static_configs:
+      - targets: ['portfolio-integration-gateway:8096']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  - job_name: 'portfolio-spatial-engine'
+    static_configs:
+      - targets: ['portfolio-spatial-engine:8097']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  - job_name: 'stakeholder-journey-temporal-worker'
+    static_configs:
+      - targets: ['stakeholder-journey-temporal-worker:9465']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
 
   - job_name: 'sedona-job-worker'
     static_configs:

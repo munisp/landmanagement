@@ -53,6 +53,7 @@ const RegistryOperationsCloud = lazy(() => import('./pages/RegistryOperationsClo
 const RightOfWayManager = lazy(() => import('./pages/RightOfWayManager'));
 const ValuationTaxOperations = lazy(() => import('./pages/ValuationTaxOperations'));
 const PortfolioProductHub = lazy(() => import('./pages/PortfolioProductHub'));
+const StakeholderJourneyHub = lazy(() => import('./pages/StakeholderJourneyHub'));
 const BorrowerPaymentPortal = lazy(() => import('./pages/BorrowerPaymentPortal'));
 const BrokerDashboard = lazy(() => import('./pages/BrokerDashboard'));
 const InvestorDashboard = lazy(() => import('./pages/InvestorDashboard'));
@@ -234,6 +235,7 @@ function Router() {
       <Route path="/right-of-way-manager" component={RightOfWayManager} />
       <Route path="/valuation-tax-operations" component={ValuationTaxOperations} />
       <Route path="/commercial-portfolio" component={PortfolioProductHub} />
+      <Route path="/journeys" component={StakeholderJourneyHub} />
       <Route path="/borrower-payment-portal" component={BorrowerPaymentPortal} />
       <Route path="/broker-dashboard" component={BrokerDashboard} />
       <Route path="/investor-dashboard" component={InvestorDashboard} />

@@ -38,7 +38,7 @@ type envelope struct {
 var accepted atomic.Uint64
 var denied atomic.Uint64
 var published atomic.Uint64
-var allowedProducts = map[string]bool{"registry-operations-cloud": true, "right-of-way-manager": true, "valuation-tax-operations": true, "acquisition-intelligence": true, "resilience-exposure-monitor": true, "property-data-api": true, "planning-analytics": true, "rural-agribusiness-hub": true, "trusted-service-directory": true}
+var allowedProducts = map[string]bool{"registry-operations-cloud": true, "right-of-way-manager": true, "valuation-tax-operations": true, "acquisition-intelligence": true, "resilience-exposure-monitor": true, "property-data-api": true, "planning-analytics": true, "rural-agribusiness-hub": true, "trusted-service-directory": true, "stakeholder-journey-engine": true}
 var allowedTypes = map[string]bool{"workflow.created": true, "workflow.reviewed": true, "workflow.closed": true, "evidence.recorded": true, "consent.recorded": true, "exposure.snapshot": true, "api.usage": true, "planning.report": true, "billing.usage": true}
 
 func required(name string) string {
@@ -52,6 +52,9 @@ func main() {
 	secret := []byte(required("PORTFOLIO_INTEGRATION_SECRET"))
 	if len(secret) < 32 {
 		log.Fatal("PORTFOLIO_INTEGRATION_SECRET must be at least 32 characters")
+	}
+	if strings.TrimSpace(os.Getenv("DAPR_PORTFOLIO_PUBLISH_URL")) == "" {
+		log.Fatal("DAPR_PORTFOLIO_PUBLISH_URL is required; middleware event delivery must not silently no-op")
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -126,7 +129,7 @@ func verify(r *http.Request, body, secret []byte) error {
 func publish(ctx context.Context, event envelope) error {
 	endpoint := strings.TrimSpace(os.Getenv("DAPR_PORTFOLIO_PUBLISH_URL"))
 	if endpoint == "" {
-		return nil
+		return errors.New("DAPR_PORTFOLIO_PUBLISH_URL is required")
 	}
 	raw, err := json.Marshal(event)
 	if err != nil {
@@ -137,6 +140,7 @@ func publish(ctx context.Context, event envelope) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("ce-type", "portfolio.event.v1")
 	client := &http.Client{Timeout: 5 * time.Second}
 	res, err := client.Do(req)
 	if err != nil {

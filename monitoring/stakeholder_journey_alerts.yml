@@ -1,0 +1,55 @@
+groups:
+  - name: idlr_stakeholder_journey_alerts
+    rules:
+      - alert: StakeholderJourneyWorkerUnavailable
+        expr: up{job="stakeholder-journey-temporal-worker"} == 0 or stakeholder_journey_temporal_worker_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: stakeholder_journeys
+        annotations:
+          summary: "The dedicated stakeholder-journey Temporal worker is unavailable"
+          runbook: "Check the worker container logs, Temporal namespace and mTLS configuration, PostgreSQL connectivity, and the configured stakeholder-journeys queue. Do not restart or complete individual workflows manually without preserving their intervention and evidence records."
+
+      - alert: StakeholderJourneyUnexpectedActivityErrorRate
+        expr: sum(rate(stakeholder_journey_activity_unexpected_errors_total[15m])) / clamp_min(sum(rate(stakeholder_journey_activity_outcomes_total[15m])) + sum(rate(stakeholder_journey_activity_unexpected_errors_total[15m])), 0.01) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: stakeholder_journeys
+        annotations:
+          summary: "Stakeholder journey worker unexpected activity error rate exceeds 5%"
+          runbook: "Review the structured worker logs and persisted journey-step failure evidence. Verify the Go gateway, Rust spatial engine, Python Lakehouse, HMAC secrets, and Bearer token. Human intervention and intentional decision boundaries are not orchestration failures."
+
+      - alert: StakeholderJourneyPortfolioGatewayUnavailable
+        expr: up{job="portfolio-integration-gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: stakeholder_journeys
+          dependency: go_gateway
+        annotations:
+          summary: "The Go portfolio event gateway required by stakeholder journeys is unavailable"
+          runbook: "Check the gateway /ready endpoint, Dapr sidecar, portfolio topic, and PORTFOLIO_INTEGRATION_SECRET parity. The worker must remain fail-closed until signed evidence delivery is restored."
+
+      - alert: StakeholderJourneySpatialEngineUnavailable
+        expr: up{job="portfolio-spatial-engine"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: stakeholder_journeys
+          dependency: rust_spatial_engine
+        annotations:
+          summary: "The Rust spatial engine required by bounded journey requests is unavailable"
+          runbook: "Check the engine /ready endpoint and PORTFOLIO_SPATIAL_ENGINE_SECRET parity. Do not substitute an unvalidated spatial result or auto-complete a rights, safety, or legal decision."
+
+      - alert: StakeholderJourneyLakehouseUnavailable
+        expr: up{job="lakehouse-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: stakeholder_journeys
+          dependency: python_lakehouse
+        annotations:
+          summary: "The Python Lakehouse required by bounded journey analytics is unavailable"
+          runbook: "Check Lakehouse health, PostgreSQL, Iceberg warehouse readiness, Sedona worker status, and LAKEHOUSE_INTERNAL_TOKEN parity. Keep analytics-dependent journey activities blocked until verified evidence is available."
