@@ -193,7 +193,7 @@
     "@types/supertest": "^7.2.1",
     "@types/uuid": "^11.0.0",
     "@types/ws": "^8.18.1",
-    "@vitejs/plugin-react": "^5.0.4",
+    "@vitejs/plugin-react": "^5.2.0",
     "add": "^2.0.6",
     "autoprefixer": "^10.5.4",
     "drizzle-kit": "^0.31.10",
